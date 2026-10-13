@@ -24,6 +24,9 @@
     duplicatePicture: null,
     codeConflict: null,
     codeMode: null,
+    sharedImport: null,
+    deviceReady: false,
+    sharedLinkStartup: false,
     imagePreviewUrl: null,
     notificationsEnabled: false,
     mutedPeople: new Set(),
@@ -61,7 +64,7 @@
   const ACCENT_THEME_KEY = "whos-free-accent-theme-v1";
   const ACCENT_THEMES = new Set(["blue", "violet", "rose", "mint", "orange"]);
   const BREAK_THRESHOLD_MINUTES = window.WhosFreeAvailability.PASSING_MINUTES;
-  const APP_URL = "https://hui3412.github.io/Whos-Free/";
+  const APP_URL = "https://hui3412.github.io/Ufree/";
 
   const els = {
     root: document.documentElement,
@@ -103,6 +106,7 @@
     addSchedulePdfButton: document.getElementById("addSchedulePdfButton"),
     parserStatus: document.getElementById("parserStatus"),
     importProgressOverlay: document.getElementById("importProgressOverlay"),
+    importProgressTitle: document.getElementById("importProgressTitle"),
     importProgressMessage: document.getElementById("importProgressMessage"),
     importPictureNameForm: document.getElementById("importPictureNameForm"),
     importPictureName: document.getElementById("importPictureName"),
@@ -124,6 +128,14 @@
     importCodeInput: document.getElementById("importCodeInput"),
     decodeCodeButton: document.getElementById("decodeCodeButton"),
     importCodeStatus: document.getElementById("importCodeStatus"),
+    importCodeField: document.getElementById("importCodeField"),
+    importCodeHelp: document.getElementById("importCodeHelp"),
+    sharedImportPreview: document.getElementById("sharedImportPreview"),
+    sharedImportPeople: document.getElementById("sharedImportPeople"),
+    exportSharePanel: document.getElementById("exportSharePanel"),
+    personSharePanel: document.getElementById("personSharePanel"),
+    exportFieldOptions: document.getElementById("exportFieldOptions"),
+    personExportFieldOptions: document.getElementById("personExportFieldOptions"),
     codeConflictPrompt: document.getElementById("codeConflictPrompt"),
     codeConflictMessage: document.getElementById("codeConflictMessage"),
     closeImportButton: document.getElementById("closeImportButton"),
@@ -1759,7 +1771,8 @@
     els.scheduleImageInput.click();
   }
 
-  function startImportProgress(message, pictureName = false) {
+  function startImportProgress(message, pictureName = false, title = "Importing schedules") {
+    els.importProgressTitle.textContent = title;
     if (state.importProgress) { updateImportProgress(message); return; }
     const overlay = els.importProgressOverlay;
     state.importProgress = {
@@ -1777,8 +1790,10 @@
     els.finishImportPictureName.textContent = "Done entering name";
     els.importPictureNameHelp.textContent = "Your name will carry over. If you're typing when loading finishes, we'll wait for you.";
     overlay.querySelector(".import-progress-spinner").hidden = false;
-    overlay.querySelector(".import-progress-note").textContent = "Please wait until the import finishes.";
+    overlay.querySelector(".import-progress-note").textContent = title === "Opening shared schedules" ? "Nothing is added until you confirm." : "Please wait until the import finishes.";
+    overlay.setAttribute("aria-busy", "true");
     overlay.hidden = false;
+    document.documentElement.classList.remove("shared-link-starting");
     document.body.style.overflow = "hidden";
     overlay.focus({ preventScroll: true });
     for (const { element } of state.importProgress.background) {
@@ -1836,6 +1851,7 @@
     if (!operation) return;
     state.importProgress = null;
     els.importProgressOverlay.hidden = true;
+    els.importProgressOverlay.removeAttribute("aria-busy");
     els.importPictureNameForm.hidden = true;
     for (const { element, inert, ariaHidden } of operation.background) {
       if (!inert) element.removeAttribute("inert");
@@ -2525,6 +2541,7 @@
     els.selectAllSchedules.checked = selected > 0 && selected === inputs.length;
     els.selectAllSchedules.indeterminate = selected > 0 && selected < inputs.length;
     els.exportCodeOutput.value = "";
+    resetShareLink(els.exportSharePanel);
     els.copyCodeButton.disabled = true;
     codeStatus(els.exportCodeStatus, `${selected} schedule${selected === 1 ? "" : "s"} selected.`);
   }
@@ -2532,6 +2549,8 @@
   function closeCodePanels() {
     if (state.isParsing) return;
     state.codeMode = null;
+    resetSharedImport();
+    resetShareLink(els.exportSharePanel);
     els.codeExportPanel.hidden = true;
     els.codeImportPanel.hidden = true;
     els.exportCodeOutput.value = "";
@@ -2541,10 +2560,12 @@
 
   function openCodePanel(mode) {
     if (state.isParsing || state.pendingImage || state.codeMode) return;
+    resetSharedImport();
     state.codeMode = mode;
     els.codeExportPanel.hidden = mode !== "export";
     els.codeImportPanel.hidden = mode !== "import";
     if (mode === "export") {
+      resetExportFields(els.exportFieldOptions);
       els.exportPeopleList.replaceChildren();
       for (const name of Object.keys(peopleMap()).sort(comparePeopleNames)) {
         const label = document.createElement("label");
@@ -2568,8 +2589,24 @@
     updateScheduleModal();
   }
 
-  function encodeSchedules(names) {
-    return window.WhosFreeShareCode.encode({ people: Object.fromEntries(names.map(name => [name, peopleMap()[name]])) });
+  function resetExportFields(options) {
+    options.open = false;
+    options.querySelectorAll("input").forEach(input => { input.checked = false; input.disabled = false; });
+    options.querySelector("button").disabled = false;
+  }
+
+  function encodeSchedules(names, options) {
+    const fields = [...options.querySelectorAll("input:checked")].map(input => input.dataset.exportField);
+    return window.WhosFreeShareCode.encode({ people: Object.fromEntries(names.map(name => [name, peopleMap()[name]])) }, { fields });
+  }
+
+  function personExportFieldsChanged() {
+    state.personWeekRequest++;
+    els.personWeekCode.value = "";
+    els.personWeekExport.hidden = true;
+    els.copyPersonWeekCodeButton.disabled = true;
+    resetShareLink(els.personSharePanel);
+    codeStatus(els.personWeekExportStatus, "Export again to apply these details.");
   }
 
   function shareCodeReadyMessage(count, code) {
@@ -2584,9 +2621,12 @@
     state.isParsing = true;
     updateScheduleModal();
     codeStatus(els.exportCodeStatus, "Creating the code on this device…");
+    els.exportFieldOptions.open = false;
+    resetShareLink(els.exportSharePanel);
     try {
-      const code = await encodeSchedules(names);
+      const code = await encodeSchedules(names, els.exportFieldOptions);
       els.exportCodeOutput.value = code;
+      populateShareLink(code, els.exportSharePanel);
       codeStatus(els.exportCodeStatus, shareCodeReadyMessage(names.length, code), "success");
       revealSection(els.exportCodeOutput.closest(".field-group"));
     } catch (error) {
@@ -2598,6 +2638,141 @@
   async function copyShareCode() {
     if (!els.exportCodeOutput.value || state.isParsing) return;
     await copyExportCode(els.exportCodeOutput, els.exportCodeStatus);
+  }
+
+  function resetShareLink(panel) {
+    panel.hidden = true;
+    panel.querySelector("textarea").value = "";
+    const qr = panel.querySelector(".share-qr");
+    qr.hidden = true;
+    qr.replaceChildren();
+    const button = panel.querySelector(".toggle-share-qr");
+    button.textContent = "Show QR";
+    button.setAttribute("aria-expanded", "false");
+    codeStatus(panel.querySelector(".share-link-status"), "");
+  }
+
+  function populateShareLink(code, panel) {
+    resetShareLink(panel);
+    try {
+      panel.querySelector("textarea").value = window.WhosFreeShareCode.createLink(code, APP_URL);
+      panel.hidden = false;
+    } catch { /* The original code remains available if link creation fails. */ }
+  }
+
+  async function copyScheduleLink(panel) {
+    const output = panel.querySelector("textarea"), status = panel.querySelector(".share-link-status");
+    if (!output.value) return;
+    try {
+      await navigator.clipboard.writeText(output.value);
+      codeStatus(status, "Link copied. Your friend can open it to review and add schedules.", "success");
+    } catch {
+      output.focus(); output.select();
+      codeStatus(status, "Select and copy the link above.");
+    }
+  }
+
+  function toggleScheduleQr(panel) {
+    const qr = panel.querySelector(".share-qr"), button = panel.querySelector(".toggle-share-qr");
+    const status = panel.querySelector(".share-link-status");
+    if (!qr.hidden) {
+      qr.hidden = true; button.textContent = "Show QR"; button.setAttribute("aria-expanded", "false"); return;
+    }
+    const link = panel.querySelector("textarea").value;
+    if (!link) return;
+    try {
+      if (link.length > 2331) throw new RangeError("QR selection too large");
+      const generator = window.qrcodegen;
+      if (!generator) throw new Error("QR generator unavailable");
+      const code = generator.QrCode.encodeText(link, generator.QrCode.Ecc.MEDIUM);
+      const ns = "http://www.w3.org/2000/svg", svg = document.createElementNS(ns, "svg");
+      const size = code.size + 8;
+      svg.setAttribute("viewBox", `0 0 ${size} ${size}`);
+      svg.setAttribute("role", "img");
+      svg.setAttribute("aria-label", "Scan to review and add these schedules in Ufree");
+      svg.setAttribute("shape-rendering", "crispEdges");
+      const background = document.createElementNS(ns, "rect");
+      background.setAttribute("width", String(size)); background.setAttribute("height", String(size)); background.setAttribute("fill", "#fff");
+      const path = document.createElementNS(ns, "path"), cells = [];
+      for (let y = 0; y < code.size; y++) for (let x = 0; x < code.size; x++) if (code.getModule(x, y)) cells.push(`M${x + 4},${y + 4}h1v1h-1z`);
+      path.setAttribute("d", cells.join("")); path.setAttribute("fill", "#000");
+      svg.append(background, path); qr.replaceChildren(svg); qr.hidden = false;
+      button.textContent = "Hide QR"; button.setAttribute("aria-expanded", "true");
+      codeStatus(status, code.version > 25 ? "Scan with your phone camera. This QR is dense; select fewer people if scanning is difficult." : "Scan with your phone camera, then open the link. Anyone with the QR or link can read these schedules.");
+      revealSection(qr);
+    } catch (error) {
+      codeStatus(status, error instanceof RangeError ? "Too much data for one QR. Select fewer schedules, or copy the code or link." : "QR could not be created. Refresh the app, or copy the link.", "error");
+    }
+  }
+
+  function resetSharedImport() {
+    state.sharedImport = null;
+    els.sharedImportPreview.hidden = true;
+    els.sharedImportPeople.replaceChildren();
+    els.importCodeField.hidden = false;
+    els.importCodeHelp.hidden = false;
+    els.decodeCodeButton.textContent = "Import schedules";
+    els.closeImportButton.textContent = "Done";
+  }
+
+  async function previewSharedImport(input) {
+    if (state.isParsing) return;
+    state.isParsing = true;
+    updateScheduleModal();
+    codeStatus(els.importCodeStatus, "Opening shared schedules on this device…");
+    startImportProgress("Reading the shared schedules…", false, "Opening shared schedules");
+    try {
+      // Let the loading popup paint before parsing a potentially large code.
+      await new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 0)));
+      const imported = await window.WhosFreeShareCode.decode(input);
+      validateData(imported);
+      state.sharedImport = imported;
+      els.sharedImportPeople.replaceChildren();
+      for (const [name, person] of Object.entries(imported.people)) {
+        const label = document.createElement("label"); label.className = "share-selection";
+        const checkbox = document.createElement("input"); checkbox.type = "checkbox"; checkbox.checked = true; checkbox.dataset.person = name;
+        checkbox.addEventListener("change", updateScheduleModal);
+        const caption = document.createElement("span");
+        caption.textContent = `${name} · ${person.classes.length} class${person.classes.length === 1 ? "" : "es"}${person.semester ? ` · ${person.semester}` : ""}`;
+        label.append(checkbox, caption); els.sharedImportPeople.append(label);
+      }
+      els.sharedImportPreview.hidden = false;
+      els.importCodeField.hidden = true;
+      els.importCodeHelp.hidden = true;
+      els.decodeCodeButton.textContent = "Add schedules";
+      els.closeImportButton.textContent = "Cancel";
+      codeStatus(els.importCodeStatus, "Add these schedules to this device? Existing duplicates are skipped.");
+    } catch (error) {
+      resetSharedImport();
+      codeStatus(els.importCodeStatus, error.message || "This shared link could not be opened.", "error");
+    } finally {
+      state.isParsing = false; updateScheduleModal();
+      endImportProgress(els.decodeCodeButton);
+      els.decodeCodeButton.focus({ preventScroll: true });
+    }
+  }
+
+  async function openSharedLink() {
+    if (!location.hash.startsWith("#import=")) return;
+    if (!state.deviceReady) {
+      state.sharedLinkStartup = true;
+      startImportProgress("Loading your saved schedules…", false, "Opening shared schedules");
+      return;
+    }
+    if (state.isParsing || state.pendingImage || state.codeMode) {
+      showToast("Finish the current import or export, then open the shared link again."); return;
+    }
+    const input = location.href;
+    // Consume the fragment before opening dialogs, so refresh cannot import it again.
+    try { history.replaceState(null, "", location.pathname + location.search); } catch { /* Read-only browser histories still show the preview. */ }
+    if (!els.personWeekModal.hidden) closePersonWeek();
+    if (!els.settingsModal.hidden) closeSettingsModal();
+    if (!els.groupWeekModal.hidden) closeGroupWeek();
+    if (!els.groupsModal.hidden) closeGroupsModal();
+    openScheduleModal();
+    openCodePanel("import");
+    els.importCodeInput.value = input;
+    await previewSharedImport(input);
   }
 
   async function copyExportCode(output, status) {
@@ -2633,13 +2808,16 @@
 
   async function importShareCode() {
     if (state.isParsing || state.codeMode !== "import") return;
+    if (!state.sharedImport && /^(?:https?:\/\/|WFL[56])/i.test(els.importCodeInput.value.trim())) { await previewSharedImport(els.importCodeInput.value); return; }
+    const selected = state.sharedImport ? [...els.sharedImportPeople.querySelectorAll("input:checked")].map(input => input.dataset.person) : null;
+    if (selected && !selected.length) return;
     if (!els.importCodeInput.value.trim()) { codeStatus(els.importCodeStatus, "Paste a code to import.", "error"); els.importCodeInput.focus(); return; }
     state.isParsing = true;
     updateScheduleModal();
     codeStatus(els.importCodeStatus, "Opening the code on this device…");
     startImportProgress("Opening the code on this device…");
     try {
-      const imported = await window.WhosFreeShareCode.decode(els.importCodeInput.value);
+      const imported = state.sharedImport ? { ...state.sharedImport, people: Object.fromEntries(selected.map(name => [name, state.sharedImport.people[name]])) } : await window.WhosFreeShareCode.decode(els.importCodeInput.value);
       validateData(imported);
       applyAutomaticSemester(imported);
       const result = await window.WhosFreeShareCode.merge(state.hasData ? state.data : null, imported, resolveCodeConflict);
@@ -2655,6 +2833,7 @@
       const choicesNote = result.replaced || result.kept ? ` Replaced ${result.replaced || 0}. Kept ${result.kept || 0} old schedules.` : "";
       codeStatus(els.importCodeStatus, warning || `Imported ${result.added} schedule${result.added === 1 ? "" : "s"}. Skipped ${result.skipped} identical schedules.${choicesNote}${renameNote}`, warning ? "error" : "success");
       showToast(warning || scheduleImportToast(before));
+      if (state.sharedImport) { resetSharedImport(); els.importCodeInput.value = ""; }
     } catch (error) {
       codeStatus(els.importCodeStatus, error.message || "The code could not be imported.", "error");
     } finally { finishCodeConflict(null); state.isParsing = false; updateScheduleModal(); endImportProgress(els.decodeCodeButton); els.decodeCodeButton.focus({ preventScroll: true }); }
@@ -2907,13 +3086,15 @@
     els.importCodeButton.disabled = importBusy;
     els.generateCodeButton.disabled = state.isParsing;
     els.copyCodeButton.disabled = state.isParsing || !els.exportCodeOutput.value;
-    els.decodeCodeButton.disabled = state.isParsing;
+    els.decodeCodeButton.disabled = state.isParsing || Boolean(state.sharedImport && !els.sharedImportPeople.querySelector("input:checked"));
     els.closeExportButton.disabled = state.isParsing;
     els.closeImportButton.disabled = state.isParsing;
     els.importCodeInput.disabled = state.isParsing;
     els.closeScheduleModal.disabled = Boolean(state.codeMode) && state.isParsing;
     els.selectAllSchedules.disabled = state.isParsing;
     els.exportPeopleList.querySelectorAll("input").forEach(input => { input.disabled = state.isParsing; });
+    els.exportFieldOptions.querySelectorAll("input, button").forEach(input => { input.disabled = state.isParsing; });
+    els.sharedImportPeople.querySelectorAll("input").forEach(input => { input.disabled = state.isParsing; });
     els.addSchedulePdfButton.disabled = importBusy;
     els.addScheduleImageButton.disabled = importBusy;
     els.manualScheduleButton.disabled = importBusy;
@@ -3195,6 +3376,8 @@
     els.personWeekTitle.textContent = displayName(name);
     els.personWeekSemester.textContent = scheduleLabel(person, true);
     els.personWeekExport.hidden = true;
+    resetExportFields(els.personExportFieldOptions);
+    resetShareLink(els.personSharePanel);
     els.personWeekCode.value = "";
     els.copyPersonWeekCodeButton.disabled = true;
     els.exportPersonScheduleButton.disabled = false;
@@ -3259,14 +3442,18 @@
     if (!name || !peopleMap()[name] || els.exportPersonScheduleButton.disabled) return;
     const request = ++state.personWeekRequest;
     els.exportPersonScheduleButton.disabled = true;
+    els.personExportFieldOptions.open = false;
+    els.personExportFieldOptions.querySelectorAll("input, button").forEach(input => { input.disabled = true; });
     els.copyPersonWeekCodeButton.disabled = true;
     els.personWeekExport.hidden = true;
     els.personWeekCode.value = "";
     codeStatus(els.personWeekExportStatus, "Creating the code on this device…");
+    resetShareLink(els.personSharePanel);
     try {
-      const code = await encodeSchedules([name]);
+      const code = await encodeSchedules([name], els.personExportFieldOptions);
       if (request !== state.personWeekRequest) return;
       els.personWeekCode.value = code;
+      populateShareLink(code, els.personSharePanel);
       els.personWeekExport.hidden = false;
       els.copyPersonWeekCodeButton.disabled = false;
       codeStatus(els.personWeekExportStatus, shareCodeReadyMessage(1, code), "success");
@@ -3274,7 +3461,10 @@
     } catch (error) {
       if (request === state.personWeekRequest) codeStatus(els.personWeekExportStatus, error.message || "The code could not be created.", "error");
     } finally {
-      if (request === state.personWeekRequest) els.exportPersonScheduleButton.disabled = false;
+      if (request === state.personWeekRequest) {
+        els.exportPersonScheduleButton.disabled = false;
+        els.personExportFieldOptions.querySelectorAll("input, button").forEach(input => { input.disabled = false; });
+      }
     }
   }
 
@@ -3666,7 +3856,19 @@
       exportSelectionChanged();
     });
     els.generateCodeButton.addEventListener("click", generateShareCode);
+    for (const options of [els.exportFieldOptions, els.personExportFieldOptions]) {
+      const changed = options === els.exportFieldOptions ? exportSelectionChanged : personExportFieldsChanged;
+      options.addEventListener("change", changed);
+      options.querySelector(".export-include-all").addEventListener("click", () => {
+        options.querySelectorAll("input").forEach(input => { input.checked = true; });
+        changed();
+      });
+    }
     els.copyCodeButton.addEventListener("click", copyShareCode);
+    for (const panel of [els.exportSharePanel, els.personSharePanel]) {
+      panel.querySelector(".copy-share-link").addEventListener("click", () => copyScheduleLink(panel));
+      panel.querySelector(".toggle-share-qr").addEventListener("click", () => toggleScheduleQr(panel));
+    }
     els.decodeCodeButton.addEventListener("click", importShareCode);
     els.codeConflictPrompt.addEventListener("click", event => {
       const button = event.target.closest("[data-code-conflict-action]");
@@ -3674,6 +3876,7 @@
     });
     els.closeExportButton.addEventListener("click", closeCodePanels);
     els.closeImportButton.addEventListener("click", closeCodePanels);
+    window.addEventListener("hashchange", openSharedLink);
     els.removeSchedulesButton.addEventListener("click", removeSchedules);
     els.undoChangesButton.addEventListener("click", undoRecentScheduleChange);
     els.undoScheduleChangesButton.addEventListener("click", undoRecentScheduleChange);
@@ -3702,12 +3905,17 @@
       }
       const groupModal = !els.personWeekModal.hidden ? els.personWeekModal : !els.groupWeekModal.hidden ? els.groupWeekModal : !els.groupsModal.hidden ? els.groupsModal : null;
       if (event.key === "Tab" && groupModal) {
-        const focusable = [...groupModal.querySelectorAll('button, input, textarea, [tabindex="0"]')].filter(item => !item.disabled && !item.closest("[hidden]"));
+        const focusable = [...groupModal.querySelectorAll('button, input, textarea, summary, [tabindex="0"]')].filter(item => {
+          const closed = item.closest("details:not([open])");
+          return !item.disabled && !item.closest("[hidden]") && (!closed || closed.querySelector(":scope > summary") === item);
+        });
         const first = focusable[0], last = focusable[focusable.length - 1];
         if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
         else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
       }
       if (event.key !== "Escape") return;
+      const exportMenu = [els.exportFieldOptions, els.personExportFieldOptions].find(menu => menu.open && !menu.closest("[hidden]"));
+      if (exportMenu) { event.preventDefault(); exportMenu.open = false; exportMenu.querySelector("summary").focus(); return; }
       if (state.codeConflict) { event.preventDefault(); finishCodeConflict("old"); return; }
       if (state.pendingPersonHold) {
         window.clearTimeout(state.pendingPersonHold.timer); state.pendingPersonHold = null;
@@ -3766,7 +3974,7 @@
     if (!("serviceWorker" in navigator)) return;
     if (location.protocol !== "https:" && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") return;
 
-    navigator.serviceWorker.register("./service-worker.js?v=64", { updateViaCache: "none" })
+    navigator.serviceWorker.register("./service-worker.js?v=67", { updateViaCache: "none" })
       .then(registration => registration.update())
       .catch(() => {
         // The app works normally even if PWA caching isn't available.
@@ -3801,6 +4009,7 @@
     updateSettingsModal();
     registerServiceWorker();
     requestAnimationFrame(animateAppEntrance);
+    openSharedLink();
 
     loadSchedulesFromDevice().then(() => {
       cleanPeoplePreferences();
@@ -3808,6 +4017,10 @@
       refresh({ preserveScroll: true });
       updateSettingsModal();
       checkBreakNotifications();
+      state.deviceReady = true;
+      if (state.sharedLinkStartup && !location.hash.startsWith("#import=")) endImportProgress();
+      state.sharedLinkStartup = false;
+      openSharedLink();
     });
 
     window.setInterval(() => {
@@ -3820,3 +4033,4 @@
 
   init();
 })();
+

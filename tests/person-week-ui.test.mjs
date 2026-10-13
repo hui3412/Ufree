@@ -62,7 +62,7 @@ test("full week includes exact times and weekends; direct export uses the canoni
     const decoded = await window.WhosFreeShareCode.decode(code);
     assert.deepEqual(Object.keys(decoded.people), ["Alice"]);
     assert.equal(decoded.people.Alice.classes[0].start, "07:07");
-    assert.equal(decoded.people.Alice.classes[0].instructor, "de la Cruz");
+    assert.equal(decoded.people.Alice.classes[0].instructor, null);
     assert.equal(decoded.people.Alice.classes[0].course_code, null);
     assert.equal(decoded.people.Alice.classes.length, 3);
     assert.match(el("personWeekExportStatus").textContent, /Code ready for 1 schedule/);
@@ -88,7 +88,7 @@ test("empty schedules export correctly, focus stays in the dialog, and backdrop 
     assert.equal(el("personWeekEmpty").hidden, false);
     assert.equal(window.document.activeElement, el("closePersonWeekModal"));
     window.document.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Tab", shiftKey: true, bubbles: true, cancelable: true }));
-    assert.equal(window.document.activeElement, el("exportPersonScheduleButton"));
+    assert.equal(window.document.activeElement, el("personExportFieldOptions").querySelector("summary"));
     el("exportPersonScheduleButton").click();
     await wait(() => !el("exportPersonScheduleButton").disabled);
     const decoded = await window.WhosFreeShareCode.decode(el("personWeekCode").value);
@@ -136,3 +136,4 @@ test("a finished export cannot leak into a different person's newly opened sched
     assert.equal(el("exportPersonScheduleButton").disabled, false);
   } finally { await window.happyDOM.abort(); }
 });
+

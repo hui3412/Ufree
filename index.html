@@ -25,7 +25,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" type="image/png" href="assets/favicon.png">
   <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
-  <link rel="stylesheet" href="styles.css?v=64">
+  <link rel="stylesheet" href="styles.css?v=67">
 </head>
 <body>
   <div class="app-shell">
@@ -154,8 +154,8 @@
 
       <section class="schedule-action-section" aria-labelledby="shareCodeTitle">
         <div class="section-kicker">Send schedules</div>
-        <h3 id="shareCodeTitle">Share with a code</h3>
-        <p>Send a code to a friend, or paste theirs here. No cloud storage.</p>
+        <h3 id="shareCodeTitle">Share schedules</h3>
+        <p>Send a code, link or QR. No cloud storage.</p>
         <div class="modal-actions database-actions">
           <button id="exportSchedulesButton" class="secondary-button" type="button">Export</button>
           <button id="importCodeButton" class="secondary-button" type="button">Import</button>
@@ -164,10 +164,30 @@
           <h4>Choose schedules to export</h4>
           <label class="share-selection"><input id="selectAllSchedules" type="checkbox"><span>Select all</span></label>
           <div id="exportPeopleList" class="export-people-list"></div>
-          <button id="generateCodeButton" class="primary-button" type="button">Generate code</button>
+          <div class="export-generation-actions">
+            <button id="generateCodeButton" class="primary-button" type="button">Generate code</button>
+            <details id="exportFieldOptions" class="export-field-options">
+              <summary aria-label="Choose export details" title="Export details">…</summary>
+              <div class="export-options-menu" role="group" aria-label="Additional export details">
+                <label class="share-selection"><input type="checkbox" data-export-field="instructor"><span>Teacher’s full name</span></label>
+                <label class="share-selection"><input type="checkbox" data-export-field="course_code"><span>Course code</span></label>
+                <label class="share-selection"><input type="checkbox" data-export-field="section"><span>Section</span></label>
+                <label class="share-selection"><input type="checkbox" data-export-field="semester"><span>Semester</span></label>
+                <label class="share-selection"><input type="checkbox" data-export-field="extras"><span>Other saved schedule details</span></label>
+                <button class="secondary-button export-include-all" type="button">Include all</button>
+                <p class="share-code-note">More details make larger codes and QRs.</p>
+              </div>
+            </details>
+          </div>
           <label class="field-group share-code-field"><span>Export code</span><textarea id="exportCodeOutput" rows="5" readonly spellcheck="false" autocapitalize="off" autocomplete="off" aria-describedby="exportCodeStatus"></textarea></label>
-          <p class="share-code-note">Codes omit course codes and sections, and use instructor surnames. Saved schedules keep all details. Copy the full code; refresh <a href="https://hui3412.github.io/Whos-Free/">the app</a> before importing. Older codes still work.</p>
+          <p class="share-code-note">Names, times, classes and rooms by default. Use … to include more. Saved schedules keep all details.</p>
           <div id="exportCodeStatus" class="parser-status" role="status" aria-live="polite"></div>
+          <div id="exportSharePanel" class="schedule-share-link" hidden>
+            <label class="field-group"><span>Share link</span><textarea class="share-link-output" rows="2" readonly spellcheck="false" aria-label="Share link"></textarea></label>
+            <div class="modal-actions"><button class="secondary-button copy-share-link" type="button">Copy link</button><button class="secondary-button toggle-share-qr" type="button" aria-expanded="false" aria-controls="exportQr">Show QR</button></div>
+            <div id="exportQr" class="share-qr" hidden></div>
+            <p class="share-link-status parser-status" role="status" aria-live="polite"></p>
+          </div>
           <div class="modal-actions">
             <button id="copyCodeButton" class="secondary-button" type="button" disabled>Copy code</button>
             <button id="closeExportButton" class="secondary-button" type="button">Done</button>
@@ -175,8 +195,12 @@
         </div>
         <div id="codeImportPanel" class="share-code-panel" hidden>
           <h4>Import a friend’s schedules</h4>
-          <p>Paste the full code, including special characters. Duplicates are skipped; you’ll choose how to handle conflicting schedules.</p>
-          <label class="field-group share-code-field"><span>Code from your friend</span><textarea id="importCodeInput" rows="5" maxlength="1800000" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></label>
+          <p id="importCodeHelp">Paste a code or share link. Duplicates are skipped; conflicting schedules need your choice.</p>
+          <label id="importCodeField" class="field-group share-code-field"><span>Code or link from your friend</span><textarea id="importCodeInput" rows="5" maxlength="1800000" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></label>
+          <div id="sharedImportPreview" hidden>
+            <p>Choose the schedules to add. Nothing is saved until you confirm.</p>
+            <div id="sharedImportPeople" class="export-people-list"></div>
+          </div>
           <div id="importCodeStatus" class="parser-status" role="status" aria-live="polite"></div>
           <div id="codeConflictPrompt" class="share-code-panel" role="group" aria-labelledby="codeConflictMessage" hidden>
             <p id="codeConflictMessage" role="alert"></p>
@@ -366,11 +390,31 @@
       </div>
       <p id="personWeekEmpty" class="settings-description" hidden>No classes scheduled.</p>
       <div class="review-grid-scroll" tabindex="0" aria-label="Full weekly schedule. Scroll horizontally for more days."><div id="personWeekGrid" class="review-grid person-week-grid"></div></div>
-      <button id="exportPersonScheduleButton" class="primary-button" type="button">Export this schedule</button>
+      <div class="export-generation-actions">
+        <button id="exportPersonScheduleButton" class="primary-button" type="button">Export this schedule</button>
+        <details id="personExportFieldOptions" class="export-field-options">
+          <summary aria-label="Choose export details" title="Export details">…</summary>
+          <div class="export-options-menu" role="group" aria-label="Additional export details">
+            <label class="share-selection"><input type="checkbox" data-export-field="instructor"><span>Teacher’s full name</span></label>
+            <label class="share-selection"><input type="checkbox" data-export-field="course_code"><span>Course code</span></label>
+            <label class="share-selection"><input type="checkbox" data-export-field="section"><span>Section</span></label>
+            <label class="share-selection"><input type="checkbox" data-export-field="semester"><span>Semester</span></label>
+            <label class="share-selection"><input type="checkbox" data-export-field="extras"><span>Other saved schedule details</span></label>
+            <button class="secondary-button export-include-all" type="button">Include all</button>
+            <p class="share-code-note">More details make larger codes and QRs.</p>
+          </div>
+        </details>
+      </div>
       <div id="personWeekExport" class="share-code-panel" hidden>
         <label class="field-group share-code-field"><span>Export code</span><textarea id="personWeekCode" rows="5" readonly spellcheck="false" autocapitalize="off" aria-describedby="personWeekExportStatus"></textarea></label>
-        <p class="share-code-note">Codes omit course codes and sections, and use instructor surnames. Your saved schedule keeps all details.</p>
+        <p class="share-code-note">Names, times, classes and rooms by default. Your saved schedule keeps all details.</p>
         <button id="copyPersonWeekCodeButton" class="secondary-button" type="button" disabled>Copy code</button>
+        <div id="personSharePanel" class="schedule-share-link" hidden>
+          <label class="field-group"><span>Share link</span><textarea class="share-link-output" rows="2" readonly spellcheck="false" aria-label="Share link"></textarea></label>
+          <div class="modal-actions"><button class="secondary-button copy-share-link" type="button">Copy link</button><button class="secondary-button toggle-share-qr" type="button" aria-expanded="false" aria-controls="personQr">Show QR</button></div>
+          <div id="personQr" class="share-qr" hidden></div>
+          <p class="share-link-status parser-status" role="status" aria-live="polite"></p>
+        </div>
       </div>
       <p id="personWeekExportStatus" class="parser-status" role="status" aria-live="polite"></p>
     </section>
@@ -405,12 +449,26 @@
     </div>
   </div>
 
+  <script id="sharedLinkBootstrap">
+    // Show feedback before deferred scripts or the local database finish loading.
+    if (location.hash.startsWith("#import=")) {
+      const loading = document.getElementById("importProgressOverlay");
+      document.getElementById("importProgressTitle").textContent = "Opening shared schedules";
+      document.getElementById("importProgressMessage").textContent = "Loading the app…";
+      loading.querySelector(".import-progress-note").textContent = "Nothing is added until you confirm.";
+      loading.setAttribute("aria-busy", "true");
+      loading.hidden = false;
+      document.documentElement.classList.add("shared-link-starting");
+    }
+  </script>
   <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js" defer></script>
-  <script src="schedule-parser.js?v=64" defer></script>
-  <script src="schedule-image-parser.js?v=64" defer></script>
-  <script src="schedule-availability.js?v=64" defer></script>
-  <script src="schedule-share-code.js?v=64" defer></script>
-  <script src="schedule-groups.js?v=64" defer></script>
-  <script src="app.js?v=64" defer></script>
+  <script src="schedule-parser.js?v=67" defer></script>
+  <script src="schedule-image-parser.js?v=67" defer></script>
+  <script src="schedule-availability.js?v=67" defer></script>
+  <script src="schedule-share-code.js?v=67" defer></script>
+  <script src="assets/qr/qrcodegen.js?v=67" defer></script>
+  <script src="schedule-groups.js?v=67" defer></script>
+  <script src="app.js?v=67" defer></script>
 </body>
 </html>
+
