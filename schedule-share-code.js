@@ -488,9 +488,41 @@ return {encode,decode,configs};
     if (code.length > MAX_CODE) throw new Error("This selection is too large. Export fewer schedules at once.");
     return code;
   }
+  function linkCode(input) {
+    if (typeof input !== "string" || input.length > MAX_CODE) throw new Error("This shared link is too large. Ask for fewer schedules.");
+    let value = input.trim();
+    if (/^https?:\/\//i.test(value)) {
+      const url = new URL(value);
+      value = new URLSearchParams(url.hash.slice(1)).get("import");
+      if (!value) throw new Error("This link does not contain schedules.");
+    }
+    if (!value.startsWith("WFL5")) return value;
+    if (!/^WFL5[JDZBRSTUV][A-Za-z0-9_-]+$/.test(value)) throw new Error("The shared link is incomplete or changed.");
+    const text = value.slice(5);
+    if (text.length > Math.ceil((MAX_BYTES + 4) * 4 / 3) || text.length % 4 === 1) throw new Error("The shared link is incomplete or too large.");
+    const binary = atob(text.replace(/-/g, "+").replace(/_/g, "/"));
+    const bytes = Uint8Array.from(binary, char => char.charCodeAt(0));
+    if (urlBytes(bytes) !== text) throw new Error("The shared link is incomplete or changed.");
+    return `WF5${value[4]}${base15(bytes)}`;
+  }
+  function urlBytes(bytes) {
+    let binary = "";
+    for (const byte of bytes) binary += String.fromCharCode(byte);
+    return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+  function createLink(code, baseUrl) {
+    if (typeof code !== "string" || code.length > MAX_CODE || !/^WF5[JDZBRSTUV]/.test(code)) throw new Error("Generate a new export code first.");
+    const checked = unbase15(code.slice(4));
+    if (checked.length < 4 || checksum(checked.subarray(4)) !== new DataView(checked.buffer).getUint32(0, true)) throw new Error("The code is incomplete or changed.");
+    const url = new URL(baseUrl);
+    if (!/^https?:$/.test(url.protocol)) throw new Error("Use an HTTP or HTTPS app address.");
+    url.search = "";
+    url.hash = `import=WFL5${code[3]}${urlBytes(checked)}`;
+    return url.href;
+  }
   async function decode(input) {
     if (typeof input !== "string" || input.length > MAX_CODE) throw new Error("This code is too large. Ask for fewer schedules in one code.");
-    const code = input.replace(/\s+/g, "");
+    const code = linkCode(input).replace(/\s+/g, "");
     const decompress = async (bytes, format) => {
       if (typeof DecompressionStream !== "function") throw new Error("Your browser cannot open this compressed code. Update Safari or use a recent Chrome or Firefox.");
       try { return await transform(bytes, DecompressionStream, format); }
@@ -591,6 +623,7 @@ return {encode,decode,configs};
     }
     return { data: { ...(existing || {}), schema_version: existing?.schema_version || 1, people }, added, replaced, skipped, kept, renamed };
   }
-  globalThis.WhosFreeShareCode = { encode, decode, merge, __test: { base14, unbase14, wrap, MAX_BYTES, sameSchedule, pack, packCompact, packBinary, unpackBinary, familyName, tokenize, untokenize, WORDS, WORDS5, DICTS5, base15, unbase15, alphabet15, factor5 } };
+  globalThis.WhosFreeShareCode = { encode, decode, merge, createLink, __test: { base14, unbase14, wrap, MAX_BYTES, sameSchedule, pack, packCompact, packBinary, unpackBinary, familyName, tokenize, untokenize, WORDS, WORDS5, DICTS5, base15, unbase15, alphabet15, factor5 } };
 })();
+
 

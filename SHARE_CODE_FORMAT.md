@@ -6,6 +6,30 @@ on the receiving device. All versions remain self-contained and work offline.
 
 ## WF5 schedule structure and dense text
 
+### Direct links and QR sharing
+
+The same WF5 payload can travel in a URL fragment:
+`https://hui3412.github.io/Ufree/#import=WFL5<mode><base64url>`.
+The bytes are the existing four-byte little-endian CRC32 followed by the payload.
+Base64url has no padding. `WFL5` distinguishes URL transport from the dense
+Unicode `WF5` message format; mode and all existing decoding rules are unchanged.
+Canonical base64url, checksum, payload and decompression limits are validated.
+The importer accepts complete share links, bare WFL5 values and old WF1–WF5
+message codes. Old codes may also appear in an `import` fragment.
+
+The fragment is processed on-device after the saved database loads, then removed
+from the current address. Links open a person-selection preview with Add schedules
+and Cancel. No schedules are saved until confirmation. The existing atomic merge,
+duplicate skipping, richer-local-detail preservation, conflict choices and Undo
+apply. Pasting a link also opens this preview. Anyone holding a link or QR can
+read its schedules; the format is not encrypted.
+
+QR generation uses a locally bundled MIT-licensed Project Nayuki encoder with
+medium error correction and a four-module quiet zone. A complete ASCII URL over
+2,331 bytes is rejected for QR display; the original code and full link remain
+available. Dense QR codes suggest selecting fewer schedules. Both collection and
+single-person exports offer Copy link and Show QR. QR support is cached offline.
+
 WF5 retains exactly the compact fields of WF4. New exports still omit course
 codes/sections and infer instructor surnames without changing the local database.
 All released WF4 JSON and binary layouts remain export candidates. The encoder
@@ -194,3 +218,4 @@ compatibility fixtures were generated using the original WF1 and WF2 encoders.
 WF1/WF2/WF3 shared fields remain name, optional semester, weekday, exact start/end times,
 course, course code, section, room, instructor and kind. Local nicknames, groups,
 Undo history, source paths and OCR review markers are not shared.
+
