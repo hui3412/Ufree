@@ -2722,10 +2722,10 @@ button:disabled { cursor: not-allowed; }
 .home-header-controls .header-data-button { min-height: 40px; white-space: nowrap; }
 .home-header-controls .nav-icon-button { width: 40px; min-width: 40px; height: 40px; min-height: 40px; padding: 0; }
 .home-header-controls .nav-icon-button svg { width: 16px; height: 16px; }
-.home-share-row { display: flex; align-items: center; gap: 10px; }
+.home-undo-row { display: flex; align-items: center; gap: 10px; }
 .action-icon-button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; }
 .action-icon-button svg { flex: 0 0 auto; width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-#homeShareButton { min-width: 110px; }
+#settingsButton svg { width: 18px; height: 18px; }
 #showGroupsToggle.group-label-button { width: auto; padding: 0 10px; gap: 7px; }
 .group-toggle-label { font-size: .7rem; font-weight: 600; letter-spacing: .045em; }
 .export-selection { margin: 0 0 18px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 8px; }
@@ -2745,7 +2745,7 @@ button:disabled { cursor: not-allowed; }
   .app-header { flex-wrap: wrap; }
   .home-header-controls { width: 100%; align-items: stretch; }
   .home-header-controls .header-actions { width: 100%; }
-  .home-share-row { justify-content: space-between; }
+  .home-undo-row { justify-content: flex-start; }
 }
 @media (max-width: 350px) {
   .home-header-controls .header-actions { gap: 6px; }

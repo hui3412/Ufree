@@ -78,7 +78,6 @@
     helpButton: document.getElementById("helpButton"),
     helpModal: document.getElementById("helpModal"),
     closeHelpModal: document.getElementById("closeHelpModal"),
-    homeShareButton: document.getElementById("homeShareButton"),
     homeExportButton: document.getElementById("homeExportButton"),
     undoChangesButton: document.getElementById("undoChangesButton"),
     undoScheduleChangesButton: document.getElementById("undoScheduleChangesButton"),
@@ -2577,14 +2576,14 @@
     if (fromHome) {
       els.scheduleModal.hidden = true;
       document.body.style.overflow = "";
-      (returnFocus || els.homeShareButton).focus({ preventScroll: true });
+      (returnFocus || els.homeExportButton).focus({ preventScroll: true });
     }
   }
 
   function openQuickExport(event) {
     if (state.isParsing || state.pendingImage || state.codeMode || !Object.keys(peopleMap()).length) return;
     if (!els.helpModal.hidden) closeHelp();
-    state.quickExportReturnFocus = event?.currentTarget || els.homeShareButton;
+    state.quickExportReturnFocus = event?.currentTarget || els.homeExportButton;
     openScheduleModal();
     openCodePanel("export", true);
   }
@@ -3145,7 +3144,6 @@
     renderPeopleManager();
     const importBusy = state.isParsing || Boolean(state.pendingImage) || Boolean(state.codeMode);
     els.exportSchedulesButton.disabled = importBusy || peopleCount === 0;
-    els.homeShareButton.disabled = importBusy || peopleCount === 0;
     els.homeExportButton.disabled = importBusy || peopleCount === 0;
     els.importCodeButton.disabled = importBusy;
     els.generateCodeButton.disabled = state.isParsing;
@@ -3868,7 +3866,6 @@
       applyAccentTheme(button.dataset.colorTheme, true);
     });
     els.scheduleDataButton.addEventListener("click", openScheduleModal);
-    els.homeShareButton.addEventListener("click", openQuickExport);
     els.homeExportButton.addEventListener("click", openQuickExport);
     els.helpButton.addEventListener("click", openHelp);
     els.closeHelpModal.addEventListener("click", closeHelp);
@@ -4049,7 +4046,7 @@
     if (!("serviceWorker" in navigator)) return;
     if (location.protocol !== "https:" && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") return;
 
-    navigator.serviceWorker.register("./service-worker.js?v=68", { updateViaCache: "none" })
+    navigator.serviceWorker.register("./service-worker.js?v=69", { updateViaCache: "none" })
       .then(registration => registration.update())
       .catch(() => {
         // The app works normally even if PWA caching isn't available.

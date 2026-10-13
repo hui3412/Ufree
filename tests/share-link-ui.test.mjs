@@ -213,11 +213,11 @@ test("single-person three-dot choices preserve full teacher names and course det
   } finally { a.window.happyDOM.abort(); }
 });
 
-test("home Share defaults to Everyone in a collapsed selection and supports each export action directly", async () => {
+test("home export defaults to Everyone in a collapsed selection and supports each export action directly", async () => {
   const a = await app(data);
   try {
     const before = a.stored();
-    a.el("homeShareButton").click();
+    a.el("homeExportButton").click();
     assert.equal(a.el("scheduleModal").hidden, false);
     assert.equal(a.el("scheduleModalTitle").textContent, "Quick share");
     assert.equal(a.el("exportSelection").open, false);
@@ -245,7 +245,7 @@ test("home Share defaults to Everyone in a collapsed selection and supports each
     assert.deepEqual(Object.keys((await a.window.WhosFreeShareCode.decode(a.copied())).people), ["Alice"]);
     assert.equal(a.stored(), before);
     a.el("closeExportButton").click(); assert.equal(a.el("scheduleModal").hidden, true);
-    assert.equal(a.window.document.activeElement.id, "homeShareButton");
+    assert.equal(a.window.document.activeElement.id, "homeExportButton");
     assert.equal(a.window.document.body.style.overflow, "");
   } finally { a.window.happyDOM.abort(); }
 });
@@ -271,12 +271,12 @@ test("navigation keeps four actions together, the export icon opens quick share,
   } finally { a.window.happyDOM.abort(); }
 });
 
-test("empty devices disable home export entry points and failed quick exports remain retryable", async () => {
+test("empty devices disable the home export entry point and failed quick exports remain retryable", async () => {
   const empty = await app(); const a = await app(data);
   try {
-    assert.equal(empty.el("homeShareButton").disabled, true); assert.equal(empty.el("homeExportButton").disabled, true);
-    empty.el("homeShareButton").click(); assert.equal(empty.el("scheduleModal").hidden, true);
-    a.el("homeShareButton").click();
+    assert.equal(empty.el("homeExportButton").disabled, true); assert.equal(empty.el("homeShareButton"), null);
+    empty.el("homeExportButton").click(); assert.equal(empty.el("scheduleModal").hidden, true);
+    a.el("homeExportButton").click();
     const encode = a.window.WhosFreeShareCode.encode;
     a.window.WhosFreeShareCode.encode = async () => { throw Error("Try exporting again"); };
     a.el("exportQrButton").click(); await a.wait(() => !a.el("generateCodeButton").disabled);
@@ -291,7 +291,7 @@ test("quick Copy Link exposes a selectable link when the clipboard is unavailabl
   const a = await app(data);
   try {
     a.window.navigator.clipboard.writeText = async () => { throw Error("Clipboard denied"); };
-    a.el("homeShareButton").click(); a.el("copyExportLinkButton").click();
+    a.el("homeExportButton").click(); a.el("copyExportLinkButton").click();
     await a.wait(() => !a.el("generateCodeButton").disabled);
     const panel = a.el("exportSharePanel"), output = panel.querySelector("textarea");
     assert.equal(panel.hidden, false); assert.equal(panel.querySelector(".share-link-field").hidden, false);
