@@ -108,7 +108,7 @@ test("compact export preserves local details and reimport skips without a confli
     const code = sender.el("exportCodeOutput").value;
     const item = (await sender.window.WhosFreeShareCode.decode(code)).people.Student.classes[0];
     assert.equal(item.course_code, null); assert.equal(item.section, null);
-    assert.equal(item.instructor, "de la Cruz"); assert.equal(item.course, "Differential Calculus");
+    assert.equal(item.instructor, null); assert.equal(item.course, "Differential Calculus");
     assert.match(sender.el("exportCodeStatus").textContent, /Fits a 1,000-character message/);
     assert.equal(JSON.stringify(sender.stored()), before);
     sender.el("closeExportButton").click(); sender.el("importCodeButton").click();
@@ -240,3 +240,4 @@ test("PDF and JSON tools are closed behind a bottom menu without moving the earl
     assert.equal(menu.open, false, "advanced tools start hidden on each new visit");
   } finally { await receiver.window.happyDOM.abort(); }
 });
+

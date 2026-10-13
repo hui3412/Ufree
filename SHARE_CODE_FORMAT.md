@@ -1,8 +1,45 @@
 # Share-code compatibility
 
-New exports use WF5. Import supports WF1, WF2, WF3, WF4 and WF5. Do not remove an older
+New app exports use WF6. Import supports WF1, WF2, WF3, WF4, WF5 and WF6. Do not remove an older
 decoder when introducing a later version. New versions require an updated app
 on the receiving device. All versions remain self-contained and work offline.
+
+## WF6 selected export details
+
+Collection and single-person exports default to person names, exact weekdays and
+times, busy-block kinds, course titles and rooms. The three-dot menu optionally
+includes full stored instructor names, course codes, sections, semester labels
+and other saved person/class details. Include all selects every extra field.
+Changing selections clears stale codes, links and QRs. Exports never edit local
+data. App-level preferences such as groups, nicknames and Undo are not schedules
+and remain outside these exports.
+
+WF6 retains the WF5 15-bit envelope, checksum and mode characters. Before optional
+compression, its payload starts with a field-selection byte and a canonical
+unsigned base-128 varint giving the core payload length. Bits 0–4 select instructor,
+course code, section, semester and extra metadata, respectively. Other bits are
+rejected. The core uses the existing JSON, binary or structural serializers.
+Selected instructor strings retain their full original text. Full JSON rows are
+used when course codes or sections are selected; structural candidates are used
+when neither is selected. Original JSON and binary candidates remain fallbacks.
+
+Optional extra metadata follows the core as UTF-8 JSON. It is an array of
+`[personIndex, personExtras, [[classIndex, classExtras], ...]]` records. Empty
+metadata needs no tail. Reserved core fields cannot appear in metadata, and
+indices, duplicate references, byte lengths and decompression are validated.
+Prototype-like JSON keys remain ordinary own properties. No metadata tail is
+accepted unless its selection bit is set.
+
+Imports expose the in-memory `share_profile: "selected"` and `share_fields`
+markers. Duplicate detection compares only the selected shared fields, preserving
+richer local schedules on identical reimports. Selected timetable or detail
+changes still require the existing conflict choice. These markers are not saved
+in the merged database. WF1–WF5 keep their existing comparison rules.
+
+Links use `#import=WFL6<mode><base64url>`, transporting the same checked bytes.
+All previous WFL5 links and WF1–WF5 codes still decode. Calling the encoder
+without field options retains its legacy WF5 behavior for compatibility; the
+app supplies explicit field options for every new export.
 
 ## WF5 schedule structure and dense text
 

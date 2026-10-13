@@ -2243,6 +2243,14 @@ input[type="time"],
 .review-passing { position: absolute; left: 3px; right: 3px; box-sizing: border-box; overflow: hidden; color: var(--muted); background: var(--input); font-size: 9px; pointer-events: none; }
 
 .schedule-share-link { margin-top: 16px; }
+.export-generation-actions { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.export-field-options { position: relative; flex: 0 0 auto; }
+.export-field-options summary { list-style: none; cursor: pointer; border: 1px solid var(--border); border-radius: 8px; min-width: 44px; min-height: 44px; display: grid; place-items: center; font-size: 22px; line-height: 1; background: var(--card); color: var(--text); }
+.export-field-options summary::-webkit-details-marker { display: none; }
+.export-field-options summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.export-options-menu { position: absolute; right: 0; top: calc(100% + 8px); z-index: 10; width: min(290px, calc(100vw - 64px)); padding: 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel); box-shadow: 0 8px 28px rgba(0, 0, 0, .2); }
+.export-options-menu .share-selection { margin: 0 0 10px; }
+.export-options-menu .share-code-note { margin-bottom: 0; }
 .share-link-output { width: 100%; resize: vertical; font-size: 12px; overflow-wrap: anywhere; }
 .share-qr { margin: 16px auto 0; max-width: 580px; background: #fff; border-radius: 8px; padding: 8px; }
 .share-qr svg { display: block; width: 100%; height: auto; }

@@ -25,7 +25,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" type="image/png" href="assets/favicon.png">
   <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
-  <link rel="stylesheet" href="styles.css?v=66">
+  <link rel="stylesheet" href="styles.css?v=67">
 </head>
 <body>
   <div class="app-shell">
@@ -164,9 +164,23 @@
           <h4>Choose schedules to export</h4>
           <label class="share-selection"><input id="selectAllSchedules" type="checkbox"><span>Select all</span></label>
           <div id="exportPeopleList" class="export-people-list"></div>
-          <button id="generateCodeButton" class="primary-button" type="button">Generate code</button>
+          <div class="export-generation-actions">
+            <button id="generateCodeButton" class="primary-button" type="button">Generate code</button>
+            <details id="exportFieldOptions" class="export-field-options">
+              <summary aria-label="Choose export details" title="Export details">…</summary>
+              <div class="export-options-menu" role="group" aria-label="Additional export details">
+                <label class="share-selection"><input type="checkbox" data-export-field="instructor"><span>Teacher’s full name</span></label>
+                <label class="share-selection"><input type="checkbox" data-export-field="course_code"><span>Course code</span></label>
+                <label class="share-selection"><input type="checkbox" data-export-field="section"><span>Section</span></label>
+                <label class="share-selection"><input type="checkbox" data-export-field="semester"><span>Semester</span></label>
+                <label class="share-selection"><input type="checkbox" data-export-field="extras"><span>Other saved schedule details</span></label>
+                <button class="secondary-button export-include-all" type="button">Include all</button>
+                <p class="share-code-note">More details make larger codes and QRs.</p>
+              </div>
+            </details>
+          </div>
           <label class="field-group share-code-field"><span>Export code</span><textarea id="exportCodeOutput" rows="5" readonly spellcheck="false" autocapitalize="off" autocomplete="off" aria-describedby="exportCodeStatus"></textarea></label>
-          <p class="share-code-note">Exports omit course codes and sections, and use instructor surnames. Saved schedules keep all details. Older codes still work.</p>
+          <p class="share-code-note">Names, times, classes and rooms by default. Use … to include more. Saved schedules keep all details.</p>
           <div id="exportCodeStatus" class="parser-status" role="status" aria-live="polite"></div>
           <div id="exportSharePanel" class="schedule-share-link" hidden>
             <label class="field-group"><span>Share link</span><textarea class="share-link-output" rows="2" readonly spellcheck="false" aria-label="Share link"></textarea></label>
@@ -376,10 +390,24 @@
       </div>
       <p id="personWeekEmpty" class="settings-description" hidden>No classes scheduled.</p>
       <div class="review-grid-scroll" tabindex="0" aria-label="Full weekly schedule. Scroll horizontally for more days."><div id="personWeekGrid" class="review-grid person-week-grid"></div></div>
-      <button id="exportPersonScheduleButton" class="primary-button" type="button">Export this schedule</button>
+      <div class="export-generation-actions">
+        <button id="exportPersonScheduleButton" class="primary-button" type="button">Export this schedule</button>
+        <details id="personExportFieldOptions" class="export-field-options">
+          <summary aria-label="Choose export details" title="Export details">…</summary>
+          <div class="export-options-menu" role="group" aria-label="Additional export details">
+            <label class="share-selection"><input type="checkbox" data-export-field="instructor"><span>Teacher’s full name</span></label>
+            <label class="share-selection"><input type="checkbox" data-export-field="course_code"><span>Course code</span></label>
+            <label class="share-selection"><input type="checkbox" data-export-field="section"><span>Section</span></label>
+            <label class="share-selection"><input type="checkbox" data-export-field="semester"><span>Semester</span></label>
+            <label class="share-selection"><input type="checkbox" data-export-field="extras"><span>Other saved schedule details</span></label>
+            <button class="secondary-button export-include-all" type="button">Include all</button>
+            <p class="share-code-note">More details make larger codes and QRs.</p>
+          </div>
+        </details>
+      </div>
       <div id="personWeekExport" class="share-code-panel" hidden>
         <label class="field-group share-code-field"><span>Export code</span><textarea id="personWeekCode" rows="5" readonly spellcheck="false" autocapitalize="off" aria-describedby="personWeekExportStatus"></textarea></label>
-        <p class="share-code-note">Codes omit course codes and sections, and use instructor surnames. Your saved schedule keeps all details.</p>
+        <p class="share-code-note">Names, times, classes and rooms by default. Your saved schedule keeps all details.</p>
         <button id="copyPersonWeekCodeButton" class="secondary-button" type="button" disabled>Copy code</button>
         <div id="personSharePanel" class="schedule-share-link" hidden>
           <label class="field-group"><span>Share link</span><textarea class="share-link-output" rows="2" readonly spellcheck="false" aria-label="Share link"></textarea></label>
@@ -434,13 +462,13 @@
     }
   </script>
   <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js" defer></script>
-  <script src="schedule-parser.js?v=66" defer></script>
-  <script src="schedule-image-parser.js?v=66" defer></script>
-  <script src="schedule-availability.js?v=66" defer></script>
-  <script src="schedule-share-code.js?v=66" defer></script>
-  <script src="assets/qr/qrcodegen.js?v=66" defer></script>
-  <script src="schedule-groups.js?v=66" defer></script>
-  <script src="app.js?v=66" defer></script>
+  <script src="schedule-parser.js?v=67" defer></script>
+  <script src="schedule-image-parser.js?v=67" defer></script>
+  <script src="schedule-availability.js?v=67" defer></script>
+  <script src="schedule-share-code.js?v=67" defer></script>
+  <script src="assets/qr/qrcodegen.js?v=67" defer></script>
+  <script src="schedule-groups.js?v=67" defer></script>
+  <script src="app.js?v=67" defer></script>
 </body>
 </html>
 

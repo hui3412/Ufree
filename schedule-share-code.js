@@ -5,6 +5,9 @@
   const FIRST = 0x4e00;
   const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
   const FIELDS = ["course", "course_code", "section", "room", "instructor"];
+  const EXPORT_FIELDS = ["instructor", "course_code", "section", "semester", "extras"];
+  const CLASS_KEYS = new Set(["day", "start", "end", "kind", ...FIELDS]);
+  const PERSON_KEYS = new Set(["classes", "semester"]);
   const MAX_BYTES = 1048576;
   const MAX_CODE = 1800000;
   const STEPS = [1, 5, 15, 30, 60];
@@ -447,11 +450,81 @@ return {encode,decode,configs};
     const checked = new Uint8Array(bytes.length + 4);
     new DataView(checked.buffer).setUint32(0, checksum(bytes), true);
     checked.set(bytes, 4);
-    return `WF${version}${mode}${(version === 5 ? base15(checked) : base14(checked))}`;
+    return `WF${version}${mode}${(version >= 5 ? base15(checked) : base14(checked))}`;
   }
-  async function encode(data) {
-    const payload = pack(data, true);
-    let bytes = new TextEncoder().encode(JSON.stringify(packCompact(payload, true)));
+  const extraFields = (value, reserved) => Object.fromEntries(Object.entries(value).filter(([key]) => !reserved.has(key)));
+  function selectedPerson(person, mask) {
+    return {
+      ...(mask & 16 ? extraFields(person, PERSON_KEYS) : {}),
+      ...(mask & 8 && person.semester !== undefined ? { semester: person.semester } : {}),
+      classes: (person.classes || []).map(item => ({
+        ...(mask & 16 ? extraFields(item, CLASS_KEYS) : {}),
+        day: item.day, start: item.start, end: item.end,
+        course: item.course || null, room: item.room || null,
+        kind: item.kind === "busy_block" ? "busy_block" : "class",
+        ...(mask & 1 ? { instructor: item.instructor || null } : {}),
+        ...(mask & 2 ? { course_code: item.course_code || null } : {}),
+        ...(mask & 4 ? { section: item.section || null } : {}),
+      })),
+    };
+  }
+  function fieldMask(fields) {
+    if (!Array.isArray(fields) || fields.some(field => !EXPORT_FIELDS.includes(field))) throw new Error("Select supported export details.");
+    return fields.reduce((mask, field) => mask | (1 << EXPORT_FIELDS.indexOf(field)), 0);
+  }
+  function selectedEnvelope(core, mask, extras) {
+    const length = []; let n = core.length;
+    do { const part = n % 128; n = Math.floor(n / 128); length.push(part | (n ? 128 : 0)); } while (n);
+    const bytes = new Uint8Array(1 + length.length + core.length + extras.length);
+    bytes[0] = mask; bytes.set(length, 1); bytes.set(core, 1 + length.length); bytes.set(extras, 1 + length.length + core.length);
+    if (bytes.length > MAX_BYTES) throw new Error("This selection is too large. Export fewer schedules at once.");
+    return bytes;
+  }
+  function readSelectedEnvelope(bytes) {
+    const invalid = () => { throw new Error("This code does not contain valid selected schedule data."); };
+    const mask = bytes[0]; if (mask === undefined || mask > 31) invalid();
+    let offset = 1, length = 0, complete = false;
+    for (let i = 0; i < 4; i++) {
+      if (offset >= bytes.length) invalid();
+      const next = bytes[offset++]; length += (next & 127) * 2 ** (7 * i);
+      if (next < 128) { if (i && next === 0) invalid(); complete = true; break; }
+    }
+    if (!complete || !length || length > MAX_BYTES || offset + length > bytes.length) invalid();
+    const core = bytes.subarray(offset, offset + length), tail = bytes.subarray(offset + length);
+    if (!(mask & 16) && tail.length) invalid();
+    let extras = [];
+    if (tail.length) {
+      try { extras = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(tail)); } catch { invalid(); }
+      if (!Array.isArray(extras) || extras.length > 250) invalid();
+    }
+    return { core, mask, extras };
+  }
+  function applyExtraFields(people, extras) {
+    const invalid = () => { throw new Error("This code has invalid extra schedule details."); };
+    const names = Object.keys(people), seen = new Set();
+    const validObject = (value, reserved) => value && typeof value === "object" && !Array.isArray(value) && Object.keys(value).every(key => !reserved.has(key));
+    for (const entry of extras) {
+      if (!Array.isArray(entry) || entry.length !== 3 || !Number.isInteger(entry[0]) || entry[0] < 0 || entry[0] >= names.length || seen.has(entry[0]) || !validObject(entry[1], PERSON_KEYS) || !Array.isArray(entry[2])) invalid();
+      seen.add(entry[0]);
+      const name = names[entry[0]], person = people[name], classes = [...person.classes], classSeen = new Set();
+      if (entry[2].length > classes.length) invalid();
+      for (const row of entry[2]) {
+        if (!Array.isArray(row) || row.length !== 2 || !Number.isInteger(row[0]) || row[0] < 0 || row[0] >= classes.length || classSeen.has(row[0]) || !validObject(row[1], CLASS_KEYS)) invalid();
+        classSeen.add(row[0]); classes[row[0]] = { ...classes[row[0]], ...row[1] };
+      }
+      people[name] = { ...person, ...entry[1], classes };
+    }
+  }
+  async function encode(data, options) {
+    if (!data?.people || typeof data.people !== "object" || Array.isArray(data.people)) throw new Error("Select schedules to export.");
+    const mask = options === undefined ? null : fieldMask(options?.fields ?? []);
+    const projected = mask === null ? data : { people: Object.fromEntries(Object.entries(data?.people || {}).map(([name, person]) => [name, selectedPerson(person, mask)])) };
+    const payload = pack(projected, mask === null);
+    const extras = mask & 16 ? Object.values(projected.people).map((person, index) => [index, extraFields(person, PERSON_KEYS), person.classes.map((item, i) => [i, extraFields(item, CLASS_KEYS)]).filter(row => Object.keys(row[1]).length)]).filter(row => Object.keys(row[1]).length || row[2].length) : [];
+    const extraBytes = extras.length ? new TextEncoder().encode(JSON.stringify(extras)) : new Uint8Array();
+    const envelope = core => mask === null ? core : selectedEnvelope(core, mask, extraBytes);
+    const slim = mask === null || !(mask & 6);
+    let bytes = envelope(new TextEncoder().encode(JSON.stringify(packCompact(payload, slim))));
     if (bytes.length > MAX_BYTES) throw new Error("This selection is too large. Export fewer schedules at once.");
     const candidates = [{ bytes, modes: ["J", "D", "Z"] }];
     for (let variant = 0; variant < 3; variant++) {
@@ -466,7 +539,8 @@ return {encode,decode,configs};
       for(const timeTable of [false,true])try{candidates.push({bytes:packBinary(payload,variant,true,{dictIndex,timeTable}),modes:["B","R","S"]});}catch{}
     }
     for(let variant=0;variant<2;variant++)try{candidates.push({bytes:packBinary(payload,variant,true,{dictIndex:3,personUnits:true}),modes:["B","R","S"]});}catch{}
-    for(const config of factor5.configs)for(let dictionary=0;dictionary<4;dictionary++)try{candidates.push({bytes:factor5.encode(payload,config,dictionary),modes:["T","U","V"]});}catch{}
+    if (slim) for(const config of factor5.configs)for(let dictionary=0;dictionary<4;dictionary++)try{candidates.push({bytes:factor5.encode(payload,config,dictionary),modes:["T","U","V"]});}catch{}
+    for (let i = 1; i < candidates.length; i++) candidates[i].bytes = envelope(candidates[i].bytes);
     let mode = "J";
     const seen=new Map();
     for (const candidate of candidates) {
@@ -484,7 +558,7 @@ return {encode,decode,configs};
         } catch { /* Older browsers can use wrapped DEFLATE or uncompressed data. */ }
       }
     }
-    const code = wrap(bytes, mode, 5);
+    const code = wrap(bytes, mode, mask === null ? 5 : 6);
     if (code.length > MAX_CODE) throw new Error("This selection is too large. Export fewer schedules at once.");
     return code;
   }
@@ -496,14 +570,14 @@ return {encode,decode,configs};
       value = new URLSearchParams(url.hash.slice(1)).get("import");
       if (!value) throw new Error("This link does not contain schedules.");
     }
-    if (!value.startsWith("WFL5")) return value;
-    if (!/^WFL5[JDZBRSTUV][A-Za-z0-9_-]+$/.test(value)) throw new Error("The shared link is incomplete or changed.");
+    if (!/^WFL[56]/.test(value)) return value;
+    if (!/^WFL[56][JDZBRSTUV][A-Za-z0-9_-]+$/.test(value)) throw new Error("The shared link is incomplete or changed.");
     const text = value.slice(5);
     if (text.length > Math.ceil((MAX_BYTES + 4) * 4 / 3) || text.length % 4 === 1) throw new Error("The shared link is incomplete or too large.");
     const binary = atob(text.replace(/-/g, "+").replace(/_/g, "/"));
     const bytes = Uint8Array.from(binary, char => char.charCodeAt(0));
     if (urlBytes(bytes) !== text) throw new Error("The shared link is incomplete or changed.");
-    return `WF5${value[4]}${base15(bytes)}`;
+    return `WF${value[3]}${value[4]}${base15(bytes)}`;
   }
   function urlBytes(bytes) {
     let binary = "";
@@ -511,13 +585,13 @@ return {encode,decode,configs};
     return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
   }
   function createLink(code, baseUrl) {
-    if (typeof code !== "string" || code.length > MAX_CODE || !/^WF5[JDZBRSTUV]/.test(code)) throw new Error("Generate a new export code first.");
+    if (typeof code !== "string" || code.length > MAX_CODE || !/^WF[56][JDZBRSTUV]/.test(code)) throw new Error("Generate a new export code first.");
     const checked = unbase15(code.slice(4));
     if (checked.length < 4 || checksum(checked.subarray(4)) !== new DataView(checked.buffer).getUint32(0, true)) throw new Error("The code is incomplete or changed.");
     const url = new URL(baseUrl);
     if (!/^https?:$/.test(url.protocol)) throw new Error("Use an HTTP or HTTPS app address.");
     url.search = "";
-    url.hash = `import=WFL5${code[3]}${urlBytes(checked)}`;
+    url.hash = `import=WFL${code[2]}${code[3]}${urlBytes(checked)}`;
     return url.href;
   }
   async function decode(input) {
@@ -532,7 +606,7 @@ return {encode,decode,configs};
       try { return JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes)); }
       catch { throw new Error("This code does not contain readable schedule data."); }
     };
-    let payload;
+    let payload, selection = null;
     if (code.slice(0, 3).toUpperCase() === "WF1") {
       // Restore the original alphanumeric format as well as keeping WF2.
       const legacy = code.toUpperCase(), alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
@@ -548,15 +622,21 @@ return {encode,decode,configs};
       if (buffer || Math.ceil(length * 8 / 5) !== text.length || checksum(bytes).toString(16).padStart(8, "0").toUpperCase() !== legacy.slice(4, 12)) throw new Error("The code is incomplete or changed. Ask your friend to copy it again.");
       if (legacy[3] === "G") bytes = await decompress(bytes, "gzip");
       payload = json(bytes); validatePayload(payload);
-    } else if(/^WF5[JDZBRSTUV]/.test(code)){
-      if(!/^WF5[JDZBRSTUV][0-9a-e][\u3400-\u4dbf\u4e00-\u9fff\uac00-\uc03f]+$/.test(code))throw new Error("That is not a valid Who’s Free? export code. Paste the full code from your friend.");
+    } else if(/^WF[56][JDZBRSTUV]/.test(code)){
+      if(!/^WF[56][JDZBRSTUV][0-9a-e][\u3400-\u4dbf\u4e00-\u9fff\uac00-\uc03f]+$/.test(code))throw new Error("That is not a valid Who’s Free? export code. Paste the full code from your friend.");
       const checked=unbase15(code.slice(4));
       if(checked.length<4)throw new Error("The code is incomplete or changed.");
       let bytes=checked.subarray(4);
       if(checksum(bytes)!==new DataView(checked.buffer).getUint32(0,true))throw new Error("The code is incomplete or changed. Ask your friend to copy it again.");
       if("DRU".includes(code[3]))bytes=await decompress(bytes,"deflate-raw");
       else if("ZSV".includes(code[3]))bytes=await decompress(bytes,"deflate");
-      payload="TUV".includes(code[3])?factor5.decode(bytes):"BRS".includes(code[3])?unpackBinary(bytes,true,true):unpackCompact(json(bytes),true);
+      if (code[2] === "6") { selection = readSelectedEnvelope(bytes); bytes = selection.core; }
+      if (selection && selection.mask & 6 && "TUV".includes(code[3])) throw new Error("This code has an invalid field layout.");
+      payload="TUV".includes(code[3])?factor5.decode(bytes):"BRS".includes(code[3])?unpackBinary(bytes,true,true):unpackCompact(json(bytes),!selection || !(selection.mask & 6));
+      if (selection) for (const person of payload.p) {
+        if (!(selection.mask & 8) && person.s !== undefined) throw new Error("This code has unselected semester details.");
+        for (const row of person.c) for (const [bit, index] of [[1,7],[2,4],[4,5]]) if (!(selection.mask & bit) && row[index] != null) throw new Error("This code has unselected class details.");
+      }
     } else {
       if (!/^WF(?:2[JDZ]|[34][JDZBRS])[0-6][\u4e00-\u8dff]+$/.test(code)) throw new Error("That is not a valid Who’s Free? export code. Paste the full code from your friend.");
       const checked = unbase14(code.slice(4));
@@ -570,15 +650,30 @@ return {encode,decode,configs};
     }
     const people = Object.create(null);
     for (const person of payload.p) {
-      people[person.n] = { source_file: "Shared code", ...(person.s !== undefined ? { semester: person.s } : {}), classes: person.c.map(row => ({
+      people[person.n] = { ...(!selection || !(selection.mask & 16) ? { source_file: "Shared code" } : {}), ...(person.s !== undefined ? { semester: person.s } : {}), classes: person.c.map(row => ({
         day: DAYS[row[0]], start: row[1], end: row[2],
         ...Object.fromEntries(FIELDS.map((key, index) => [key, row[index + 3] || null])),
         kind: row[8] || "class",
       })) };
     }
-    return { schema_version: 1, ...("45".includes(code[2]) ? { share_profile: "compact" } : {}), people };
+    if (selection) applyExtraFields(people, selection.extras);
+    return { schema_version: 1, ...(selection ? { share_profile: "selected", share_fields: EXPORT_FIELDS.filter((_, i) => selection.mask & (1 << i)) } : "45".includes(code[2]) ? { share_profile: "compact" } : {}), people };
   }
   function sameSchedule(a, b, compact = false) {
+    if (Array.isArray(compact)) {
+      const mask = fieldMask(compact);
+      const canonical = value => {
+        if (Array.isArray(value)) return value.map(canonical);
+        if (value && typeof value === "object") return Object.fromEntries(Object.keys(value).sort().map(key => [key, canonical(value[key])]));
+        return value;
+      };
+      const signature = person => {
+        const projected = selectedPerson(person, mask);
+        projected.classes = projected.classes.map(item => JSON.stringify(canonical(item))).sort();
+        return JSON.stringify(canonical(projected));
+      };
+      return signature(a) === signature(b);
+    }
     const signature = person => JSON.stringify([
       person.semester ?? null,
       (person.classes || []).map(item => JSON.stringify([
@@ -603,7 +698,7 @@ return {encode,decode,configs};
       const normalized = normalizedName(name), existingName = names.get(normalized);
       let target = name;
       if (existingName !== undefined) {
-        if (sameSchedule(people[existingName], person, incoming.share_profile === "compact")) { skipped++; continue; }
+        if (sameSchedule(people[existingName], person, incoming.share_profile === "selected" ? incoming.share_fields : incoming.share_profile === "compact")) { skipped++; continue; }
         let number = 2;
         while (names.has(normalizedName(numberedName(existingName, number))) || reserved.has(normalizedName(numberedName(existingName, number)))) number++;
         const newName = numberedName(existingName, number);
