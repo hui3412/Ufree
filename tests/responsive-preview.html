@@ -28,11 +28,11 @@
     <a href="../">Open app</a>
   </div>
   <p id="status" role="status">Loading app…</p>
+  <iframe id="app" src="../" title="Live UFree app"></iframe>
   <table id="results" hidden>
     <thead><tr><th>Viewport</th><th>Header</th><th>People controls</th><th>Overflow</th><th>Visible labels</th></tr></thead>
     <tbody></tbody>
   </table>
-  <iframe id="app" src="../" title="Live UFree app"></iframe>
   <script>
     const sizes = [[280,640],[320,568],[350,700],[360,800],[375,812],[390,844],[414,896],[568,320],[667,375],[844,390],[768,1024],[1024,768],[1440,900],[1920,1080]];
     const frame = document.querySelector('#app');
@@ -65,14 +65,15 @@
       const description = doc.querySelector('.brand-copy > p');
       const toolbar = doc.querySelector('.people-actions');
       const peopleControls = [...toolbar.children].flatMap(element => element.matches('.group-view-controls') ? [...element.children] : [element]).filter(visible);
-      const sameLine = elements => elements.every(element => Math.abs(rect(element).top - rect(elements[0]).top) < 2);
+      const center = element => rect(element).top + rect(element).height / 2;
+      const sameLine = elements => elements.every(element => Math.abs(center(element) - center(elements[0])) < 2);
       const inside = (elements,container) => elements.every(element => rect(element).left >= rect(container).left - 1 && rect(element).right <= rect(container).right + 1);
       const header = sameLine(buttons) && inside(buttons,nav)
         && Math.abs(rect(buttons[0]).left - rect(description).left) < 1
         && rect(nav).top >= rect(description).bottom;
       const people = sameLine(peopleControls) && inside(peopleControls,toolbar);
       const overflow = doc.documentElement.scrollWidth <= frame.contentWindow.innerWidth;
-      const labels = [...doc.querySelectorAll('.nav-button-label, .group-toggle-label')].filter(visible).map(element => element.textContent.trim()).join(', ') || 'Icons';
+      const labels = [...doc.querySelectorAll('.nav-button-label, .group-toggle-label, [data-mode-label]')].filter(visible).map(element => element.textContent.trim()).join(', ') || 'Icons';
       return { size: viewport.selectedOptions[0].textContent, header, people, overflow, labels };
     }
     async function checkCurrent() {
