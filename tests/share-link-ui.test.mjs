@@ -250,11 +250,11 @@ test("home export defaults to Everyone in a collapsed selection and supports eac
   } finally { a.window.happyDOM.abort(); }
 });
 
-test("navigation keeps four actions together, the export icon opens quick share, and Help works", async () => {
+test("navigation keeps five actions together, the export icon opens quick share, and Help works", async () => {
   const a = await app(data);
   try {
     const nav = a.window.document.querySelector('nav[aria-label="Main navigation"]');
-    assert.deepEqual([...nav.children].map(button => button.id), ["scheduleDataButton","helpButton","settingsButton","homeExportButton"]);
+    assert.deepEqual([...nav.children].map(button => button.id), ["scheduleDataButton","helpButton","settingsButton","homeExportButton","undoChangesButton"]);
     assert.equal(a.el("settingsButton").textContent, ""); assert.equal(a.el("settingsButton").getAttribute("aria-label"), "Settings");
     assert.equal(a.el("homeExportButton").textContent, ""); assert.ok(a.el("homeExportButton").querySelector("svg"));
     a.el("homeExportButton").click(); assert.equal(a.el("exportSelection").open, false); assert.equal(a.el("selectAllSchedules").checked, true);

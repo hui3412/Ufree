@@ -1314,12 +1314,57 @@
     showToast(persisted ? `${group.name} moved to top.` : "Group moved for this session, but could not be saved on this device.");
   }
 
+  let toolbarLayoutFrame = null;
+
+  function fitToolbarLabels() {
+    const nav = els.scheduleDataButton.parentElement;
+    const peopleActions = els.showGroupsToggle.closest(".people-actions");
+    const fits = row => {
+      const children = [...row.children].filter(child => getComputedStyle(child).display !== "none");
+      const gap = parseFloat(getComputedStyle(row).columnGap) || 0;
+      const required = children.reduce((width, child) => width + child.getBoundingClientRect().width, 0)
+        + Math.max(0, children.length - 1) * gap;
+      return required <= row.getBoundingClientRect().width + 0.5;
+    };
+
+    // Start with full labels so widening the row restores them automatically.
+    els.helpButton.classList.remove("compact-label");
+    els.scheduleDataButton.classList.remove("compact-label");
+    if (!fits(nav)) els.helpButton.classList.add("compact-label");
+    if (!fits(nav)) els.scheduleDataButton.classList.add("compact-label");
+
+    els.showGroupsToggle.classList.remove("compact-label");
+    if (!els.manageGroupsButton.hidden && !fits(peopleActions)) {
+      els.showGroupsToggle.classList.add("compact-label");
+    }
+  }
+
+  function scheduleToolbarLayout() {
+    if (toolbarLayoutFrame !== null) return;
+    toolbarLayoutFrame = requestAnimationFrame(() => {
+      toolbarLayoutFrame = null;
+      fitToolbarLabels();
+    });
+  }
+
+  function watchToolbarLayout() {
+    window.addEventListener("resize", scheduleToolbarLayout);
+    if (typeof ResizeObserver !== "undefined") {
+      const observer = new ResizeObserver(scheduleToolbarLayout);
+      observer.observe(document.querySelector(".home-header-controls"));
+      observer.observe(els.showGroupsToggle.closest(".people-actions"));
+    }
+    document.fonts?.ready.then(scheduleToolbarLayout);
+    fitToolbarLabels();
+  }
+
   function updateGroupToolbar() {
     els.showGroupsToggle.disabled = !state.hasData;
     const busy = state.isParsing || Boolean(state.pendingImage) || Boolean(state.codeMode);
     els.manageGroupsButton.hidden = !state.showGroups;
     els.manageGroupsButton.disabled = !state.hasData || busy;
     setViewToggle(els.showGroupsToggle, state.showGroups ? "Hide groups" : "Show groups", state.showGroups);
+    scheduleToolbarLayout();
   }
 
   function setViewToggle(button, label, pressed) {
@@ -4046,7 +4091,7 @@
     if (!("serviceWorker" in navigator)) return;
     if (location.protocol !== "https:" && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") return;
 
-    navigator.serviceWorker.register("./service-worker.js?v=70", { updateViaCache: "none" })
+    navigator.serviceWorker.register("./service-worker.js?v=71", { updateViaCache: "none" })
       .then(registration => registration.update())
       .catch(() => {
         // The app works normally even if PWA caching isn't available.
@@ -4077,6 +4122,7 @@
     setLiveValues();
     syncLiveControls();
     bindEvents();
+    watchToolbarLayout();
     updateScheduleModal();
     updateSettingsModal();
     registerServiceWorker();
