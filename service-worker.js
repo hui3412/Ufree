@@ -1,15 +1,16 @@
-const CACHE_NAME = "whos-free-shell-v64";
+const CACHE_NAME = "whos-free-shell-v65";
 const OCR_CACHE_NAME = "whos-free-ocr-v1";
 const APP_SHELL = [
   "./",
   "./index.html",
-  "./styles.css?v=64",
-  "./app.js?v=64",
-  "./schedule-share-code.js?v=64",
-  "./schedule-availability.js?v=64",
-  "./schedule-groups.js?v=64",
-  "./schedule-parser.js?v=64",
-  "./schedule-image-parser.js?v=64",
+  "./styles.css?v=65",
+  "./app.js?v=65",
+  "./schedule-share-code.js?v=65",
+  "./assets/qr/qrcodegen.js?v=65",
+  "./schedule-availability.js?v=65",
+  "./schedule-groups.js?v=65",
+  "./schedule-parser.js?v=65",
+  "./schedule-image-parser.js?v=65",
   "./manifest.webmanifest",
   "./assets/favicon.png",
   "./assets/apple-touch-icon.png",
@@ -86,4 +87,5 @@ self.addEventListener("notificationclick", event => {
     })
   );
 });
+
 

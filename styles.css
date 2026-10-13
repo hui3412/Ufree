@@ -2240,6 +2240,11 @@ input[type="time"],
 .person-availability { display: block; margin-top: 5px; font-size: 0.79rem; line-height: 1.4; white-space: pre-line; overflow-wrap: anywhere; }
 .review-passing { position: absolute; left: 3px; right: 3px; box-sizing: border-box; overflow: hidden; color: var(--muted); background: var(--input); font-size: 9px; pointer-events: none; }
 
+.schedule-share-link { margin-top: 16px; }
+.share-link-output { width: 100%; resize: vertical; font-size: 12px; overflow-wrap: anywhere; }
+.share-qr { margin: 16px auto 0; max-width: 580px; background: #fff; border-radius: 8px; padding: 8px; }
+.share-qr svg { display: block; width: 100%; height: auto; }
+.schedule-share-link[hidden], .share-qr[hidden], #sharedImportPreview[hidden] { display: none; }
 .share-code-panel { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); }
 .share-code-panel h4 { margin: 0 0 12px; }
 .export-people-list { max-height: 250px; overflow-y: auto; margin-bottom: 14px; }
@@ -2701,3 +2706,4 @@ button:disabled { cursor: not-allowed; }
 .person-week-modal .review-grid-scroll { overscroll-behavior: auto; touch-action: pan-x pinch-zoom; -webkit-overflow-scrolling: touch; }
 .person-week-modal .modal-header h2 { overflow-wrap: anywhere; }
 .person-week-modal .parser-status { margin-bottom: 0; }
+
