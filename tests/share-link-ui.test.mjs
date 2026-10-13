@@ -162,3 +162,51 @@ test("a fragment opened in an existing tab previews older codes after local sche
     a.el("closeImportButton").click(); assert.equal(a.stored(), before);
   } finally { a.window.happyDOM.abort(); }
 });
+
+test("three-dot export choices start basic and regenerate codes, links and QRs with full selected details", async () => {
+  const rich = { people: { Alice: { semester: "Fall 2026", source_file: "original.jpg", notes: "saved note", classes: [{ ...person("Physics").classes[0], kind: "class", course_code: "203-SN1-RE", section: "00002", recognition: { reviewed: true } }] } } };
+  const a = await app(rich);
+  try {
+    const before = a.stored(), options = a.el("exportFieldOptions");
+    a.el("exportSchedulesButton").click(); a.el("selectAllSchedules").click();
+    assert.equal(options.open, false); assert.equal(options.querySelectorAll("input:checked").length, 0);
+    a.el("generateCodeButton").click(); await a.wait(() => !a.el("generateCodeButton").disabled);
+    const basicCode = a.el("exportCodeOutput").value;
+    assert.match(basicCode, /^WF6/);
+    const basic = await a.window.WhosFreeShareCode.decode(basicCode);
+    assert.equal(basic.people.Alice.classes[0].instructor, null); assert.equal(basic.people.Alice.semester, undefined);
+    options.querySelector('[data-export-field="instructor"]').click();
+    assert.equal(a.el("exportCodeOutput").value, ""); assert.equal(a.el("exportSharePanel").hidden, true);
+    a.el("generateCodeButton").click(); await a.wait(() => !a.el("generateCodeButton").disabled);
+    let exported = await a.window.WhosFreeShareCode.decode(a.el("exportCodeOutput").value);
+    assert.equal(exported.people.Alice.classes[0].instructor, "Anna de la Cruz"); assert.equal(exported.people.Alice.classes[0].course_code, null);
+    options.querySelector(".export-include-all").click(); assert.equal(options.querySelectorAll("input:checked").length, 5);
+    a.el("generateCodeButton").click(); await a.wait(() => !a.el("generateCodeButton").disabled);
+    const panel = a.el("exportSharePanel"); exported = await a.window.WhosFreeShareCode.decode(panel.querySelector("textarea").value);
+    assert.deepEqual(plain(exported.people), rich.people);
+    panel.querySelector(".toggle-share-qr").click(); assert.ok(panel.querySelector("svg"));
+    assert.equal(a.stored(), before);
+    a.el("closeExportButton").click(); a.el("exportSchedulesButton").click();
+    assert.equal(options.querySelectorAll("input:checked").length, 0);
+  } finally { a.window.happyDOM.abort(); }
+});
+
+test("single-person three-dot choices preserve full teacher names and course details without including anyone else", async () => {
+  const rich = { people: { ...data.people, Alice: { ...person("Physics"), classes: [{ ...person("Physics").classes[0], course_code: "203-SN1-RE", section: "00002" }] } } };
+  const a = await app(rich);
+  try {
+    a.el("viewToggleButton").click(); a.el("peopleList").querySelector('[data-person="Alice"]').click(); a.el("fullScheduleButton").click();
+    const options = a.el("personExportFieldOptions"); assert.equal(options.querySelectorAll("input:checked").length, 0);
+    options.querySelector(".export-include-all").click(); a.el("exportPersonScheduleButton").click();
+    await a.wait(() => !a.el("exportPersonScheduleButton").disabled);
+    const imported = await a.window.WhosFreeShareCode.decode(a.el("personSharePanel").querySelector("textarea").value);
+    assert.deepEqual(Object.keys(imported.people), ["Alice"]);
+    assert.equal(imported.people.Alice.classes[0].instructor, "Anna de la Cruz");
+    assert.equal(imported.people.Alice.classes[0].course_code, "203-SN1-RE"); assert.equal(imported.people.Alice.classes[0].section, "00002");
+    options.querySelector('[data-export-field="instructor"]').click();
+    assert.equal(a.el("personWeekCode").value, ""); assert.equal(a.el("personSharePanel").hidden, true);
+    options.open = true;
+    a.window.document.dispatchEvent(new a.window.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    assert.equal(options.open, false); assert.equal(a.el("personWeekModal").hidden, false);
+  } finally { a.window.happyDOM.abort(); }
+});

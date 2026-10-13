@@ -134,6 +134,8 @@
     sharedImportPeople: document.getElementById("sharedImportPeople"),
     exportSharePanel: document.getElementById("exportSharePanel"),
     personSharePanel: document.getElementById("personSharePanel"),
+    exportFieldOptions: document.getElementById("exportFieldOptions"),
+    personExportFieldOptions: document.getElementById("personExportFieldOptions"),
     codeConflictPrompt: document.getElementById("codeConflictPrompt"),
     codeConflictMessage: document.getElementById("codeConflictMessage"),
     closeImportButton: document.getElementById("closeImportButton"),
@@ -2563,6 +2565,7 @@
     els.codeExportPanel.hidden = mode !== "export";
     els.codeImportPanel.hidden = mode !== "import";
     if (mode === "export") {
+      resetExportFields(els.exportFieldOptions);
       els.exportPeopleList.replaceChildren();
       for (const name of Object.keys(peopleMap()).sort(comparePeopleNames)) {
         const label = document.createElement("label");
@@ -2586,8 +2589,24 @@
     updateScheduleModal();
   }
 
-  function encodeSchedules(names) {
-    return window.WhosFreeShareCode.encode({ people: Object.fromEntries(names.map(name => [name, peopleMap()[name]])) });
+  function resetExportFields(options) {
+    options.open = false;
+    options.querySelectorAll("input").forEach(input => { input.checked = false; input.disabled = false; });
+    options.querySelector("button").disabled = false;
+  }
+
+  function encodeSchedules(names, options) {
+    const fields = [...options.querySelectorAll("input:checked")].map(input => input.dataset.exportField);
+    return window.WhosFreeShareCode.encode({ people: Object.fromEntries(names.map(name => [name, peopleMap()[name]])) }, { fields });
+  }
+
+  function personExportFieldsChanged() {
+    state.personWeekRequest++;
+    els.personWeekCode.value = "";
+    els.personWeekExport.hidden = true;
+    els.copyPersonWeekCodeButton.disabled = true;
+    resetShareLink(els.personSharePanel);
+    codeStatus(els.personWeekExportStatus, "Export again to apply these details.");
   }
 
   function shareCodeReadyMessage(count, code) {
@@ -2602,9 +2621,10 @@
     state.isParsing = true;
     updateScheduleModal();
     codeStatus(els.exportCodeStatus, "Creating the code on this device…");
+    els.exportFieldOptions.open = false;
     resetShareLink(els.exportSharePanel);
     try {
-      const code = await encodeSchedules(names);
+      const code = await encodeSchedules(names, els.exportFieldOptions);
       els.exportCodeOutput.value = code;
       populateShareLink(code, els.exportSharePanel);
       codeStatus(els.exportCodeStatus, shareCodeReadyMessage(names.length, code), "success");
@@ -2788,7 +2808,7 @@
 
   async function importShareCode() {
     if (state.isParsing || state.codeMode !== "import") return;
-    if (!state.sharedImport && /^(?:https?:\/\/|WFL5)/i.test(els.importCodeInput.value.trim())) { await previewSharedImport(els.importCodeInput.value); return; }
+    if (!state.sharedImport && /^(?:https?:\/\/|WFL[56])/i.test(els.importCodeInput.value.trim())) { await previewSharedImport(els.importCodeInput.value); return; }
     const selected = state.sharedImport ? [...els.sharedImportPeople.querySelectorAll("input:checked")].map(input => input.dataset.person) : null;
     if (selected && !selected.length) return;
     if (!els.importCodeInput.value.trim()) { codeStatus(els.importCodeStatus, "Paste a code to import.", "error"); els.importCodeInput.focus(); return; }
@@ -3073,6 +3093,7 @@
     els.closeScheduleModal.disabled = Boolean(state.codeMode) && state.isParsing;
     els.selectAllSchedules.disabled = state.isParsing;
     els.exportPeopleList.querySelectorAll("input").forEach(input => { input.disabled = state.isParsing; });
+    els.exportFieldOptions.querySelectorAll("input, button").forEach(input => { input.disabled = state.isParsing; });
     els.sharedImportPeople.querySelectorAll("input").forEach(input => { input.disabled = state.isParsing; });
     els.addSchedulePdfButton.disabled = importBusy;
     els.addScheduleImageButton.disabled = importBusy;
@@ -3355,6 +3376,7 @@
     els.personWeekTitle.textContent = displayName(name);
     els.personWeekSemester.textContent = scheduleLabel(person, true);
     els.personWeekExport.hidden = true;
+    resetExportFields(els.personExportFieldOptions);
     resetShareLink(els.personSharePanel);
     els.personWeekCode.value = "";
     els.copyPersonWeekCodeButton.disabled = true;
@@ -3420,13 +3442,15 @@
     if (!name || !peopleMap()[name] || els.exportPersonScheduleButton.disabled) return;
     const request = ++state.personWeekRequest;
     els.exportPersonScheduleButton.disabled = true;
+    els.personExportFieldOptions.open = false;
+    els.personExportFieldOptions.querySelectorAll("input, button").forEach(input => { input.disabled = true; });
     els.copyPersonWeekCodeButton.disabled = true;
     els.personWeekExport.hidden = true;
     els.personWeekCode.value = "";
     codeStatus(els.personWeekExportStatus, "Creating the code on this device…");
     resetShareLink(els.personSharePanel);
     try {
-      const code = await encodeSchedules([name]);
+      const code = await encodeSchedules([name], els.personExportFieldOptions);
       if (request !== state.personWeekRequest) return;
       els.personWeekCode.value = code;
       populateShareLink(code, els.personSharePanel);
@@ -3437,7 +3461,10 @@
     } catch (error) {
       if (request === state.personWeekRequest) codeStatus(els.personWeekExportStatus, error.message || "The code could not be created.", "error");
     } finally {
-      if (request === state.personWeekRequest) els.exportPersonScheduleButton.disabled = false;
+      if (request === state.personWeekRequest) {
+        els.exportPersonScheduleButton.disabled = false;
+        els.personExportFieldOptions.querySelectorAll("input, button").forEach(input => { input.disabled = false; });
+      }
     }
   }
 
@@ -3829,6 +3856,14 @@
       exportSelectionChanged();
     });
     els.generateCodeButton.addEventListener("click", generateShareCode);
+    for (const options of [els.exportFieldOptions, els.personExportFieldOptions]) {
+      const changed = options === els.exportFieldOptions ? exportSelectionChanged : personExportFieldsChanged;
+      options.addEventListener("change", changed);
+      options.querySelector(".export-include-all").addEventListener("click", () => {
+        options.querySelectorAll("input").forEach(input => { input.checked = true; });
+        changed();
+      });
+    }
     els.copyCodeButton.addEventListener("click", copyShareCode);
     for (const panel of [els.exportSharePanel, els.personSharePanel]) {
       panel.querySelector(".copy-share-link").addEventListener("click", () => copyScheduleLink(panel));
@@ -3870,12 +3905,17 @@
       }
       const groupModal = !els.personWeekModal.hidden ? els.personWeekModal : !els.groupWeekModal.hidden ? els.groupWeekModal : !els.groupsModal.hidden ? els.groupsModal : null;
       if (event.key === "Tab" && groupModal) {
-        const focusable = [...groupModal.querySelectorAll('button, input, textarea, [tabindex="0"]')].filter(item => !item.disabled && !item.closest("[hidden]"));
+        const focusable = [...groupModal.querySelectorAll('button, input, textarea, summary, [tabindex="0"]')].filter(item => {
+          const closed = item.closest("details:not([open])");
+          return !item.disabled && !item.closest("[hidden]") && (!closed || closed.querySelector(":scope > summary") === item);
+        });
         const first = focusable[0], last = focusable[focusable.length - 1];
         if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
         else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
       }
       if (event.key !== "Escape") return;
+      const exportMenu = [els.exportFieldOptions, els.personExportFieldOptions].find(menu => menu.open && !menu.closest("[hidden]"));
+      if (exportMenu) { event.preventDefault(); exportMenu.open = false; exportMenu.querySelector("summary").focus(); return; }
       if (state.codeConflict) { event.preventDefault(); finishCodeConflict("old"); return; }
       if (state.pendingPersonHold) {
         window.clearTimeout(state.pendingPersonHold.timer); state.pendingPersonHold = null;
@@ -3934,7 +3974,7 @@
     if (!("serviceWorker" in navigator)) return;
     if (location.protocol !== "https:" && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") return;
 
-    navigator.serviceWorker.register("./service-worker.js?v=66", { updateViaCache: "none" })
+    navigator.serviceWorker.register("./service-worker.js?v=67", { updateViaCache: "none" })
       .then(registration => registration.update())
       .catch(() => {
         // The app works normally even if PWA caching isn't available.
