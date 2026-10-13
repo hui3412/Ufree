@@ -26,6 +26,7 @@
     codeMode: null,
     sharedImport: null,
     deviceReady: false,
+    sharedLinkStartup: false,
     imagePreviewUrl: null,
     notificationsEnabled: false,
     mutedPeople: new Set(),
@@ -105,6 +106,7 @@
     addSchedulePdfButton: document.getElementById("addSchedulePdfButton"),
     parserStatus: document.getElementById("parserStatus"),
     importProgressOverlay: document.getElementById("importProgressOverlay"),
+    importProgressTitle: document.getElementById("importProgressTitle"),
     importProgressMessage: document.getElementById("importProgressMessage"),
     importPictureNameForm: document.getElementById("importPictureNameForm"),
     importPictureName: document.getElementById("importPictureName"),
@@ -1767,7 +1769,8 @@
     els.scheduleImageInput.click();
   }
 
-  function startImportProgress(message, pictureName = false) {
+  function startImportProgress(message, pictureName = false, title = "Importing schedules") {
+    els.importProgressTitle.textContent = title;
     if (state.importProgress) { updateImportProgress(message); return; }
     const overlay = els.importProgressOverlay;
     state.importProgress = {
@@ -1785,8 +1788,10 @@
     els.finishImportPictureName.textContent = "Done entering name";
     els.importPictureNameHelp.textContent = "Your name will carry over. If you're typing when loading finishes, we'll wait for you.";
     overlay.querySelector(".import-progress-spinner").hidden = false;
-    overlay.querySelector(".import-progress-note").textContent = "Please wait until the import finishes.";
+    overlay.querySelector(".import-progress-note").textContent = title === "Opening shared schedules" ? "Nothing is added until you confirm." : "Please wait until the import finishes.";
+    overlay.setAttribute("aria-busy", "true");
     overlay.hidden = false;
+    document.documentElement.classList.remove("shared-link-starting");
     document.body.style.overflow = "hidden";
     overlay.focus({ preventScroll: true });
     for (const { element } of state.importProgress.background) {
@@ -1844,6 +1849,7 @@
     if (!operation) return;
     state.importProgress = null;
     els.importProgressOverlay.hidden = true;
+    els.importProgressOverlay.removeAttribute("aria-busy");
     els.importPictureNameForm.hidden = true;
     for (const { element, inert, ariaHidden } of operation.background) {
       if (!inert) element.removeAttribute("inert");
@@ -2694,7 +2700,10 @@
     state.isParsing = true;
     updateScheduleModal();
     codeStatus(els.importCodeStatus, "Opening shared schedules on this device…");
+    startImportProgress("Reading the shared schedules…", false, "Opening shared schedules");
     try {
+      // Let the loading popup paint before parsing a potentially large code.
+      await new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 0)));
       const imported = await window.WhosFreeShareCode.decode(input);
       validateData(imported);
       state.sharedImport = imported;
@@ -2718,12 +2727,18 @@
       codeStatus(els.importCodeStatus, error.message || "This shared link could not be opened.", "error");
     } finally {
       state.isParsing = false; updateScheduleModal();
+      endImportProgress(els.decodeCodeButton);
       els.decodeCodeButton.focus({ preventScroll: true });
     }
   }
 
   async function openSharedLink() {
-    if (!state.deviceReady || !location.hash.startsWith("#import=")) return;
+    if (!location.hash.startsWith("#import=")) return;
+    if (!state.deviceReady) {
+      state.sharedLinkStartup = true;
+      startImportProgress("Loading your saved schedules…", false, "Opening shared schedules");
+      return;
+    }
     if (state.isParsing || state.pendingImage || state.codeMode) {
       showToast("Finish the current import or export, then open the shared link again."); return;
     }
@@ -3919,7 +3934,7 @@
     if (!("serviceWorker" in navigator)) return;
     if (location.protocol !== "https:" && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") return;
 
-    navigator.serviceWorker.register("./service-worker.js?v=65", { updateViaCache: "none" })
+    navigator.serviceWorker.register("./service-worker.js?v=66", { updateViaCache: "none" })
       .then(registration => registration.update())
       .catch(() => {
         // The app works normally even if PWA caching isn't available.
@@ -3954,6 +3969,7 @@
     updateSettingsModal();
     registerServiceWorker();
     requestAnimationFrame(animateAppEntrance);
+    openSharedLink();
 
     loadSchedulesFromDevice().then(() => {
       cleanPeoplePreferences();
@@ -3962,6 +3978,8 @@
       updateSettingsModal();
       checkBreakNotifications();
       state.deviceReady = true;
+      if (state.sharedLinkStartup && !location.hash.startsWith("#import=")) endImportProgress();
+      state.sharedLinkStartup = false;
       openSharedLink();
     });
 

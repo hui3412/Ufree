@@ -25,7 +25,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" type="image/png" href="assets/favicon.png">
   <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
-  <link rel="stylesheet" href="styles.css?v=65">
+  <link rel="stylesheet" href="styles.css?v=66">
 </head>
 <body>
   <div class="app-shell">
@@ -421,14 +421,26 @@
     </div>
   </div>
 
+  <script id="sharedLinkBootstrap">
+    // Show feedback before deferred scripts or the local database finish loading.
+    if (location.hash.startsWith("#import=")) {
+      const loading = document.getElementById("importProgressOverlay");
+      document.getElementById("importProgressTitle").textContent = "Opening shared schedules";
+      document.getElementById("importProgressMessage").textContent = "Loading the app…";
+      loading.querySelector(".import-progress-note").textContent = "Nothing is added until you confirm.";
+      loading.setAttribute("aria-busy", "true");
+      loading.hidden = false;
+      document.documentElement.classList.add("shared-link-starting");
+    }
+  </script>
   <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js" defer></script>
-  <script src="schedule-parser.js?v=65" defer></script>
-  <script src="schedule-image-parser.js?v=65" defer></script>
-  <script src="schedule-availability.js?v=65" defer></script>
-  <script src="schedule-share-code.js?v=65" defer></script>
-  <script src="assets/qr/qrcodegen.js?v=65" defer></script>
-  <script src="schedule-groups.js?v=65" defer></script>
-  <script src="app.js?v=65" defer></script>
+  <script src="schedule-parser.js?v=66" defer></script>
+  <script src="schedule-image-parser.js?v=66" defer></script>
+  <script src="schedule-availability.js?v=66" defer></script>
+  <script src="schedule-share-code.js?v=66" defer></script>
+  <script src="assets/qr/qrcodegen.js?v=66" defer></script>
+  <script src="schedule-groups.js?v=66" defer></script>
+  <script src="app.js?v=66" defer></script>
 </body>
 </html>
 
