@@ -25,7 +25,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" type="image/png" href="assets/favicon.png">
   <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
-  <link rel="stylesheet" href="styles.css?v=67">
+  <link rel="stylesheet" href="styles.css?v=68">
 </head>
 <body>
   <div class="app-shell">
@@ -38,10 +38,17 @@
         <p>Find who's free now, or check any time during the week. Optimized for the Omnivox system.</p>
       </div>
 
-      <div class="header-actions">
-        <button id="undoChangesButton" class="secondary-button header-data-button" type="button" disabled title="No recent changes to undo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10h10a7 7 0 0 1 0 14M3 10l5-5M3 10l5 5" transform="translate(0 -3)"/></svg><span>Undo</span></button>
+      <div class="home-header-controls">
+        <nav class="header-actions" aria-label="Main navigation">
         <button id="scheduleDataButton" class="secondary-button header-data-button" type="button" title="Manage schedule data"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4M17 3v4M3 11h18"/></svg><span>Schedules</span></button>
-        <button id="settingsButton" class="secondary-button header-data-button" type="button" title="Open settings"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="m9 3-1 3-3 1-2 5 2 5 3 1 1 3h6l1-3 3-1 2-5-2-5-3-1-1-3Z"/></svg><span>Settings</span></button>
+        <button id="helpButton" class="secondary-button header-data-button" type="button" title="Help"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 8.5a2.5 2.5 0 0 1 5 0c0 2-2.5 2-2.5 4M12 16h.01"/></svg><span>Help</span></button>
+        <button id="settingsButton" class="secondary-button header-data-button nav-icon-button" type="button" title="Settings" aria-label="Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="m9 3-1 3-3 1-2 5 2 5 3 1 1 3h6l1-3 3-1 2-5-2-5-3-1-1-3Z"/></svg></button>
+        <button id="homeExportButton" class="secondary-button header-data-button nav-icon-button" type="button" title="Export schedules" aria-label="Export schedules"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-4-8 4-4 4 4M5 13v7h14v-7"/></svg></button>
+        </nav>
+        <div class="home-share-row">
+          <button id="undoChangesButton" class="secondary-button header-data-button" type="button" disabled title="No recent changes to undo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10h10a7 7 0 0 1 0 14M3 10l5-5M3 10l5 5" transform="translate(0 -3)"/></svg><span>Undo</span></button>
+          <button id="homeShareButton" class="primary-button action-icon-button" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 10.5 6.8-4m-6.8 7 6.8 4"/></svg><span>Share</span></button>
+        </div>
       </div>
     </header>
 
@@ -72,7 +79,7 @@
             </label>
             <button id="viewToggleButton" class="secondary-button view-icon-button view-mode-button" type="button" aria-label="Show everyone" title="Show everyone" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="7" r="3"/><path d="M3 21v-3a6 6 0 0 1 12 0v3M16 4a3 3 0 0 1 0 6M18 14a5 5 0 0 1 3 4v3"/></svg><span data-mode-label aria-hidden="true">All</span><span class="visually-hidden" data-toggle-label>Show everyone</span></button>
             <span class="group-view-controls">
-              <button id="showGroupsToggle" class="secondary-button view-icon-button" type="button" aria-label="Show groups" title="Show groups" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span class="visually-hidden" data-toggle-label>Show groups</span></button>
+              <button id="showGroupsToggle" class="secondary-button view-icon-button group-label-button" type="button" aria-label="Show groups" title="Show groups" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span class="group-toggle-label" aria-hidden="true">GROUP</span><span class="visually-hidden" data-toggle-label>Show groups</span></button>
               <button id="manageGroupsButton" class="secondary-button" type="button" aria-label="Manage groups" title="Manage groups" hidden>Manage</button>
             </span>
           </div>
@@ -161,11 +168,17 @@
           <button id="importCodeButton" class="secondary-button" type="button">Import</button>
         </div>
         <div id="codeExportPanel" class="share-code-panel" hidden>
-          <h4>Choose schedules to export</h4>
-          <label class="share-selection"><input id="selectAllSchedules" type="checkbox"><span>Select all</span></label>
-          <div id="exportPeopleList" class="export-people-list"></div>
+          <details id="exportSelection" class="export-selection">
+            <summary><span>People to share</span><span id="exportSelectionSummary" class="export-selection-summary">Choose people</span></summary>
+            <label class="share-selection"><input id="selectAllSchedules" type="checkbox"><span>Everyone</span></label>
+            <div id="exportPeopleList" class="export-people-list"></div>
+          </details>
           <div class="export-generation-actions">
-            <button id="generateCodeButton" class="primary-button" type="button">Generate code</button>
+            <div class="export-action-buttons">
+              <button id="generateCodeButton" class="primary-button action-icon-button" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 7-5 5 5 5m8-10 5 5-5 5m-3-14-2 18"/></svg><span>Export Code</span></button>
+              <button id="exportQrButton" class="secondary-button action-icon-button toggle-share-qr" type="button" aria-expanded="false" aria-controls="exportQr"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="6" height="6" rx=".5"/><rect x="15" y="3" width="6" height="6" rx=".5"/><rect x="3" y="15" width="6" height="6" rx=".5"/><path d="M15 15h3v3h3v3h-6v-3m6-6v3M12 3v3m0 6h-3m3 3v6"/></svg><span data-action-label>Export QR</span></button>
+              <button id="copyExportLinkButton" class="secondary-button action-icon-button copy-share-link" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m10 13 4-4m-6 6-1 1a4 4 0 0 1-6-6l4-4a4 4 0 0 1 6 0m2 2 1-1a4 4 0 0 1 6 6l-4 4a4 4 0 0 1-6 0"/></svg><span>Copy Link</span></button>
+            </div>
             <details id="exportFieldOptions" class="export-field-options">
               <summary aria-label="Choose export details" title="Export details">…</summary>
               <div class="export-options-menu" role="group" aria-label="Additional export details">
@@ -179,17 +192,16 @@
               </div>
             </details>
           </div>
-          <label class="field-group share-code-field"><span>Export code</span><textarea id="exportCodeOutput" rows="5" readonly spellcheck="false" autocapitalize="off" autocomplete="off" aria-describedby="exportCodeStatus"></textarea></label>
+          <label id="exportCodeField" class="field-group share-code-field" hidden><span>Export code</span><textarea id="exportCodeOutput" rows="5" readonly spellcheck="false" autocapitalize="off" autocomplete="off" aria-describedby="exportCodeStatus"></textarea></label>
           <p class="share-code-note">Names, times, classes and rooms by default. Use … to include more. Saved schedules keep all details.</p>
           <div id="exportCodeStatus" class="parser-status" role="status" aria-live="polite"></div>
           <div id="exportSharePanel" class="schedule-share-link" hidden>
-            <label class="field-group"><span>Share link</span><textarea class="share-link-output" rows="2" readonly spellcheck="false" aria-label="Share link"></textarea></label>
-            <div class="modal-actions"><button class="secondary-button copy-share-link" type="button">Copy link</button><button class="secondary-button toggle-share-qr" type="button" aria-expanded="false" aria-controls="exportQr">Show QR</button></div>
+            <label class="field-group share-link-field" hidden><span>Share link</span><textarea class="share-link-output" rows="2" readonly spellcheck="false" aria-label="Share link"></textarea></label>
             <div id="exportQr" class="share-qr" hidden></div>
             <p class="share-link-status parser-status" role="status" aria-live="polite"></p>
           </div>
           <div class="modal-actions">
-            <button id="copyCodeButton" class="secondary-button" type="button" disabled>Copy code</button>
+            <button id="copyCodeButton" class="secondary-button" type="button" disabled hidden>Copy code</button>
             <button id="closeExportButton" class="secondary-button" type="button">Done</button>
           </div>
         </div>
@@ -420,6 +432,19 @@
     </section>
   </div>
 
+  <div id="helpModal" class="modal-backdrop" hidden>
+    <section class="settings-modal help-modal panel" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+      <div class="modal-header"><h2 id="helpTitle">Help</h2><button id="closeHelpModal" class="modal-close" type="button" aria-label="Close help">×</button></div>
+      <div class="help-topics">
+        <article><h3>Add schedules</h3><p>Open Schedules to add an Omnivox picture or create a timetable manually. Review the detected classes before saving.</p></article>
+        <article><h3>Find a free moment</h3><p>Choose a day and time, or use the current time. Switch between Free and All to change who appears.</p></article>
+        <article><h3>Groups</h3><p>Turn on GROUP to see your groups. Manage lets you create and edit them.</p></article>
+        <article><h3>Share</h3><p>Share opens a quick export for everyone. Expand People to share to choose fewer people, then export a code, show a QR or copy a link. Use … to include more class details.</p></article>
+        <article><h3>Individual schedules</h3><p>Select a person, then Full schedule to view or share their weekly timetable. Your saved schedules stay on this device.</p></article>
+      </div>
+    </section>
+  </div>
+
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
   <template id="dataSetupTemplate">
@@ -462,13 +487,13 @@
     }
   </script>
   <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js" defer></script>
-  <script src="schedule-parser.js?v=67" defer></script>
-  <script src="schedule-image-parser.js?v=67" defer></script>
-  <script src="schedule-availability.js?v=67" defer></script>
-  <script src="schedule-share-code.js?v=67" defer></script>
-  <script src="assets/qr/qrcodegen.js?v=67" defer></script>
-  <script src="schedule-groups.js?v=67" defer></script>
-  <script src="app.js?v=67" defer></script>
+  <script src="schedule-parser.js?v=68" defer></script>
+  <script src="schedule-image-parser.js?v=68" defer></script>
+  <script src="schedule-availability.js?v=68" defer></script>
+  <script src="schedule-share-code.js?v=68" defer></script>
+  <script src="assets/qr/qrcodegen.js?v=68" defer></script>
+  <script src="schedule-groups.js?v=68" defer></script>
+  <script src="app.js?v=68" defer></script>
 </body>
 </html>
 

@@ -24,6 +24,8 @@
     duplicatePicture: null,
     codeConflict: null,
     codeMode: null,
+    quickExport: false,
+    quickExportReturnFocus: null,
     sharedImport: null,
     deviceReady: false,
     sharedLinkStartup: false,
@@ -73,6 +75,11 @@
     darkThemeButton: document.getElementById("darkThemeButton"),
     scheduleDataButton: document.getElementById("scheduleDataButton"),
     settingsButton: document.getElementById("settingsButton"),
+    helpButton: document.getElementById("helpButton"),
+    helpModal: document.getElementById("helpModal"),
+    closeHelpModal: document.getElementById("closeHelpModal"),
+    homeShareButton: document.getElementById("homeShareButton"),
+    homeExportButton: document.getElementById("homeExportButton"),
     undoChangesButton: document.getElementById("undoChangesButton"),
     undoScheduleChangesButton: document.getElementById("undoScheduleChangesButton"),
     undoChangesStatus: document.getElementById("undoChangesStatus"),
@@ -120,6 +127,11 @@
     exportPeopleList: document.getElementById("exportPeopleList"),
     selectAllSchedules: document.getElementById("selectAllSchedules"),
     generateCodeButton: document.getElementById("generateCodeButton"),
+    exportQrButton: document.getElementById("exportQrButton"),
+    copyExportLinkButton: document.getElementById("copyExportLinkButton"),
+    exportCodeField: document.getElementById("exportCodeField"),
+    exportSelection: document.getElementById("exportSelection"),
+    exportSelectionSummary: document.getElementById("exportSelectionSummary"),
     exportCodeOutput: document.getElementById("exportCodeOutput"),
     copyCodeButton: document.getElementById("copyCodeButton"),
     exportCodeStatus: document.getElementById("exportCodeStatus"),
@@ -2540,7 +2552,10 @@
     const selected = inputs.filter(input => input.checked).length;
     els.selectAllSchedules.checked = selected > 0 && selected === inputs.length;
     els.selectAllSchedules.indeterminate = selected > 0 && selected < inputs.length;
+    els.exportSelectionSummary.textContent = selected === inputs.length && selected > 0 ? `Everyone · ${selected}` : `${selected} of ${inputs.length} selected`;
     els.exportCodeOutput.value = "";
+    els.exportCodeField.hidden = true;
+    els.copyCodeButton.hidden = true;
     resetShareLink(els.exportSharePanel);
     els.copyCodeButton.disabled = true;
     codeStatus(els.exportCodeStatus, `${selected} schedule${selected === 1 ? "" : "s"} selected.`);
@@ -2548,7 +2563,10 @@
 
   function closeCodePanels() {
     if (state.isParsing) return;
+    const fromHome = state.quickExport, returnFocus = state.quickExportReturnFocus;
     state.codeMode = null;
+    state.quickExport = false;
+    state.quickExportReturnFocus = null;
     resetSharedImport();
     resetShareLink(els.exportSharePanel);
     els.codeExportPanel.hidden = true;
@@ -2556,12 +2574,40 @@
     els.exportCodeOutput.value = "";
     els.importCodeInput.value = "";
     updateScheduleModal();
+    if (fromHome) {
+      els.scheduleModal.hidden = true;
+      document.body.style.overflow = "";
+      (returnFocus || els.homeShareButton).focus({ preventScroll: true });
+    }
   }
 
-  function openCodePanel(mode) {
+  function openQuickExport(event) {
+    if (state.isParsing || state.pendingImage || state.codeMode || !Object.keys(peopleMap()).length) return;
+    if (!els.helpModal.hidden) closeHelp();
+    state.quickExportReturnFocus = event?.currentTarget || els.homeShareButton;
+    openScheduleModal();
+    openCodePanel("export", true);
+  }
+
+  function openHelp() {
+    if (state.isParsing || state.pendingImage || state.codeMode) return;
+    els.helpModal.hidden = false;
+    document.body.style.overflow = "hidden";
+    els.helpModal.querySelector(".help-modal").scrollTop = 0;
+    els.closeHelpModal.focus({ preventScroll: true });
+  }
+
+  function closeHelp() {
+    els.helpModal.hidden = true;
+    if (![els.scheduleModal, els.settingsModal, els.groupsModal, els.groupWeekModal, els.personWeekModal].some(modal => !modal.hidden)) document.body.style.overflow = "";
+    els.helpButton.focus({ preventScroll: true });
+  }
+
+  function openCodePanel(mode, quick = false) {
     if (state.isParsing || state.pendingImage || state.codeMode) return;
     resetSharedImport();
     state.codeMode = mode;
+    state.quickExport = quick;
     els.codeExportPanel.hidden = mode !== "export";
     els.codeImportPanel.hidden = mode !== "import";
     if (mode === "export") {
@@ -2572,6 +2618,7 @@
         label.className = "share-selection";
         const input = document.createElement("input");
         input.type = "checkbox";
+        input.checked = quick;
         input.dataset.person = name;
         input.addEventListener("change", exportSelectionChanged);
         const caption = document.createElement("span");
@@ -2580,7 +2627,8 @@
         els.exportPeopleList.append(label);
       }
       exportSelectionChanged();
-      revealSection(els.codeExportPanel, els.selectAllSchedules);
+      els.exportSelection.open = !quick;
+      revealSection(els.codeExportPanel, quick ? els.generateCodeButton : els.exportSelection.querySelector("summary"));
     } else {
       els.importCodeInput.value = "";
       codeStatus(els.importCodeStatus, "");
@@ -2614,7 +2662,7 @@
     return `Code ready for ${count} schedule${count === 1 ? "" : "s"} · ${code.length.toLocaleString()} characters. ${messageSize}`;
   }
 
-  async function generateShareCode() {
+  async function generateShareCode(action = "code") {
     if (state.isParsing || state.codeMode !== "export") return;
     const names = [...els.exportPeopleList.querySelectorAll("input:checked")].map(input => input.dataset.person);
     if (!names.length) { codeStatus(els.exportCodeStatus, "Select at least one schedule to export.", "error"); return; }
@@ -2624,11 +2672,23 @@
     els.exportFieldOptions.open = false;
     resetShareLink(els.exportSharePanel);
     try {
-      const code = await encodeSchedules(names, els.exportFieldOptions);
+      const code = action !== "code" && els.exportCodeOutput.value || await encodeSchedules(names, els.exportFieldOptions);
       els.exportCodeOutput.value = code;
       populateShareLink(code, els.exportSharePanel);
+      els.exportCodeField.hidden = action !== "code";
+      els.copyCodeButton.hidden = action !== "code";
       codeStatus(els.exportCodeStatus, shareCodeReadyMessage(names.length, code), "success");
-      revealSection(els.exportCodeOutput.closest(".field-group"));
+      if (action === "qr") {
+        if (!els.exportSharePanel.querySelector("textarea").value) throw new Error("This code cannot make a QR. Use Export Code instead.");
+        toggleScheduleQr(els.exportSharePanel);
+      } else if (action === "link") {
+        if (!els.exportSharePanel.querySelector("textarea").value) throw new Error("This code cannot make a link. Use Export Code instead.");
+        els.exportSharePanel.querySelector(".share-link-field").hidden = false;
+        await copyScheduleLink(els.exportSharePanel);
+      } else {
+        els.exportSharePanel.hidden = true;
+        revealSection(els.exportCodeField);
+      }
     } catch (error) {
       els.exportCodeOutput.value = "";
       codeStatus(els.exportCodeStatus, error.message || "The code could not be created.", "error");
@@ -2646,8 +2706,9 @@
     const qr = panel.querySelector(".share-qr");
     qr.hidden = true;
     qr.replaceChildren();
-    const button = panel.querySelector(".toggle-share-qr");
-    button.textContent = "Show QR";
+    const button = panel === els.exportSharePanel ? els.exportQrButton : panel.querySelector(".toggle-share-qr");
+    if (panel === els.exportSharePanel) panel.querySelector(".share-link-field").hidden = true;
+    if (panel !== els.exportSharePanel) button.textContent = "Show QR";
     button.setAttribute("aria-expanded", "false");
     codeStatus(panel.querySelector(".share-link-status"), "");
   }
@@ -2673,10 +2734,10 @@
   }
 
   function toggleScheduleQr(panel) {
-    const qr = panel.querySelector(".share-qr"), button = panel.querySelector(".toggle-share-qr");
+    const qr = panel.querySelector(".share-qr"), button = panel === els.exportSharePanel ? els.exportQrButton : panel.querySelector(".toggle-share-qr");
     const status = panel.querySelector(".share-link-status");
     if (!qr.hidden) {
-      qr.hidden = true; button.textContent = "Show QR"; button.setAttribute("aria-expanded", "false"); return;
+      qr.hidden = true; if (panel !== els.exportSharePanel) button.textContent = "Show QR"; button.setAttribute("aria-expanded", "false"); return;
     }
     const link = panel.querySelector("textarea").value;
     if (!link) return;
@@ -2697,7 +2758,7 @@
       for (let y = 0; y < code.size; y++) for (let x = 0; x < code.size; x++) if (code.getModule(x, y)) cells.push(`M${x + 4},${y + 4}h1v1h-1z`);
       path.setAttribute("d", cells.join("")); path.setAttribute("fill", "#000");
       svg.append(background, path); qr.replaceChildren(svg); qr.hidden = false;
-      button.textContent = "Hide QR"; button.setAttribute("aria-expanded", "true");
+      if (panel !== els.exportSharePanel) button.textContent = "Hide QR"; button.setAttribute("aria-expanded", "true");
       codeStatus(status, code.version > 25 ? "Scan with your phone camera. This QR is dense; select fewer people if scanning is difficult." : "Scan with your phone camera, then open the link. Anyone with the QR or link can read these schedules.");
       revealSection(qr);
     } catch (error) {
@@ -2769,6 +2830,7 @@
     if (!els.settingsModal.hidden) closeSettingsModal();
     if (!els.groupWeekModal.hidden) closeGroupWeek();
     if (!els.groupsModal.hidden) closeGroupsModal();
+    if (!els.helpModal.hidden) closeHelp();
     openScheduleModal();
     openCodePanel("import");
     els.importCodeInput.value = input;
@@ -3063,7 +3125,7 @@
     }
     els.codeImportPanel.hidden = state.codeMode !== "import";
     els.codeExportPanel.hidden = state.codeMode !== "export";
-    document.getElementById("scheduleModalTitle").textContent = flow === "review" ? "Review schedule" : flow === "code-import" ? "Import schedules" : flow === "code-export" ? "Share schedules" : "Schedule data";
+    document.getElementById("scheduleModalTitle").textContent = flow === "review" ? "Review schedule" : flow === "code-import" ? "Import schedules" : flow === "code-export" ? state.quickExport ? "Quick share" : "Share schedules" : "Schedule data";
     dialog.querySelector(".modal-header p").hidden = Boolean(flow);
     if (flow) dialog.dataset.scheduleFlow = flow;
     else delete dialog.dataset.scheduleFlow;
@@ -3083,8 +3145,12 @@
     renderPeopleManager();
     const importBusy = state.isParsing || Boolean(state.pendingImage) || Boolean(state.codeMode);
     els.exportSchedulesButton.disabled = importBusy || peopleCount === 0;
+    els.homeShareButton.disabled = importBusy || peopleCount === 0;
+    els.homeExportButton.disabled = importBusy || peopleCount === 0;
     els.importCodeButton.disabled = importBusy;
     els.generateCodeButton.disabled = state.isParsing;
+    els.exportQrButton.disabled = state.isParsing;
+    els.copyExportLinkButton.disabled = state.isParsing;
     els.copyCodeButton.disabled = state.isParsing || !els.exportCodeOutput.value;
     els.decodeCodeButton.disabled = state.isParsing || Boolean(state.sharedImport && !els.sharedImportPeople.querySelector("input:checked"));
     els.closeExportButton.disabled = state.isParsing;
@@ -3142,6 +3208,7 @@
     els.advancedScheduleOptions.open = false;
     els.scheduleModal.querySelector(".schedule-modal").scrollTop = 0;
     requestAnimationFrame(() => {
+      if (els.scheduleModal.hidden) return;
       animateModalOpen(els.scheduleModal, els.scheduleModal.querySelector(".schedule-modal"));
       els.closeScheduleModal.focus();
     });
@@ -3801,6 +3868,11 @@
       applyAccentTheme(button.dataset.colorTheme, true);
     });
     els.scheduleDataButton.addEventListener("click", openScheduleModal);
+    els.homeShareButton.addEventListener("click", openQuickExport);
+    els.homeExportButton.addEventListener("click", openQuickExport);
+    els.helpButton.addEventListener("click", openHelp);
+    els.closeHelpModal.addEventListener("click", closeHelp);
+    els.helpModal.addEventListener("click", event => { if (event.target === els.helpModal) closeHelp(); });
     els.settingsButton.addEventListener("click", openSettingsModal);
     els.showGroupsToggle.addEventListener("click", () => {
       state.showGroups = !state.showGroups;
@@ -3855,7 +3927,9 @@
       els.exportPeopleList.querySelectorAll("input").forEach(input => { input.checked = els.selectAllSchedules.checked; });
       exportSelectionChanged();
     });
-    els.generateCodeButton.addEventListener("click", generateShareCode);
+    els.generateCodeButton.addEventListener("click", () => generateShareCode("code"));
+    els.exportQrButton.addEventListener("click", () => generateShareCode("qr"));
+    els.copyExportLinkButton.addEventListener("click", () => generateShareCode("link"));
     for (const options of [els.exportFieldOptions, els.personExportFieldOptions]) {
       const changed = options === els.exportFieldOptions ? exportSelectionChanged : personExportFieldsChanged;
       options.addEventListener("change", changed);
@@ -3865,7 +3939,7 @@
       });
     }
     els.copyCodeButton.addEventListener("click", copyShareCode);
-    for (const panel of [els.exportSharePanel, els.personSharePanel]) {
+    for (const panel of [els.personSharePanel]) {
       panel.querySelector(".copy-share-link").addEventListener("click", () => copyScheduleLink(panel));
       panel.querySelector(".toggle-share-qr").addEventListener("click", () => toggleScheduleQr(panel));
     }
@@ -3903,9 +3977,9 @@
         if (event.key === "Escape") event.preventDefault();
         return;
       }
-      const groupModal = !els.personWeekModal.hidden ? els.personWeekModal : !els.groupWeekModal.hidden ? els.groupWeekModal : !els.groupsModal.hidden ? els.groupsModal : null;
+      const groupModal = !els.personWeekModal.hidden ? els.personWeekModal : !els.groupWeekModal.hidden ? els.groupWeekModal : !els.groupsModal.hidden ? els.groupsModal : !els.helpModal.hidden ? els.helpModal : !els.scheduleModal.hidden ? els.scheduleModal : null;
       if (event.key === "Tab" && groupModal) {
-        const focusable = [...groupModal.querySelectorAll('button, input, textarea, summary, [tabindex="0"]')].filter(item => {
+        const focusable = [...groupModal.querySelectorAll('button, input, textarea, select, summary, [tabindex="0"]')].filter(item => {
           const closed = item.closest("details:not([open])");
           return !item.disabled && !item.closest("[hidden]") && (!closed || closed.querySelector(":scope > summary") === item);
         });
@@ -3933,6 +4007,7 @@
       if (!els.personWeekModal.hidden) closePersonWeek();
       else if (!els.groupWeekModal.hidden) closeGroupWeek();
       else if (!els.groupsModal.hidden) closeGroupsModal();
+      else if (!els.helpModal.hidden) closeHelp();
       else if (!els.settingsModal.hidden) closeSettingsModal();
       else if (!els.scheduleModal.hidden) closeScheduleModal();
     });
@@ -3974,7 +4049,7 @@
     if (!("serviceWorker" in navigator)) return;
     if (location.protocol !== "https:" && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") return;
 
-    navigator.serviceWorker.register("./service-worker.js?v=67", { updateViaCache: "none" })
+    navigator.serviceWorker.register("./service-worker.js?v=68", { updateViaCache: "none" })
       .then(registration => registration.update())
       .catch(() => {
         // The app works normally even if PWA caching isn't available.
