@@ -2726,9 +2726,10 @@ button:disabled { cursor: not-allowed; }
 .home-header-controls .nav-icon-button { width: 40px; min-width: 40px; height: 40px; min-height: 40px; padding: 0; }
 .home-header-controls .nav-icon-button svg { width: 16px; height: 16px; }
 .home-header-controls .compact-label { width: 40px; min-width: 40px; padding: 0; gap: 0; }
-.compact-label .nav-button-label, .compact-label .group-toggle-label { display: none; }
+.compact-label .nav-button-label, .compact-label .group-toggle-label, .compact-label [data-mode-label] { display: none; }
 .people-actions { flex-wrap: nowrap; min-width: 0; max-width: 100%; }
 .people-actions > *, .group-view-controls > * { flex-shrink: 0; }
+.people-actions .view-mode-button.compact-label { width: 42px; min-width: 42px; padding: 0; gap: 0; }
 .action-icon-button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; }
 .action-icon-button svg { flex: 0 0 auto; width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 #settingsButton svg { width: 18px; height: 18px; }
@@ -2753,6 +2754,7 @@ button:disabled { cursor: not-allowed; }
   .home-header-controls { width: 100%; }
   .home-header-controls .header-actions { width: 100%; }
 }
+
 @media (max-width: 350px) {
   .home-header-controls .header-actions { gap: 6px; }
   .home-header-controls .header-data-button { padding-left: 9px; padding-right: 9px; gap: 5px; font-size: .78rem; }
@@ -2764,5 +2766,13 @@ button:disabled { cursor: not-allowed; }
   .export-generation-actions { gap: 8px; }
   .export-action-buttons { gap: 5px; }
   .export-action-buttons button { font-size: .72rem; padding-left: 5px; padding-right: 5px; }
+}
+
+@media (max-width: 300px) {
+  .people-actions, .group-view-controls { gap: 4px; }
+  .people-actions .live-control, .people-actions #manageGroupsButton { font-size: .72rem; }
+  .people-actions #manageGroupsButton { padding-left: 6px; padding-right: 6px; }
+  .people-actions .view-mode-button.compact-label,
+  #showGroupsToggle.group-label-button.compact-label { width: 36px; min-width: 36px; }
 }
 

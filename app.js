@@ -1334,9 +1334,11 @@
     if (!fits(nav)) els.scheduleDataButton.classList.add("compact-label");
 
     els.showGroupsToggle.classList.remove("compact-label");
+    els.viewToggleButton.classList.remove("compact-label");
     if (!els.manageGroupsButton.hidden && !fits(peopleActions)) {
       els.showGroupsToggle.classList.add("compact-label");
     }
+    if (!fits(peopleActions)) els.viewToggleButton.classList.add("compact-label");
   }
 
   function scheduleToolbarLayout() {
@@ -4091,7 +4093,7 @@
     if (!("serviceWorker" in navigator)) return;
     if (location.protocol !== "https:" && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") return;
 
-    navigator.serviceWorker.register("./service-worker.js?v=72", { updateViaCache: "none" })
+    navigator.serviceWorker.register("./service-worker.js?v=73", { updateViaCache: "none" })
       .then(registration => registration.update())
       .catch(() => {
         // The app works normally even if PWA caching isn't available.
