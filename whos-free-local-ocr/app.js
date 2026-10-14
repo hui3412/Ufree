@@ -40,7 +40,7 @@
   const ACCENT_THEME_KEY = "whos-free-accent-theme-v1";
   const ACCENT_THEMES = new Set(["blue", "violet", "rose", "mint", "orange"]);
   const BREAK_THRESHOLD_MINUTES = 10;
-  const APP_URL = "https://xander444.github.io/Whos-Free/";
+  const APP_URL = "https://hui3412.github.io/Ufree/";
 
   const els = {
     root: document.documentElement,
@@ -427,8 +427,8 @@
 
     await showSystemNotification(title, {
       body,
-      icon: "./assets/icon-192.png",
-      badge: "./assets/icon-192.png",
+      icon: "./assets/icon-192.png?v=83",
+      badge: "./assets/icon-192.png?v=83",
       tag: `whos-free-break-${dateKey()}-${breaks[0].start}`,
       data: { url: "./" },
     });
@@ -457,7 +457,7 @@
 
   function notificationSupportText() {
     if (!("Notification" in window)) {
-      return { tone: "error", text: "Notifications are not supported in this browser. On iPhone, add Who's Free? to the Home Screen and open it from there." };
+      return { tone: "error", text: "Notifications are not supported in this browser. On iPhone, add UFree to the Home Screen and open it from there." };
     }
     if (Notification.permission === "denied") {
       return { tone: "error", text: "Notifications are blocked. Re-enable them in your browser or device settings." };
@@ -465,7 +465,7 @@
     if (Notification.permission === "granted") {
       return { tone: "success", text: state.notificationsEnabled ? "Break notifications are on." : "Notification permission is ready. Turn alerts on whenever you want." };
     }
-    return { tone: "neutral", text: "Turn alerts on to let Who's Free? ask for notification permission." };
+    return { tone: "neutral", text: "Turn alerts on to let UFree ask for notification permission." };
   }
 
   async function handleNotificationToggle() {
@@ -513,10 +513,10 @@
       showToast("Turn notifications on first");
       return;
     }
-    const ok = await showSystemNotification("Who's Free? notifications work", {
+    const ok = await showSystemNotification("UFree notifications work", {
       body: "You'll get grouped alerts when friends start breaks longer than 10 minutes.",
-      icon: "./assets/icon-192.png",
-      badge: "./assets/icon-192.png",
+      icon: "./assets/icon-192.png?v=83",
+      badge: "./assets/icon-192.png?v=83",
       tag: "whos-free-test",
       data: { url: "./" },
     });
@@ -915,7 +915,7 @@
   }
 
   function renderDataSetup() {
-    els.peopleHeading.textContent = "Who's Free?";
+    els.peopleHeading.textContent = "Schedules";
     els.freeCount.textContent = "Local only";
     els.statusLine.textContent = state.loadError
       ? "Schedule data needs your attention."
@@ -1436,7 +1436,7 @@
     }
 
     if (failures.length > 1) {
-      console.warn("Who’s Free? PDF import errors\n" + failures.join("\n"));
+      console.warn("UFree PDF import errors\n" + failures.join("\n"));
     }
 
     state.isParsing = false;
@@ -1467,13 +1467,13 @@
   async function shareSchedules() {
     if (!state.hasData) return;
     const file = new File([databaseJsonText()], "schedules.json", { type: "application/json" });
-    const shareText = `Import this schedules.json into Who's Free?\n${APP_URL}`;
+    const shareText = `Import this schedules.json into UFree\n${APP_URL}`;
 
     try {
       if (navigator.share && navigator.canShare?.({ files: [file] })) {
         try {
           await navigator.share({
-            title: "Who's Free? schedules",
+            title: "UFree schedules",
             text: shareText,
             url: APP_URL,
             files: [file],
@@ -1481,7 +1481,7 @@
         } catch (error) {
           if (error?.name === "AbortError") return;
           await navigator.share({
-            title: "Who's Free? schedules",
+            title: "UFree schedules",
             text: shareText,
             files: [file],
           });
@@ -1494,7 +1494,7 @@
     }
 
     downloadDatabaseFile(file);
-    showToast("Downloaded schedules.json — the Who's Free? link is included in the file");
+    showToast("Downloaded schedules.json — the UFree link is included in the file");
   }
 
   async function handleLocalScheduleFile(event) {
@@ -2159,7 +2159,7 @@
     if (!("serviceWorker" in navigator)) return;
     if (location.protocol !== "https:" && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") return;
 
-    navigator.serviceWorker.register("./service-worker.js?v=13", { updateViaCache: "none" })
+    navigator.serviceWorker.register("./service-worker.js?v=83", { updateViaCache: "none" })
       .then(registration => registration.update())
       .catch(() => {
         // The app works normally even if PWA caching isn't available.
@@ -2207,3 +2207,4 @@
 
   init();
 })();
+

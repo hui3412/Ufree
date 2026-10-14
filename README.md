@@ -439,3 +439,9 @@ The **Share schedules.json** button shares/downloads only the schedule database.
 
 App by David Dajbog and Hui En Quan. Inspiration from Xander Vatch.
 
+
+
+
+## v83: Official UFree branding
+
+The supplied SVG replaces the text masthead, including the legacy entry point. The supplied PNG is referenced in Open Graph and Twitter metadata. Browser, iOS, installable-app and notification icons use the official logo; square and maskable variants preserve its proportions. Branding assets are included in the offline shell.

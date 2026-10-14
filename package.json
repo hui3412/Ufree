@@ -1,9 +1,10 @@
 {
   "name": "ufree",
   "private": true,
-  "version": "82.0.0",
+  "version": "83.0.0",
   "scripts": { "test": "node --test tests/*.test.cjs tests/*.test.mjs" },
   "devDependencies": { "happy-dom": "20.14.5" }
 }
+
 
 
