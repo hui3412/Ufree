@@ -2848,3 +2848,9 @@ button:disabled { cursor: not-allowed; }
 @media (max-width: 300px) {
   .people-search-button, .people-actions #manageGroupsButton { width: 36px; min-width: 36px; }
 }
+
+
+/* Official UFree identity: retain the master logo’s aspect ratio in every theme. */
+.brand-copy .brand-title { line-height: 0; margin: 0; }
+.brand-logo { display: block; width: 112px; height: auto; max-width: 100%; object-fit: contain; }
+@media (max-width: 480px) { .brand-logo { width: 96px; } }
