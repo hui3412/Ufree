@@ -1359,14 +1359,12 @@
 
     els.showGroupsToggle.classList.remove("compact-label");
     els.viewToggleButton.classList.remove("compact-label");
-    els.manageGroupsButton.classList.remove("compact-label");
     const liveControl = els.liveToggle.closest(".live-control");
     liveControl.classList.remove("compact-label");
     if (!fits(peopleActions)) {
       els.showGroupsToggle.classList.add("compact-label");
     }
     if (!fits(peopleActions)) els.viewToggleButton.classList.add("compact-label");
-    if (!fits(peopleActions)) els.manageGroupsButton.classList.add("compact-label");
     if (!fits(peopleActions)) liveControl.classList.add("compact-label");
     const fullSchedule = document.getElementById("fullScheduleButton");
     if (fullSchedule) {
@@ -1603,10 +1601,7 @@
       const week = document.createElement("button"); week.type = "button"; week.className = "secondary-button";
       week.textContent = "Weekly availability"; week.setAttribute("aria-label", `View weekly availability for ${group.name}`);
       week.addEventListener("click", () => { menu.open = false; openGroupWeek(group.id, more); });
-      const edit = document.createElement("button"); edit.type = "button"; edit.className = "secondary-button";
-      edit.textContent = "Edit Group"; edit.setAttribute("aria-label", `Edit Group ${group.name}`);
-      edit.addEventListener("click", () => { menu.open = false; openGroupsModal(group.id, more); });
-      options.append(edit, top, week); menu.append(more, options); actions.append(menu);
+      options.append(top, week); menu.append(more, options); actions.append(menu);
     }
     header.append(copy, actions);
     section.append(header);
@@ -4264,7 +4259,7 @@
       state.showGroups = !state.showGroups;
       saveGroupPreferences(); refresh({ preserveScroll: true });
     });
-    els.manageGroupsButton.addEventListener("click", () => openGroupsModal());
+    els.manageGroupsButton.addEventListener("click", () => openGroupsModal(null, els.manageGroupsButton));
     els.closeGroupsModal.addEventListener("click", closeGroupsModal);
     els.newGroupButton.addEventListener("click", () => editGroup());
     els.groupForm.addEventListener("submit", saveGroup);

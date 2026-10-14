@@ -36,6 +36,7 @@
   <script>
     const sizes = [[280,640],[320,568],[350,700],[360,800],[375,812],[390,844],[414,896],[568,320],[667,375],[844,390],[768,1024],[1024,768],[1440,900],[1920,1080]];
     const frame = document.querySelector('#app');
+    const freshAppUrl = () => `../?layout-check=${Date.now()}`;
     const viewport = document.querySelector('#viewport');
     const status = document.querySelector('#status');
     const auditButton = document.querySelector('#audit');
@@ -83,7 +84,7 @@
       return result;
     }
     viewport.addEventListener('change', () => { resize(); checkCurrent(); });
-    document.querySelector('#reload').addEventListener('click', () => { frame.src = '../'; });
+    document.querySelector('#reload').addEventListener('click', () => { frame.src = freshAppUrl(); });
     frame.addEventListener('load', checkCurrent);
     auditButton.addEventListener('click', async () => {
       auditButton.disabled = true;
@@ -113,6 +114,7 @@
       auditButton.disabled = false;
     });
     resize();
+    frame.src = freshAppUrl();
   </script>
 </body>
 </html>

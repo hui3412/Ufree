@@ -2,6 +2,13 @@
 
 link: [www.youfree.ca](https://www.youfree.ca)
 
+### Version 82 — Compact group controls
+
+October 14, 2026
+
+- Make the main group management button icon-only at every width, retaining its accessible name and tooltip.
+- Remove Edit Group from each group's … menu. Editing stays in the group management panel; the dropdown keeps Send group to top and Weekly availability with a smaller footprint.
+
 ### Version 81 — Keyboard search exit
 
 October 14, 2026

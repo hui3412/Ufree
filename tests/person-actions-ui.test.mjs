@@ -322,15 +322,17 @@ test("search respects free filters, group membership and accented multiword name
   } finally { await a.window.happyDOM.abort(); }
 });
 
-test("Edit Group from the options menu stages renaming and individual removals, then saves only that group", async () => {
+test("icon-only group management edits groups; their options menu contains no duplicate edit action", async () => {
   const groups = [{ id:"team",name:"Team",members:["Alice","Bob"],hidden:false },{ id:"other",name:"Other",members:["Bob"],hidden:false }];
   const a = await app(data, groups);
   try {
     const before = a.stored(); a.el("showGroupsToggle").click();
     const section = a.el("peopleList").querySelector('[data-group-id="team"]');
     section.querySelector("details").open = true;
-    const edit = [...section.querySelectorAll("button")].find(button => button.textContent === "Edit Group");
-    assert.ok(edit); edit.click();
+    assert.deepEqual([...section.querySelectorAll(".group-options-panel button")].map(button => button.textContent), ["Send group to top", "Weekly availability"]);
+    assert.equal(a.el("manageGroupsButton").textContent.trim(), ""); assert.ok(a.el("manageGroupsButton").querySelector("svg"));
+    assert.equal(a.el("manageGroupsButton").getAttribute("aria-label"), "Manage groups");
+    a.el("manageGroupsButton").click(); a.el("groupsManagerList").querySelector('[aria-label="Edit group Team"]').click();
     assert.equal(a.el("groupsModal").hidden, false); assert.equal(a.el("groupNameInput").value, "Team");
     assert.equal(a.el("groupMembersList").querySelectorAll(".group-member-row").length, 2);
     const remove = a.el("groupMembersList").querySelector('[data-person="Bob"] button');
@@ -344,7 +346,7 @@ test("Edit Group from the options menu stages renaming and individual removals, 
     assert.deepEqual(saved[0],{ id:"team",name:"Study team",members:["Alice"],hidden:false });
     assert.deepEqual(saved[1],groups[1]); assert.equal(a.stored(), before);
     a.el("closeGroupsModal").click();
-    assert.equal(a.window.document.activeElement.getAttribute("aria-label"), "Options for group Study team");
+    assert.equal(a.window.document.activeElement.id, "manageGroupsButton");
     const restored = await app(data, saved);
     try { restored.el("showGroupsToggle").click(); const row=restored.el("peopleList").querySelector('[data-group-id="team"]'); assert.equal(row.querySelectorAll(".person-card").length,1); }
     finally { await restored.window.happyDOM.abort(); }
@@ -356,7 +358,7 @@ test("cancel and close discard group drafts, duplicate names are rejected, and e
   const a=await app(data,groups);
   try {
     a.el("showGroupsToggle").click();
-    const edit=()=>{a.el("peopleList").querySelector('[data-group-id="team"] .group-options').open=true; a.el("peopleList").querySelector('[aria-label="Edit Group Team"]').click();};
+    const edit=()=>{a.el("manageGroupsButton").click(); a.el("groupsManagerList").querySelector('[aria-label="Edit group Team"]').click();};
     edit(); a.el("groupMembersList").querySelector(".group-remove-member").click(); a.el("groupNameInput").value="Other";
     a.el("groupForm").dispatchEvent(new a.window.Event("submit",{bubbles:true,cancelable:true})); assert.match(a.el("groupFormError").textContent,/already uses/);
     a.el("cancelGroupButton").click(); a.el("closeGroupsModal").click(); edit(); assert.equal(a.el("groupMembersList").querySelectorAll(".group-member-row").length,1);
