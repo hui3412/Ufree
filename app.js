@@ -21,6 +21,7 @@
     personShareReturnFocus: null,
     groupPerson: null,
     showEveryone: false,
+    peopleSearchQuery: "",
     theme: loadTheme(),
     loadError: null,
     isParsing: false,
@@ -47,6 +48,8 @@
     showGroups: false,
     hideUngrouped: false,
     editingGroupId: null,
+    editingGroupMembers: null,
+    groupReturnId: null,
     weekGroupId: null,
     groupReturnFocus: null,
     groupFromSchedules: false,
@@ -174,6 +177,11 @@
     peopleList: document.getElementById("peopleList"),
     showGroupsToggle: document.getElementById("showGroupsToggle"),
     manageGroupsButton: document.getElementById("manageGroupsButton"),
+    peopleSearchButton: document.getElementById("peopleSearchButton"),
+    peopleSearchPanel: document.getElementById("peopleSearchPanel"),
+    peopleSearchInput: document.getElementById("peopleSearchInput"),
+    clearPeopleSearchButton: document.getElementById("clearPeopleSearchButton"),
+    peopleSearchStatus: document.getElementById("peopleSearchStatus"),
     groupsModal: document.getElementById("groupsModal"),
     closeGroupsModal: document.getElementById("closeGroupsModal"),
     newGroupButton: document.getElementById("newGroupButton"),
@@ -182,6 +190,7 @@
     groupFormTitle: document.getElementById("groupFormTitle"),
     groupNameInput: document.getElementById("groupNameInput"),
     groupMembersList: document.getElementById("groupMembersList"),
+    groupMembersInstructions: document.getElementById("groupMembersInstructions"),
     groupFormError: document.getElementById("groupFormError"),
     cancelGroupButton: document.getElementById("cancelGroupButton"),
     groupWeekModal: document.getElementById("groupWeekModal"),
@@ -1349,10 +1358,15 @@
 
     els.showGroupsToggle.classList.remove("compact-label");
     els.viewToggleButton.classList.remove("compact-label");
-    if (!els.manageGroupsButton.hidden && !fits(peopleActions)) {
+    els.manageGroupsButton.classList.remove("compact-label");
+    const liveControl = els.liveToggle.closest(".live-control");
+    liveControl.classList.remove("compact-label");
+    if (!fits(peopleActions)) {
       els.showGroupsToggle.classList.add("compact-label");
     }
     if (!fits(peopleActions)) els.viewToggleButton.classList.add("compact-label");
+    if (!fits(peopleActions)) els.manageGroupsButton.classList.add("compact-label");
+    if (!fits(peopleActions)) liveControl.classList.add("compact-label");
     const fullSchedule = document.getElementById("fullScheduleButton");
     if (fullSchedule) {
       fullSchedule.classList.remove("compact-label");
@@ -1428,27 +1442,75 @@
     }
   }
 
+  function renderGroupEditorMembers() {
+    const names = Object.keys(peopleMap()).sort(comparePeopleNames);
+    els.groupMembersList.replaceChildren();
+    if (!state.editingGroupId) {
+      for (const name of names) {
+        const label = document.createElement("label"); label.className = "share-selection";
+        const input = document.createElement("input"); input.type = "checkbox"; input.dataset.person = name;
+        label.append(input, document.createTextNode(displayName(name))); els.groupMembersList.append(label);
+      }
+      return;
+    }
+    const members = document.createElement("div"); members.className = "group-current-members";
+    members.setAttribute("role", "list"); members.setAttribute("aria-label", "Current group members");
+    const selected = names.filter(name => state.editingGroupMembers.has(name));
+    for (const [index, name] of selected.entries()) {
+      const row = document.createElement("div"); row.className = "group-member-row";
+      row.setAttribute("role", "listitem"); row.dataset.person = name;
+      const label = document.createElement("span"); label.className = "group-member-name"; label.textContent = displayName(name);
+      const remove = iconAction(`Remove ${displayName(name)} from group`, "M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7", "person-delete-button group-remove-member");
+      remove.addEventListener("click", () => {
+        const additionsOpen = els.groupMembersList.querySelector("details")?.open;
+        state.editingGroupMembers.delete(name);
+        renderGroupEditorMembers();
+        const additions = els.groupMembersList.querySelector("details"); additions.open = additionsOpen;
+        const next = els.groupMembersList.querySelectorAll(".group-remove-member");
+        (next[Math.min(index, next.length - 1)] || additions.querySelector("summary")).focus({ preventScroll: true });
+      });
+      row.append(label, remove); members.append(row);
+    }
+    if (!selected.length) {
+      const empty = document.createElement("p"); empty.className = "group-editor-empty"; empty.textContent = "No members. Use Add people to choose someone."; members.append(empty);
+    }
+    const additions = document.createElement("details"); additions.className = "group-add-people";
+    const summary = document.createElement("summary"); summary.textContent = "Add people"; additions.append(summary);
+    const available = names.filter(name => !state.editingGroupMembers.has(name));
+    for (const name of available) {
+      const label = document.createElement("label"); label.className = "share-selection";
+      const input = document.createElement("input"); input.type = "checkbox"; input.dataset.person = name;
+      input.addEventListener("change", () => {
+        if (!input.checked) return;
+        state.editingGroupMembers.add(name); renderGroupEditorMembers();
+        els.groupMembersList.querySelector("details").open = true;
+        [...els.groupMembersList.querySelectorAll(".group-member-row")].find(row => row.dataset.person === name)?.querySelector("button").focus({ preventScroll: true });
+      });
+      label.append(input, document.createTextNode(displayName(name))); additions.append(label);
+    }
+    if (!available.length) { const empty = document.createElement("p"); empty.textContent = "Everyone is already in this group."; additions.append(empty); }
+    els.groupMembersList.append(members, additions);
+  }
+
   function editGroup(id = null) {
     const group = state.groups.find(item => item.id === id);
     state.editingGroupId = group?.id || null;
+    state.editingGroupMembers = group ? new Set(groupMembers(group)) : null;
     els.groupForm.hidden = false;
-    els.groupFormTitle.textContent = group ? "Edit group" : "New group";
+    els.groupsManagerList.hidden = true; els.newGroupButton.hidden = true;
+    document.getElementById("groupsModalTitle").textContent = group ? "Edit Group" : "Manage groups";
+    els.groupFormTitle.textContent = group ? "Members" : "New group";
     els.groupNameInput.value = group?.name || "";
     els.groupFormError.textContent = "";
-    els.groupMembersList.replaceChildren();
-    const selected = new Set(group?.members || []);
-    for (const name of Object.keys(peopleMap()).sort(comparePeopleNames)) {
-      const label = document.createElement("label"); label.className = "share-selection";
-      const input = document.createElement("input"); input.type = "checkbox";
-      input.dataset.person = name; input.checked = selected.has(name);
-      label.append(input, document.createTextNode(displayName(name)));
-      els.groupMembersList.append(label);
-    }
+    els.groupMembersInstructions.textContent = group ? "Remove members below, or expand Add people. Changes apply when you save." : "Choose members.";
+    renderGroupEditorMembers();
     revealSection(els.groupForm, els.groupNameInput);
   }
 
   function cancelGroupEdit() {
-    els.groupForm.hidden = true; state.editingGroupId = null;
+    els.groupForm.hidden = true; state.editingGroupId = null; state.editingGroupMembers = null;
+    els.groupsManagerList.hidden = false; els.newGroupButton.hidden = false;
+    document.getElementById("groupsModalTitle").textContent = "Manage groups";
     els.newGroupButton.focus();
   }
 
@@ -1459,7 +1521,9 @@
     if (state.groups.some(group => group.id !== state.editingGroupId && group.name.normalize("NFC").toLowerCase() === name.normalize("NFC").toLowerCase())) {
       els.groupFormError.textContent = "A group already uses this name. Choose another name."; return;
     }
-    const members = [...els.groupMembersList.querySelectorAll("input:checked")].map(input => input.dataset.person);
+    const members = state.editingGroupId
+      ? [...state.editingGroupMembers].filter(person => Object.hasOwn(peopleMap(), person))
+      : [...els.groupMembersList.querySelectorAll("input:checked")].map(input => input.dataset.person);
     const existing = state.groups.find(group => group.id === state.editingGroupId);
     if (existing) { existing.name = name; existing.members = members; }
     else {
@@ -1472,24 +1536,28 @@
     showToast(`Group saved: ${name}`);
   }
 
-  function openGroupsModal(id = null) {
+  function openGroupsModal(id = null, returnFocus = document.activeElement) {
     if (state.isParsing || state.pendingImage || state.codeMode) return;
-    state.groupReturnFocus = document.activeElement;
+    state.groupReturnFocus = returnFocus;
+    state.groupReturnId = id;
     state.groupFromSchedules = !els.scheduleModal.hidden;
     if (state.groupFromSchedules) els.scheduleModal.hidden = true;
     els.groupsModal.hidden = false; document.body.style.overflow = "hidden";
     renderGroupsManager();
     if (id || !state.groups.length) editGroup(id);
-    else { els.groupForm.hidden = true; els.closeGroupsModal.focus(); }
+    else { cancelGroupEdit(); els.closeGroupsModal.focus(); }
     animateModalOpen(els.groupsModal, els.groupsModal.querySelector(".groups-modal"));
   }
 
   function closeGroupsModal() {
+    cancelGroupEdit();
     els.groupsModal.hidden = true;
     if (state.groupFromSchedules) { els.scheduleModal.hidden = false; updateScheduleModal(); }
     state.groupFromSchedules = false;
     if (els.scheduleModal.hidden && els.settingsModal.hidden && els.groupWeekModal.hidden) document.body.style.overflow = "";
-    state.groupReturnFocus?.focus?.();
+    const replacement = [...els.peopleList.querySelectorAll(".people-group")].find(group => group.dataset.groupId === state.groupReturnId)?.querySelector(".group-more");
+    (state.groupReturnFocus?.isConnected ? state.groupReturnFocus : replacement || els.manageGroupsButton)?.focus?.({ preventScroll: true });
+    state.groupReturnId = null;
   }
 
   function sharedTimeText(weekly, day, minute) {
@@ -1534,7 +1602,10 @@
       const week = document.createElement("button"); week.type = "button"; week.className = "secondary-button";
       week.textContent = "Weekly availability"; week.setAttribute("aria-label", `View weekly availability for ${group.name}`);
       week.addEventListener("click", () => { menu.open = false; openGroupWeek(group.id, more); });
-      options.append(top, week); menu.append(more, options); actions.append(menu);
+      const edit = document.createElement("button"); edit.type = "button"; edit.className = "secondary-button";
+      edit.textContent = "Edit Group"; edit.setAttribute("aria-label", `Edit Group ${group.name}`);
+      edit.addEventListener("click", () => { menu.open = false; openGroupsModal(group.id, more); });
+      options.append(edit, top, week); menu.append(more, options); actions.append(menu);
     }
     header.append(copy, actions);
     section.append(header);
@@ -1546,7 +1617,7 @@
     orderScopeMembers(scope).filter(name => shown.has(name)).forEach(name => list.append(renderPersonCard(name, day, minute, scope)));
     if (!filtered.length) {
       const message = document.createElement("p"); message.className = "group-empty";
-      message.textContent = members.length ? "Nobody in this group is free at this time. Choose Show everyone to see them." : "No people in this group. Edit it to add members.";
+      message.textContent = state.peopleSearchQuery.trim() ? "No matching people in this view." : members.length ? "Nobody in this group is free at this time. Choose Show everyone to see them." : "No people in this group. Edit it to add members.";
       list.append(message);
     }
     section.append(list);
@@ -1559,14 +1630,14 @@
     for (const group of state.groups) {
       const members = groupMembers(group);
       if (!group.hidden) members.forEach(name => shown.add(name));
-      els.peopleList.append(groupSection(group.name, members, visible, day, minute, group));
+      if (!state.peopleSearchQuery.trim() || members.some(name => visible.includes(name))) els.peopleList.append(groupSection(group.name, members, visible, day, minute, group));
     }
     const ungrouped = Object.keys(peopleMap()).filter(name => !assigned.has(name));
-    if (ungrouped.length) {
+    if (ungrouped.length && (!state.peopleSearchQuery.trim() || ungrouped.some(name => visible.includes(name)))) {
       if (!state.hideUngrouped) ungrouped.forEach(name => shown.add(name));
       els.peopleList.append(groupSection("Ungrouped people", ungrouped, visible, day, minute));
     }
-    if (!els.peopleList.children.length) els.peopleList.append(createEmptyList("No groups shown", "Select a group above, or choose Hide groups to see the usual list."));
+    if (!els.peopleList.children.length) els.peopleList.append(createEmptyList(state.peopleSearchQuery.trim() ? "No matching people" : "No groups shown", state.peopleSearchQuery.trim() ? "Try another name, clear the search, or choose All." : "Select a group above, or choose Hide groups to see the usual list."));
     return { visible: visible.filter(name => shown.has(name)), shown };
   }
 
@@ -1732,8 +1803,31 @@
     return { day, minute };
   }
 
+  function searchText(value) {
+    return value.normalize("NFD").replace(/\p{M}/gu, "").toLocaleLowerCase();
+  }
+
+  function togglePeopleSearch() {
+    const opening = els.peopleSearchPanel.hidden;
+    els.peopleSearchPanel.hidden = !opening;
+    els.peopleSearchButton.setAttribute("aria-expanded", String(opening));
+    if (opening) els.peopleSearchInput.focus();
+    else {
+      state.peopleSearchQuery = ""; els.peopleSearchInput.value = "";
+      refresh({ preserveScroll: true }); els.peopleSearchButton.focus({ preventScroll: true });
+    }
+  }
+
+  function updatePeopleSearchStatus(names = []) {
+    els.clearPeopleSearchButton.hidden = !state.peopleSearchQuery;
+    els.peopleSearchStatus.textContent = state.peopleSearchQuery.trim()
+      ? `${new Set(names).size} matching ${new Set(names).size === 1 ? "person" : "people"} in this view.`
+      : "Search names and nicknames in this view.";
+  }
+
   function visiblePeople(day, minute) {
-    const people = Object.keys(peopleMap()).sort(comparePeopleNames);
+    const terms = searchText(state.peopleSearchQuery.trim()).split(/\s+/).filter(Boolean);
+    const people = Object.keys(peopleMap()).filter(name => terms.every(term => searchText(`${name} ${displayName(name)}`).includes(term))).sort(comparePeopleNames);
     const free = people.filter(name => isFree(name, day, minute)).sort(comparePeopleNames);
     const freeSet = new Set(free);
     const busy = people.filter(name => !freeSet.has(name)).sort(comparePeopleNames);
@@ -3889,6 +3983,7 @@
   function refresh({ preserveScroll = false } = {}) {
     if (state.activeReorder || state.pendingPersonHold) return;
     if (!state.hasData || state.loadError) {
+      updatePeopleSearchStatus();
       renderDataSetup();
       return;
     }
@@ -3918,6 +4013,8 @@
     els.viewToggleButton.querySelector("[data-mode-label]").textContent = state.showEveryone ? "Free" : "All";
     els.peopleList.replaceChildren();
 
+    updatePeopleSearchStatus(visible);
+
     if (peopleCount === 0) {
       els.peopleList.append(createEmptyList("No people in this file", "Replace the schedule file from the Schedules button."));
       state.selectedPerson = null;
@@ -3926,7 +4023,7 @@
     }
 
     if (visible.length === 0 && !state.showGroups) {
-      els.peopleList.append(createEmptyList("Nobody is free", "Try another time or choose Show everyone."));
+      els.peopleList.append(createEmptyList(state.peopleSearchQuery.trim() ? "No matching people" : "Nobody is free", state.peopleSearchQuery.trim() ? "Try another name, clear the search, or choose All." : "Try another time or choose Show everyone."));
       state.selectedPerson = null;
       renderEmptyDetail();
       return;
@@ -3936,6 +4033,7 @@
     if (state.showGroups) {
       const grouped = renderGroupedPeople(visible, day, minute);
       displayed = grouped.visible;
+      updatePeopleSearchStatus(displayed);
     } else visible.forEach(name => els.peopleList.append(renderPersonCard(name, day, minute)));
     for (const section of els.peopleList.querySelectorAll(".people-group")) {
       if (openMenus.includes(section.dataset.groupId)) section.querySelector(".group-options").open = true;
@@ -4101,6 +4199,17 @@
     els.closeHelpModal.addEventListener("click", closeHelp);
     els.helpModal.addEventListener("click", event => { if (event.target === els.helpModal) closeHelp(); });
     els.settingsButton.addEventListener("click", openSettingsModal);
+    els.peopleSearchButton.addEventListener("click", togglePeopleSearch);
+    els.peopleSearchInput.addEventListener("input", () => {
+      state.peopleSearchQuery = els.peopleSearchInput.value; refresh({ preserveScroll: true });
+    });
+    els.clearPeopleSearchButton.addEventListener("click", () => {
+      state.peopleSearchQuery = ""; els.peopleSearchInput.value = "";
+      refresh({ preserveScroll: true }); els.peopleSearchInput.focus();
+    });
+    els.peopleSearchPanel.addEventListener("keydown", event => {
+      if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); togglePeopleSearch(); }
+    });
     els.showGroupsToggle.addEventListener("click", () => {
       state.showGroups = !state.showGroups;
       saveGroupPreferences(); refresh({ preserveScroll: true });
