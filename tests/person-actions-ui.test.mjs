@@ -228,9 +228,14 @@ test("Class Soon, collapsed people, removed summary/forecast, UFree identity, an
     assert.equal(a.window.document.querySelector("h1").textContent, "UFree");
     assert.equal(JSON.parse(fs.readFileSync(new URL("../manifest.webmanifest", import.meta.url))).name, "UFree");
     assert.equal(a.el("statusLine"), null); assert.equal(a.el("freeCount"), null);
-    a.el("scheduleDataButton").click(); assert.equal(a.el("storedPeopleSection").open, false);
-    a.el("storedPeopleSection").open = true; a.el("closeScheduleModal").click();
-    a.el("scheduleDataButton").click(); assert.equal(a.el("storedPeopleSection").open, false); a.el("closeScheduleModal").click();
+    a.el("scheduleDataButton").click();
+    const toggle = a.el("storedPeopleToggle"), list = a.el("peopleManagerList");
+    assert.equal(list.hidden, true); assert.equal(toggle.textContent, "Show");
+    toggle.click(); assert.equal(list.hidden, false); assert.equal(toggle.textContent, "Hide");
+    assert.equal(toggle.getAttribute("aria-expanded"), "true"); assert.equal(toggle.getAttribute("aria-label"), "Hide stored people");
+    toggle.click(); assert.equal(list.hidden, true); assert.equal(toggle.textContent, "Show");
+    toggle.click(); a.el("closeScheduleModal").click();
+    a.el("scheduleDataButton").click(); assert.equal(list.hidden, true); assert.equal(toggle.getAttribute("aria-expanded"), "false"); a.el("closeScheduleModal").click();
     a.el("showGroupsToggle").click(); assert.equal(a.el("peopleList").querySelector(".people-group-header p"), null);
     a.el("showGroupsToggle").click();
     a.el("daySelect").value = "Monday"; a.el("daySelect").dispatchEvent(new a.window.Event("change", { bubbles: true }));

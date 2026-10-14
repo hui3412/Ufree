@@ -160,6 +160,7 @@
 
     peopleManagerCount: document.getElementById("peopleManagerCount"),
     peopleManagerList: document.getElementById("peopleManagerList"),
+    storedPeopleToggle: document.getElementById("storedPeopleToggle"),
     removeSchedulesButton: document.getElementById("removeSchedulesButton"),
     settingsModal: document.getElementById("settingsModal"),
     closeSettingsModal: document.getElementById("closeSettingsModal"),
@@ -3207,6 +3208,13 @@
     showToast(warning || `Schedule removed: ${displayName(name)}`);
   }
 
+  function setStoredPeopleExpanded(expanded) {
+    els.peopleManagerList.hidden = !expanded;
+    els.storedPeopleToggle.textContent = expanded ? "Hide" : "Show";
+    els.storedPeopleToggle.setAttribute("aria-expanded", String(expanded));
+    els.storedPeopleToggle.setAttribute("aria-label", expanded ? "Hide stored people" : "Show stored people");
+  }
+
   function renderPeopleManager() {
     const names = Object.keys(peopleMap()).sort(comparePeopleNames);
     els.peopleManagerCount.textContent = String(names.length);
@@ -3357,7 +3365,7 @@
     document.body.style.overflow = "hidden";
     if (!wasHidden) return;
     els.advancedScheduleOptions.open = false;
-    document.getElementById("storedPeopleSection").open = false;
+    setStoredPeopleExpanded(false);
     els.scheduleModal.querySelector(".schedule-modal").scrollTop = 0;
     requestAnimationFrame(() => {
       if (els.scheduleModal.hidden) return;
@@ -4199,6 +4207,7 @@
     els.closeHelpModal.addEventListener("click", closeHelp);
     els.helpModal.addEventListener("click", event => { if (event.target === els.helpModal) closeHelp(); });
     els.settingsButton.addEventListener("click", openSettingsModal);
+    els.storedPeopleToggle.addEventListener("click", () => setStoredPeopleExpanded(els.peopleManagerList.hidden));
     els.peopleSearchButton.addEventListener("click", togglePeopleSearch);
     els.peopleSearchInput.addEventListener("input", () => {
       state.peopleSearchQuery = els.peopleSearchInput.value; refresh({ preserveScroll: true });

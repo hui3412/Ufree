@@ -2726,11 +2726,8 @@ button:disabled { cursor: not-allowed; }
 .person-delete-button { color: #eb7777; background: color-mix(in srgb, #e24444 10%, var(--button)); }
 .person-delete-button:hover { color: #ffaaaa; background: color-mix(in srgb, #e24444 20%, var(--button)); }
 :root[data-theme="light"] .person-delete-button { color: #b42323; }
-.people-manager-section > summary { cursor: pointer; min-height: 44px; gap: 12px; list-style: none; }
-.people-manager-section > summary::-webkit-details-marker { display: none; }
-.people-manager-section > summary::after { content: "+"; color: var(--text); display: inline-flex; align-items: center; justify-content: center; flex: 0 0 28px; width: 28px; height: 28px; border: 1.5px solid var(--muted); border-radius: 0; line-height: 1; }
-.people-manager-section[open] > summary::after { content: "−"; }
-.people-manager-section[open] .people-manager-list { margin-top: 12px; }
+#peopleManagerCount { margin-left: auto; flex-shrink: 0; }
+.stored-people-toggle { flex: 0 0 auto; min-width: 60px; min-height: 44px; padding: 0 12px; font-size: .82rem; }
 .person-quick-share-modal, .person-group-modal { width: min(540px, 100%); }
 #personQuickShareModal [hidden], #personGroupModal [hidden] { display: none !important; }
 .person-quick-share-modal .modal-header h2 { overflow-wrap: anywhere; }
