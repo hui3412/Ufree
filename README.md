@@ -2,6 +2,15 @@
 
 link: [www.youfree.ca](https://www.youfree.ca)
 
+### Version 77 — Help, privacy and page scrolling
+
+October 14, 2026
+
+- Expand Help & Tips with collapsible feature guides, feedback at ufree_info@proton.me and a collapsed Apple Shortcuts Home Screen guide at the very bottom.
+- Remove Google Analytics and its CSP permissions. Explain local browser storage, no accounts or app tracking, and normal hosting/asset requests without claiming app-level encryption.
+- Explain compact CJK/Hangul text-code encoding inside every schedule export workflow.
+- Use natural page scrolling for People and person details at all widths, avoiding nested desktop scroll traps.
+
 ### Version 76 — Expanded person action row and credit hierarchy
 
 October 13, 2026

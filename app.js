@@ -2646,6 +2646,7 @@
 
   function openHelp() {
     if (state.isParsing || state.pendingImage || state.codeMode) return;
+    els.helpModal.querySelector("#iosShortcutGuide").open = false;
     els.helpModal.hidden = false;
     document.body.style.overflow = "hidden";
     els.helpModal.querySelector(".help-modal").scrollTop = 0;
