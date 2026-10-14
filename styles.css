@@ -2705,9 +2705,9 @@ button:disabled { cursor: not-allowed; }
 .appearance-settings-section .theme-swatch.mint { background: #40d99a; }
 .appearance-settings-section .theme-swatch.orange { background: #ff9f43; }
 
-.settings-credit { margin: 20px 0 0; padding-top: 0; text-align: center; line-height: 1.5; font-weight: 400; }
+.settings-credit { display: block; margin: 20px 0 0; padding-top: 0; text-align: center; line-height: 1.5; font-weight: 400; }
 
-.detail-name-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.detail-name-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; }
 .detail-name-row h2 { min-width: 0; overflow-wrap: anywhere; }
 .full-schedule-button { flex-shrink: 0; min-height: 44px; padding: 0 12px; font-size: .8rem; }
 .person-week-modal { width: min(1050px, 100%); }
@@ -2717,3 +2717,141 @@ button:disabled { cursor: not-allowed; }
 .person-week-modal .modal-header h2 { overflow-wrap: anywhere; }
 .person-week-modal .parser-status { margin-bottom: 0; }
 
+.person-select-button { min-width: 0; border: 0; padding: 0; color: inherit; background: transparent; font-family: inherit; text-align: left; cursor: pointer; overflow-wrap: anywhere; }
+.person-action-icon { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; width: 40px; min-width: 40px; min-height: 40px; padding: 0; }
+.person-action-icon svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.person-detail-actions { display: flex; align-items: center; flex-wrap: nowrap; gap: 8px; min-width: 0; max-width: 100%; }
+.person-detail-actions .full-schedule-button { width: auto; min-width: 40px; min-height: 44px; gap: 6px; padding: 0 12px; }
+.person-detail-actions .full-schedule-button.compact-label { width: 40px; padding: 0; gap: 0; }
+.person-delete-button { color: #eb7777; background: color-mix(in srgb, #e24444 10%, var(--button)); }
+.person-delete-button:hover { color: #ffaaaa; background: color-mix(in srgb, #e24444 20%, var(--button)); }
+:root[data-theme="light"] .person-delete-button { color: #b42323; }
+#peopleManagerCount { margin-left: auto; flex-shrink: 0; }
+.stored-people-toggle { flex: 0 0 auto; min-width: 60px; min-height: 44px; padding: 0 12px; font-size: .82rem; }
+.person-quick-share-modal, .person-group-modal { width: min(540px, 100%); }
+#personQuickShareModal [hidden], #personGroupModal [hidden] { display: none !important; }
+.person-quick-share-modal .modal-header h2 { overflow-wrap: anywhere; }
+.person-quick-share-modal .export-generation-actions { margin-top: 16px; }
+.person-quick-share-modal .share-qr { max-width: 360px; }
+.person-group-modal select { width: 100%; }
+.settings-credit .credit-team { display: block; font-size: .98rem; font-weight: 500; }
+.settings-credit .credit-inspiration { display: block; margin-top: 3px; font-size: .76rem; font-weight: 400; text-align: center; }
+
+.app-header { flex-direction: column; align-items: stretch; gap: 16px; }
+.brand-copy { flex: 0 0 auto; min-width: 0; }
+.brand-copy > p { max-width: none; }
+.home-header-controls { display: flex; align-items: center; width: 100%; min-width: 0; }
+.home-header-controls .header-actions { display: flex; flex-wrap: nowrap; align-items: center; justify-content: flex-start; gap: 8px; width: 100%; min-width: 0; }
+.home-header-controls .header-data-button { min-height: 40px; white-space: nowrap; flex: 0 0 auto; }
+.home-header-controls .nav-icon-button { width: 40px; min-width: 40px; height: 40px; min-height: 40px; padding: 0; }
+.home-header-controls .nav-icon-button svg { width: 16px; height: 16px; }
+.home-header-controls .compact-label { width: 40px; min-width: 40px; padding: 0; gap: 0; }
+.compact-label .nav-button-label, .compact-label .group-toggle-label, .compact-label [data-mode-label] { display: none; }
+.people-actions { flex-wrap: nowrap; min-width: 0; max-width: 100%; }
+.people-actions > *, .group-view-controls > * { flex-shrink: 0; }
+.people-actions .view-mode-button.compact-label { width: 42px; min-width: 42px; padding: 0; gap: 0; }
+.action-icon-button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; }
+.action-icon-button svg { flex: 0 0 auto; width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+#settingsButton svg { width: 18px; height: 18px; }
+#showGroupsToggle.group-label-button { width: auto; padding: 0 10px; gap: 7px; }
+#showGroupsToggle.group-label-button.compact-label { width: 42px; min-width: 42px; padding: 0; gap: 0; }
+.group-toggle-label { font-size: .7rem; font-weight: 600; letter-spacing: .045em; }
+.export-selection { margin: 0 0 18px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 8px; }
+.export-selection summary { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; cursor: pointer; list-style: none; min-height: 24px; font-size: .88rem; }
+.export-selection summary::-webkit-details-marker { display: none; }
+.export-selection summary::after { content: "+"; color: var(--muted); }
+.export-selection[open] summary::after { content: "−"; }
+.export-selection-summary { margin-left: auto; color: var(--muted); font-size: .8rem; }
+.export-selection[open] > .share-selection { margin-top: 16px; }
+.export-action-buttons { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; flex: 1 1 auto; min-width: 0; }
+.export-action-buttons button { padding: 10px 8px; flex-direction: column; gap: 6px; line-height: 1.25; font-size: .8rem; }
+.export-action-buttons svg { width: 21px; height: 21px; }
+.help-topics { display: grid; gap: 18px; }
+.help-topics h3 { margin: 0 0 5px; font-size: .95rem; }
+.help-topics p { margin: 0; line-height: 1.55; font-size: .88rem; color: var(--muted); }
+@media (max-width: 720px) {
+  .app-header { flex-wrap: wrap; }
+  .home-header-controls { width: 100%; }
+  .home-header-controls .header-actions { width: 100%; }
+}
+
+@media (max-width: 350px) {
+  .home-header-controls .header-actions { gap: 6px; }
+  .home-header-controls .header-data-button { padding-left: 9px; padding-right: 9px; gap: 5px; font-size: .78rem; }
+  .home-header-controls .nav-icon-button { width: 36px; min-width: 36px; padding: 0; }
+  .home-header-controls .compact-label { width: 36px; min-width: 36px; padding: 0; }
+  .people-actions, .group-view-controls { gap: 6px; }
+  .people-actions .live-control, .people-actions .view-mode-button, .people-actions #manageGroupsButton { font-size: .76rem; }
+  .people-actions .view-mode-button, .people-actions #manageGroupsButton { padding-left: 8px; padding-right: 8px; }
+  .export-generation-actions { gap: 8px; }
+  .export-action-buttons { gap: 5px; }
+  .export-action-buttons button { font-size: .72rem; padding-left: 5px; padding-right: 5px; }
+}
+
+@media (max-width: 300px) {
+  .people-actions, .group-view-controls { gap: 4px; }
+  .people-actions .live-control, .people-actions #manageGroupsButton { font-size: .72rem; }
+  .people-actions #manageGroupsButton { padding-left: 6px; padding-right: 6px; }
+  .people-actions .view-mode-button.compact-label,
+  #showGroupsToggle.group-label-button.compact-label { width: 36px; min-width: 36px; }
+}
+
+
+/* Main content scrolls with the page, including when the pointer is over cards. */
+.main-grid { min-height: 0; align-items: start; }
+.people-panel, .detail-panel { min-height: 0; max-height: none; overflow: visible; overscroll-behavior: auto; }
+.people-list { overflow: visible; overscroll-behavior: auto; }
+
+.help-feedback, .help-privacy p, .help-topic p, .help-topic li, .export-encoding-note p {
+  font-size: .88rem;
+  line-height: 1.6;
+  color: var(--muted);
+}
+.help-modal a { color: var(--text); text-underline-offset: 3px; overflow-wrap: anywhere; }
+.help-feedback { margin: 0 0 20px; }
+.help-topics { gap: 0; }
+.help-topic { border-bottom: 1px solid var(--border); }
+.help-topic > summary { padding: 13px 0; min-height: 44px; cursor: pointer; font-size: .93rem; font-weight: 600; }
+.help-topic p { margin: 0 0 14px; }
+.help-topic ol { margin: 0 0 14px; padding-left: 23px; }
+.help-topic li + li { margin-top: 8px; }
+.help-privacy { margin-top: 24px; }
+.help-privacy h3 { margin: 0 0 12px; font-size: 1rem; }
+.help-privacy p { margin: 0 0 12px; }
+.help-privacy strong { color: var(--text); }
+.ios-shortcut-guide { margin-top: 20px; border-top: 1px solid var(--border); border-bottom: 0; }
+.export-encoding-note { margin: 10px 0 14px; color: var(--muted); }
+.export-encoding-note summary { cursor: pointer; font-size: .8rem; padding: 8px 0; }
+.export-encoding-note p { margin: 3px 0 0; }
+
+/* Search stays beside GROUP; the field expands on its own row. */
+#peopleSearchPanel[hidden], #groupsModal [hidden] { display: none !important; }
+.people-search-button { width: 42px; min-width: 42px; padding: 0; }
+.people-search-button[aria-expanded="true"] { background: var(--button-hover); }
+.people-search-panel { margin: 12px 0 16px; }
+.people-search-field { display: flex; align-items: center; gap: 8px; }
+.people-search-field input { min-width: 0; width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--input); color: var(--text); font: inherit; font-size: 16px; }
+.people-search-field input::-webkit-search-cancel-button { display: none; }
+#clearPeopleSearchButton { flex: 0 0 44px; min-height: 44px; padding: 0; font-size: 22px; }
+.people-search-status { margin: 6px 0 0; font-size: .78rem; line-height: 1.4; color: var(--muted); }
+#manageGroupsButton svg, .live-control-icon { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.people-actions #manageGroupsButton { width: 42px; min-width: 42px; padding: 0; }
+.live-control-icon { display: none; }
+.live-control.compact-label .live-control-label { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.live-control.compact-label .live-control-icon { display: block; }
+.group-member-row { display: flex; align-items: center; gap: 12px; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.group-member-name { min-width: 0; overflow-wrap: anywhere; }
+.group-remove-member { flex: 0 0 44px; }
+.group-add-people { margin-top: 16px; }
+.group-add-people > summary { min-height: 44px; padding: 10px 0; cursor: pointer; }
+.group-editor-empty, .group-add-people > p { color: var(--muted); font-size: .88rem; }
+@media (max-width: 300px) {
+  .people-search-button, .people-actions #manageGroupsButton { width: 36px; min-width: 36px; }
+}
+
+
+/* Official UFree identity: retain the master logo’s aspect ratio in every theme. */
+.brand-copy .brand-title { display: flex; align-items: center; gap: 16px; line-height: 1.1; margin: 0; color: var(--text); }
+.brand-name { font-size: clamp(2.4rem, 6vw, 3.25rem); font-weight: 500; letter-spacing: -.025em; white-space: nowrap; }
+.brand-logo { display: block; width: 112px; height: auto; max-width: 100%; object-fit: contain; }
+@media (max-width: 480px) { .brand-logo { width: 96px; } }

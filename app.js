@@ -15,7 +15,13 @@
     selectedPerson: null,
     weekPerson: null,
     personWeekRequest: 0,
+    personShareName: null,
+    personShareRequest: 0,
+    personShareBusy: false,
+    personShareReturnFocus: null,
+    groupPerson: null,
     showEveryone: false,
+    peopleSearchQuery: "",
     theme: loadTheme(),
     loadError: null,
     isParsing: false,
@@ -24,6 +30,8 @@
     duplicatePicture: null,
     codeConflict: null,
     codeMode: null,
+    quickExport: false,
+    quickExportReturnFocus: null,
     sharedImport: null,
     deviceReady: false,
     sharedLinkStartup: false,
@@ -40,13 +48,14 @@
     showGroups: false,
     hideUngrouped: false,
     editingGroupId: null,
+    editingGroupMembers: null,
+    groupReturnId: null,
     weekGroupId: null,
     groupReturnFocus: null,
     groupFromSchedules: false,
     accentTheme: "blue",
     lastPeopleSignature: "",
     lastDetailPerson: null,
-    lastFreeCountText: "",
     recentChanges: [],
   };
 
@@ -73,6 +82,10 @@
     darkThemeButton: document.getElementById("darkThemeButton"),
     scheduleDataButton: document.getElementById("scheduleDataButton"),
     settingsButton: document.getElementById("settingsButton"),
+    helpButton: document.getElementById("helpButton"),
+    helpModal: document.getElementById("helpModal"),
+    closeHelpModal: document.getElementById("closeHelpModal"),
+    homeExportButton: document.getElementById("homeExportButton"),
     undoChangesButton: document.getElementById("undoChangesButton"),
     undoScheduleChangesButton: document.getElementById("undoScheduleChangesButton"),
     undoChangesStatus: document.getElementById("undoChangesStatus"),
@@ -120,6 +133,11 @@
     exportPeopleList: document.getElementById("exportPeopleList"),
     selectAllSchedules: document.getElementById("selectAllSchedules"),
     generateCodeButton: document.getElementById("generateCodeButton"),
+    exportQrButton: document.getElementById("exportQrButton"),
+    copyExportLinkButton: document.getElementById("copyExportLinkButton"),
+    exportCodeField: document.getElementById("exportCodeField"),
+    exportSelection: document.getElementById("exportSelection"),
+    exportSelectionSummary: document.getElementById("exportSelectionSummary"),
     exportCodeOutput: document.getElementById("exportCodeOutput"),
     copyCodeButton: document.getElementById("copyCodeButton"),
     exportCodeStatus: document.getElementById("exportCodeStatus"),
@@ -142,6 +160,7 @@
 
     peopleManagerCount: document.getElementById("peopleManagerCount"),
     peopleManagerList: document.getElementById("peopleManagerList"),
+    storedPeopleToggle: document.getElementById("storedPeopleToggle"),
     removeSchedulesButton: document.getElementById("removeSchedulesButton"),
     settingsModal: document.getElementById("settingsModal"),
     closeSettingsModal: document.getElementById("closeSettingsModal"),
@@ -156,11 +175,14 @@
     timeInput: document.getElementById("timeInput"),
     peopleHeading: document.getElementById("peopleHeading"),
     viewToggleButton: document.getElementById("viewToggleButton"),
-    freeCount: document.getElementById("freeCount"),
-    statusLine: document.getElementById("statusLine"),
     peopleList: document.getElementById("peopleList"),
     showGroupsToggle: document.getElementById("showGroupsToggle"),
     manageGroupsButton: document.getElementById("manageGroupsButton"),
+    peopleSearchButton: document.getElementById("peopleSearchButton"),
+    peopleSearchPanel: document.getElementById("peopleSearchPanel"),
+    peopleSearchInput: document.getElementById("peopleSearchInput"),
+    clearPeopleSearchButton: document.getElementById("clearPeopleSearchButton"),
+    peopleSearchStatus: document.getElementById("peopleSearchStatus"),
     groupsModal: document.getElementById("groupsModal"),
     closeGroupsModal: document.getElementById("closeGroupsModal"),
     newGroupButton: document.getElementById("newGroupButton"),
@@ -169,6 +191,7 @@
     groupFormTitle: document.getElementById("groupFormTitle"),
     groupNameInput: document.getElementById("groupNameInput"),
     groupMembersList: document.getElementById("groupMembersList"),
+    groupMembersInstructions: document.getElementById("groupMembersInstructions"),
     groupFormError: document.getElementById("groupFormError"),
     cancelGroupButton: document.getElementById("cancelGroupButton"),
     groupWeekModal: document.getElementById("groupWeekModal"),
@@ -190,6 +213,27 @@
     personWeekCode: document.getElementById("personWeekCode"),
     personWeekExportStatus: document.getElementById("personWeekExportStatus"),
     copyPersonWeekCodeButton: document.getElementById("copyPersonWeekCodeButton"),
+    personQuickShareModal: document.getElementById("personQuickShareModal"),
+    personQuickShareTitle: document.getElementById("personQuickShareTitle"),
+    closePersonQuickShare: document.getElementById("closePersonQuickShare"),
+    personQuickUrlButton: document.getElementById("personQuickUrlButton"),
+    personQuickQrButton: document.getElementById("personQuickQrButton"),
+    personQuickCodeButton: document.getElementById("personQuickCodeButton"),
+    personQuickExportFields: document.getElementById("personQuickExportFields"),
+    personQuickCodeField: document.getElementById("personQuickCodeField"),
+    personQuickCode: document.getElementById("personQuickCode"),
+    copyPersonQuickCode: document.getElementById("copyPersonQuickCode"),
+    personQuickSharePanel: document.getElementById("personQuickSharePanel"),
+    personQuickShareStatus: document.getElementById("personQuickShareStatus"),
+    personGroupModal: document.getElementById("personGroupModal"),
+    personGroupTitle: document.getElementById("personGroupTitle"),
+    closePersonGroup: document.getElementById("closePersonGroup"),
+    personGroupForm: document.getElementById("personGroupForm"),
+    personGroupField: document.getElementById("personGroupField"),
+    personGroupSelect: document.getElementById("personGroupSelect"),
+    personGroupEmpty: document.getElementById("personGroupEmpty"),
+    savePersonGroup: document.getElementById("savePersonGroup"),
+    personGroupManage: document.getElementById("personGroupManage"),
     toast: document.getElementById("toast"),
     dataSetupTemplate: document.getElementById("dataSetupTemplate"),
   };
@@ -351,15 +395,6 @@
     }
   }
 
-  function animateCountIfChanged(nextText) {
-    if (!canAnimate() || state.lastFreeCountText === nextText) return;
-    window.gsap.fromTo(
-      els.freeCount,
-      { scale: 0.96 },
-      { scale: 1, duration: 0.2, ease: "back.out(1.7)", clearProps: "transform" }
-    );
-  }
-
   function animateAppEntrance() {
     if (!canAnimate()) return;
     const targets = [
@@ -519,8 +554,8 @@
 
     await showSystemNotification(title, {
       body,
-      icon: "./assets/icon-192.png",
-      badge: "./assets/icon-192.png",
+      icon: "./assets/icon-192.png?v=84",
+      badge: "./assets/icon-192.png?v=84",
       tag: `whos-free-break-${dateKey()}-${breaks[0].start}`,
       data: { url: "./" },
     });
@@ -549,7 +584,7 @@
 
   function notificationSupportText() {
     if (!("Notification" in window)) {
-      return { tone: "error", text: "Notifications are not supported in this browser. On iPhone, add Who's Free? to the Home Screen and open it from there." };
+      return { tone: "error", text: "Notifications are not supported in this browser. On iPhone, add UFree to the Home Screen and open it from there." };
     }
     if (Notification.permission === "denied") {
       return { tone: "error", text: "Notifications are blocked. Re-enable them in your browser or device settings." };
@@ -557,7 +592,7 @@
     if (Notification.permission === "granted") {
       return { tone: "success", text: state.notificationsEnabled ? "Break notifications are on." : "Notification permission is ready. Turn alerts on whenever you want." };
     }
-    return { tone: "neutral", text: "Turn alerts on to let Who's Free? ask for notification permission." };
+    return { tone: "neutral", text: "Turn alerts on to let UFree ask for notification permission." };
   }
 
   async function handleNotificationToggle() {
@@ -605,10 +640,10 @@
       showToast("Turn notifications on first");
       return;
     }
-    const ok = await showSystemNotification("Who's Free? notifications work", {
+    const ok = await showSystemNotification("UFree notifications work", {
       body: "You'll get grouped alerts when friends start breaks longer than 10 minutes.",
-      icon: "./assets/icon-192.png",
-      badge: "./assets/icon-192.png",
+      icon: "./assets/icon-192.png?v=84",
+      badge: "./assets/icon-192.png?v=84",
       tag: "whos-free-test",
       data: { url: "./" },
     });
@@ -1303,12 +1338,67 @@
     showToast(persisted ? `${group.name} moved to top.` : "Group moved for this session, but could not be saved on this device.");
   }
 
+  let toolbarLayoutFrame = null;
+
+  function fitToolbarLabels() {
+    const nav = els.scheduleDataButton.parentElement;
+    const peopleActions = els.showGroupsToggle.closest(".people-actions");
+    const fits = row => {
+      const children = [...row.children].filter(child => getComputedStyle(child).display !== "none");
+      const gap = parseFloat(getComputedStyle(row).columnGap) || 0;
+      const required = children.reduce((width, child) => width + child.getBoundingClientRect().width, 0)
+        + Math.max(0, children.length - 1) * gap;
+      return required <= row.getBoundingClientRect().width + 0.5;
+    };
+
+    // Start with full labels so widening the row restores them automatically.
+    els.helpButton.classList.remove("compact-label");
+    els.scheduleDataButton.classList.remove("compact-label");
+    if (!fits(nav)) els.helpButton.classList.add("compact-label");
+    if (!fits(nav)) els.scheduleDataButton.classList.add("compact-label");
+
+    els.showGroupsToggle.classList.remove("compact-label");
+    els.viewToggleButton.classList.remove("compact-label");
+    const liveControl = els.liveToggle.closest(".live-control");
+    liveControl.classList.remove("compact-label");
+    if (!fits(peopleActions)) {
+      els.showGroupsToggle.classList.add("compact-label");
+    }
+    if (!fits(peopleActions)) els.viewToggleButton.classList.add("compact-label");
+    if (!fits(peopleActions)) liveControl.classList.add("compact-label");
+    const fullSchedule = document.getElementById("fullScheduleButton");
+    if (fullSchedule) {
+      fullSchedule.classList.remove("compact-label");
+      if (!fits(fullSchedule.closest(".person-detail-actions"))) fullSchedule.classList.add("compact-label");
+    }
+  }
+
+  function scheduleToolbarLayout() {
+    if (toolbarLayoutFrame !== null) return;
+    toolbarLayoutFrame = requestAnimationFrame(() => {
+      toolbarLayoutFrame = null;
+      fitToolbarLabels();
+    });
+  }
+
+  function watchToolbarLayout() {
+    window.addEventListener("resize", scheduleToolbarLayout);
+    if (typeof ResizeObserver !== "undefined") {
+      const observer = new ResizeObserver(scheduleToolbarLayout);
+      observer.observe(document.querySelector(".home-header-controls"));
+      observer.observe(els.showGroupsToggle.closest(".people-actions"));
+    }
+    document.fonts?.ready.then(scheduleToolbarLayout);
+    fitToolbarLabels();
+  }
+
   function updateGroupToolbar() {
     els.showGroupsToggle.disabled = !state.hasData;
     const busy = state.isParsing || Boolean(state.pendingImage) || Boolean(state.codeMode);
     els.manageGroupsButton.hidden = !state.showGroups;
     els.manageGroupsButton.disabled = !state.hasData || busy;
     setViewToggle(els.showGroupsToggle, state.showGroups ? "Hide groups" : "Show groups", state.showGroups);
+    scheduleToolbarLayout();
   }
 
   function setViewToggle(button, label, pressed) {
@@ -1351,27 +1441,75 @@
     }
   }
 
+  function renderGroupEditorMembers() {
+    const names = Object.keys(peopleMap()).sort(comparePeopleNames);
+    els.groupMembersList.replaceChildren();
+    if (!state.editingGroupId) {
+      for (const name of names) {
+        const label = document.createElement("label"); label.className = "share-selection";
+        const input = document.createElement("input"); input.type = "checkbox"; input.dataset.person = name;
+        label.append(input, document.createTextNode(displayName(name))); els.groupMembersList.append(label);
+      }
+      return;
+    }
+    const members = document.createElement("div"); members.className = "group-current-members";
+    members.setAttribute("role", "list"); members.setAttribute("aria-label", "Current group members");
+    const selected = names.filter(name => state.editingGroupMembers.has(name));
+    for (const [index, name] of selected.entries()) {
+      const row = document.createElement("div"); row.className = "group-member-row";
+      row.setAttribute("role", "listitem"); row.dataset.person = name;
+      const label = document.createElement("span"); label.className = "group-member-name"; label.textContent = displayName(name);
+      const remove = iconAction(`Remove ${displayName(name)} from group`, "M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7", "person-delete-button group-remove-member");
+      remove.addEventListener("click", () => {
+        const additionsOpen = els.groupMembersList.querySelector("details")?.open;
+        state.editingGroupMembers.delete(name);
+        renderGroupEditorMembers();
+        const additions = els.groupMembersList.querySelector("details"); additions.open = additionsOpen;
+        const next = els.groupMembersList.querySelectorAll(".group-remove-member");
+        (next[Math.min(index, next.length - 1)] || additions.querySelector("summary")).focus({ preventScroll: true });
+      });
+      row.append(label, remove); members.append(row);
+    }
+    if (!selected.length) {
+      const empty = document.createElement("p"); empty.className = "group-editor-empty"; empty.textContent = "No members. Use Add people to choose someone."; members.append(empty);
+    }
+    const additions = document.createElement("details"); additions.className = "group-add-people";
+    const summary = document.createElement("summary"); summary.textContent = "Add people"; additions.append(summary);
+    const available = names.filter(name => !state.editingGroupMembers.has(name));
+    for (const name of available) {
+      const label = document.createElement("label"); label.className = "share-selection";
+      const input = document.createElement("input"); input.type = "checkbox"; input.dataset.person = name;
+      input.addEventListener("change", () => {
+        if (!input.checked) return;
+        state.editingGroupMembers.add(name); renderGroupEditorMembers();
+        els.groupMembersList.querySelector("details").open = true;
+        [...els.groupMembersList.querySelectorAll(".group-member-row")].find(row => row.dataset.person === name)?.querySelector("button").focus({ preventScroll: true });
+      });
+      label.append(input, document.createTextNode(displayName(name))); additions.append(label);
+    }
+    if (!available.length) { const empty = document.createElement("p"); empty.textContent = "Everyone is already in this group."; additions.append(empty); }
+    els.groupMembersList.append(members, additions);
+  }
+
   function editGroup(id = null) {
     const group = state.groups.find(item => item.id === id);
     state.editingGroupId = group?.id || null;
+    state.editingGroupMembers = group ? new Set(groupMembers(group)) : null;
     els.groupForm.hidden = false;
-    els.groupFormTitle.textContent = group ? "Edit group" : "New group";
+    els.groupsManagerList.hidden = true; els.newGroupButton.hidden = true;
+    document.getElementById("groupsModalTitle").textContent = group ? "Edit Group" : "Manage groups";
+    els.groupFormTitle.textContent = group ? "Members" : "New group";
     els.groupNameInput.value = group?.name || "";
     els.groupFormError.textContent = "";
-    els.groupMembersList.replaceChildren();
-    const selected = new Set(group?.members || []);
-    for (const name of Object.keys(peopleMap()).sort(comparePeopleNames)) {
-      const label = document.createElement("label"); label.className = "share-selection";
-      const input = document.createElement("input"); input.type = "checkbox";
-      input.dataset.person = name; input.checked = selected.has(name);
-      label.append(input, document.createTextNode(displayName(name)));
-      els.groupMembersList.append(label);
-    }
+    els.groupMembersInstructions.textContent = group ? "Remove members below, or expand Add people. Changes apply when you save." : "Choose members.";
+    renderGroupEditorMembers();
     revealSection(els.groupForm, els.groupNameInput);
   }
 
   function cancelGroupEdit() {
-    els.groupForm.hidden = true; state.editingGroupId = null;
+    els.groupForm.hidden = true; state.editingGroupId = null; state.editingGroupMembers = null;
+    els.groupsManagerList.hidden = false; els.newGroupButton.hidden = false;
+    document.getElementById("groupsModalTitle").textContent = "Manage groups";
     els.newGroupButton.focus();
   }
 
@@ -1382,7 +1520,9 @@
     if (state.groups.some(group => group.id !== state.editingGroupId && group.name.normalize("NFC").toLowerCase() === name.normalize("NFC").toLowerCase())) {
       els.groupFormError.textContent = "A group already uses this name. Choose another name."; return;
     }
-    const members = [...els.groupMembersList.querySelectorAll("input:checked")].map(input => input.dataset.person);
+    const members = state.editingGroupId
+      ? [...state.editingGroupMembers].filter(person => Object.hasOwn(peopleMap(), person))
+      : [...els.groupMembersList.querySelectorAll("input:checked")].map(input => input.dataset.person);
     const existing = state.groups.find(group => group.id === state.editingGroupId);
     if (existing) { existing.name = name; existing.members = members; }
     else {
@@ -1395,24 +1535,28 @@
     showToast(`Group saved: ${name}`);
   }
 
-  function openGroupsModal(id = null) {
+  function openGroupsModal(id = null, returnFocus = document.activeElement) {
     if (state.isParsing || state.pendingImage || state.codeMode) return;
-    state.groupReturnFocus = document.activeElement;
+    state.groupReturnFocus = returnFocus;
+    state.groupReturnId = id;
     state.groupFromSchedules = !els.scheduleModal.hidden;
     if (state.groupFromSchedules) els.scheduleModal.hidden = true;
     els.groupsModal.hidden = false; document.body.style.overflow = "hidden";
     renderGroupsManager();
     if (id || !state.groups.length) editGroup(id);
-    else { els.groupForm.hidden = true; els.closeGroupsModal.focus(); }
+    else { cancelGroupEdit(); els.closeGroupsModal.focus(); }
     animateModalOpen(els.groupsModal, els.groupsModal.querySelector(".groups-modal"));
   }
 
   function closeGroupsModal() {
+    cancelGroupEdit();
     els.groupsModal.hidden = true;
     if (state.groupFromSchedules) { els.scheduleModal.hidden = false; updateScheduleModal(); }
     state.groupFromSchedules = false;
     if (els.scheduleModal.hidden && els.settingsModal.hidden && els.groupWeekModal.hidden) document.body.style.overflow = "";
-    state.groupReturnFocus?.focus?.();
+    const replacement = [...els.peopleList.querySelectorAll(".people-group")].find(group => group.dataset.groupId === state.groupReturnId)?.querySelector(".group-more");
+    (state.groupReturnFocus?.isConnected ? state.groupReturnFocus : replacement || els.manageGroupsButton)?.focus?.({ preventScroll: true });
+    state.groupReturnId = null;
   }
 
   function sharedTimeText(weekly, day, minute) {
@@ -1433,15 +1577,9 @@
     const header = document.createElement("div"); header.className = "people-group-header";
     const copy = document.createElement("div");
     const heading = document.createElement("h3"); heading.textContent = title;
-    const detail = document.createElement("p");
     const count = document.createElement("small");
     count.textContent = `${members.filter(name => isFree(name, day, minute)).length} of ${members.length} free`;
     copy.append(heading, count);
-    if (group && !collapsed) {
-      const weekly = window.WhosFreeGroups.week(group, peopleMap());
-      detail.textContent = sharedTimeText(weekly, day, minute);
-      copy.append(detail);
-    }
     const actions = document.createElement("div"); actions.className = "people-group-actions";
     const hide = document.createElement("button"); hide.type = "button";
     hide.className = "secondary-button group-hide";
@@ -1475,7 +1613,7 @@
     orderScopeMembers(scope).filter(name => shown.has(name)).forEach(name => list.append(renderPersonCard(name, day, minute, scope)));
     if (!filtered.length) {
       const message = document.createElement("p"); message.className = "group-empty";
-      message.textContent = members.length ? "Nobody in this group is free at this time. Choose Show everyone to see them." : "No people in this group. Edit it to add members.";
+      message.textContent = state.peopleSearchQuery.trim() ? "No matching people in this view." : members.length ? "Nobody in this group is free at this time. Choose Show everyone to see them." : "No people in this group. Edit it to add members.";
       list.append(message);
     }
     section.append(list);
@@ -1488,14 +1626,14 @@
     for (const group of state.groups) {
       const members = groupMembers(group);
       if (!group.hidden) members.forEach(name => shown.add(name));
-      els.peopleList.append(groupSection(group.name, members, visible, day, minute, group));
+      if (!state.peopleSearchQuery.trim() || members.some(name => visible.includes(name))) els.peopleList.append(groupSection(group.name, members, visible, day, minute, group));
     }
     const ungrouped = Object.keys(peopleMap()).filter(name => !assigned.has(name));
-    if (ungrouped.length) {
+    if (ungrouped.length && (!state.peopleSearchQuery.trim() || ungrouped.some(name => visible.includes(name)))) {
       if (!state.hideUngrouped) ungrouped.forEach(name => shown.add(name));
       els.peopleList.append(groupSection("Ungrouped people", ungrouped, visible, day, minute));
     }
-    if (!els.peopleList.children.length) els.peopleList.append(createEmptyList("No groups shown", "Select a group above, or choose Hide groups to see the usual list."));
+    if (!els.peopleList.children.length) els.peopleList.append(createEmptyList(state.peopleSearchQuery.trim() ? "No matching people" : "No groups shown", state.peopleSearchQuery.trim() ? "Try another name, clear the search, or choose All." : "Select a group above, or choose Hide groups to see the usual list."));
     return { visible: visible.filter(name => shown.has(name)), shown };
   }
 
@@ -1661,8 +1799,64 @@
     return { day, minute };
   }
 
+  function searchText(value) {
+    return value.normalize("NFD").replace(/\p{M}/gu, "").toLocaleLowerCase();
+  }
+
+  function closePeopleSearch(restoreFocus = false) {
+    if (els.peopleSearchPanel.hidden) return;
+    const focused = document.activeElement;
+    const card = focused?.closest?.(".person-card");
+    const personFocus = focused?.matches?.(".person-select-button") && card
+      ? { name: card.dataset.person, scope: card.dataset.orderScope } : null;
+    const hadFilter = Boolean(state.peopleSearchQuery.trim());
+    els.peopleSearchPanel.hidden = true;
+    els.peopleSearchButton.setAttribute("aria-expanded", "false");
+    state.peopleSearchQuery = ""; els.peopleSearchInput.value = "";
+    if (hadFilter) refresh({ preserveScroll: true });
+    else updatePeopleSearchStatus();
+    if (restoreFocus) els.peopleSearchButton.focus({ preventScroll: true });
+    else if (els.peopleSearchPanel.contains(focused)) focused.blur();
+    else if (personFocus && !focused.isConnected) {
+      [...els.peopleList.querySelectorAll(".person-card")].find(item => item.dataset.person === personFocus.name && item.dataset.orderScope === personFocus.scope)?.querySelector(".person-select-button")?.focus({ preventScroll: true });
+    }
+  }
+
+  function togglePeopleSearch() {
+    if (!els.peopleSearchPanel.hidden) { closePeopleSearch(true); return; }
+    els.peopleSearchPanel.hidden = false;
+    els.peopleSearchButton.setAttribute("aria-expanded", "true");
+    els.peopleSearchInput.focus();
+  }
+
+  let peopleSearchDismissFrame = null;
+  let peopleSearchPointerDown = false;
+  let peopleSearchOutsideClick = false;
+  const withinPeopleSearch = target => target && (els.peopleSearchPanel.contains(target) || els.peopleSearchButton.contains(target));
+  function queuePeopleSearchDismiss(outsideClick = false) {
+    if (els.peopleSearchPanel.hidden) return;
+    peopleSearchOutsideClick ||= outsideClick;
+    if (peopleSearchDismissFrame !== null) return;
+    peopleSearchDismissFrame = requestAnimationFrame(() => {
+      peopleSearchDismissFrame = null;
+      const clickedOutside = peopleSearchOutsideClick;
+      peopleSearchOutsideClick = false;
+      // Wait for a pointer click to finish before hiding or rebuilding its target.
+      if (peopleSearchPointerDown || els.peopleSearchPanel.hidden) return;
+      if (clickedOutside || !els.peopleSearchPanel.contains(document.activeElement)) closePeopleSearch();
+    });
+  }
+
+  function updatePeopleSearchStatus(names = []) {
+    els.clearPeopleSearchButton.hidden = !state.peopleSearchQuery;
+    els.peopleSearchStatus.textContent = state.peopleSearchQuery.trim()
+      ? `${new Set(names).size} matching ${new Set(names).size === 1 ? "person" : "people"} in this view.`
+      : "Search names and nicknames in this view.";
+  }
+
   function visiblePeople(day, minute) {
-    const people = Object.keys(peopleMap()).sort(comparePeopleNames);
+    const terms = searchText(state.peopleSearchQuery.trim()).split(/\s+/).filter(Boolean);
+    const people = Object.keys(peopleMap()).filter(name => terms.every(term => searchText(`${name} ${displayName(name)}`).includes(term))).sort(comparePeopleNames);
     const free = people.filter(name => isFree(name, day, minute)).sort(comparePeopleNames);
     const freeSet = new Set(free);
     const busy = people.filter(name => !freeSet.has(name)).sort(comparePeopleNames);
@@ -1721,11 +1915,7 @@
 
   function renderDataSetup() {
     updateGroupToolbar();
-    els.peopleHeading.textContent = "Who's Free?";
-    els.freeCount.textContent = "Local only";
-    els.statusLine.textContent = state.loadError
-      ? "Schedule data needs your attention."
-      : "Add a schedule picture or create one manually.";
+    els.peopleHeading.textContent = "Schedules";
     els.viewToggleButton.disabled = true;
     els.peopleList.replaceChildren();
 
@@ -2001,8 +2191,8 @@
           gap.className = passing ? "review-passing" : "review-break";
           gap.style.top = `${occupiedUntil - first}px`;
           gap.style.height = `${start - occupiedUntil}px`;
-          gap.textContent = `${passing ? "Passing time" : "Break"} ${start - occupiedUntil} min`;
-          gap.title = `${day} ${passing ? "passing time" : "break"} ${clock(occupiedUntil)}–${clock(start)}`;
+          gap.textContent = `${passing ? "Class Soon" : "Break"} ${start - occupiedUntil} min`;
+          gap.title = `${day} ${passing ? "Class Soon" : "break"} ${clock(occupiedUntil)}–${clock(start)}`;
           track.append(gap);
         }
         const block = document.createElement("button");
@@ -2463,7 +2653,7 @@
       }
 
       if (failures.length > 1) {
-        console.warn("Who’s Free? PDF import errors\n" + failures.join("\n"));
+        console.warn("UFree PDF import errors\n" + failures.join("\n"));
       }
 
     } catch (error) {
@@ -2499,13 +2689,13 @@
   async function shareSchedules() {
     if (!state.hasData) return;
     const file = new File([databaseJsonText()], "schedules.json", { type: "application/json" });
-    const shareText = `Import this schedules.json into Who's Free?\n${APP_URL}`;
+    const shareText = `Import this schedules.json into UFree\n${APP_URL}`;
 
     try {
       if (navigator.share && navigator.canShare?.({ files: [file] })) {
         try {
           await navigator.share({
-            title: "Who's Free? schedules",
+            title: "UFree schedules",
             text: shareText,
             url: APP_URL,
             files: [file],
@@ -2513,7 +2703,7 @@
         } catch (error) {
           if (error?.name === "AbortError") return;
           await navigator.share({
-            title: "Who's Free? schedules",
+            title: "UFree schedules",
             text: shareText,
             files: [file],
           });
@@ -2526,7 +2716,7 @@
     }
 
     downloadDatabaseFile(file);
-    showToast("Downloaded schedules.json — the Who's Free? link is included in the file");
+    showToast("Downloaded schedules.json — the UFree link is included in the file");
   }
 
   function codeStatus(element, message, tone = "") {
@@ -2540,7 +2730,10 @@
     const selected = inputs.filter(input => input.checked).length;
     els.selectAllSchedules.checked = selected > 0 && selected === inputs.length;
     els.selectAllSchedules.indeterminate = selected > 0 && selected < inputs.length;
+    els.exportSelectionSummary.textContent = selected === inputs.length && selected > 0 ? `Everyone · ${selected}` : `${selected} of ${inputs.length} selected`;
     els.exportCodeOutput.value = "";
+    els.exportCodeField.hidden = true;
+    els.copyCodeButton.hidden = true;
     resetShareLink(els.exportSharePanel);
     els.copyCodeButton.disabled = true;
     codeStatus(els.exportCodeStatus, `${selected} schedule${selected === 1 ? "" : "s"} selected.`);
@@ -2548,7 +2741,10 @@
 
   function closeCodePanels() {
     if (state.isParsing) return;
+    const fromHome = state.quickExport, returnFocus = state.quickExportReturnFocus;
     state.codeMode = null;
+    state.quickExport = false;
+    state.quickExportReturnFocus = null;
     resetSharedImport();
     resetShareLink(els.exportSharePanel);
     els.codeExportPanel.hidden = true;
@@ -2556,12 +2752,41 @@
     els.exportCodeOutput.value = "";
     els.importCodeInput.value = "";
     updateScheduleModal();
+    if (fromHome) {
+      els.scheduleModal.hidden = true;
+      document.body.style.overflow = "";
+      (returnFocus || els.homeExportButton).focus({ preventScroll: true });
+    }
   }
 
-  function openCodePanel(mode) {
+  function openQuickExport(event) {
+    if (state.isParsing || state.pendingImage || state.codeMode || !Object.keys(peopleMap()).length) return;
+    if (!els.helpModal.hidden) closeHelp();
+    state.quickExportReturnFocus = event?.currentTarget || els.homeExportButton;
+    openScheduleModal();
+    openCodePanel("export", true);
+  }
+
+  function openHelp() {
+    if (state.isParsing || state.pendingImage || state.codeMode) return;
+    els.helpModal.querySelector("#iosShortcutGuide").open = false;
+    els.helpModal.hidden = false;
+    document.body.style.overflow = "hidden";
+    els.helpModal.querySelector(".help-modal").scrollTop = 0;
+    els.closeHelpModal.focus({ preventScroll: true });
+  }
+
+  function closeHelp() {
+    els.helpModal.hidden = true;
+    if (![els.scheduleModal, els.settingsModal, els.groupsModal, els.groupWeekModal, els.personWeekModal].some(modal => !modal.hidden)) document.body.style.overflow = "";
+    els.helpButton.focus({ preventScroll: true });
+  }
+
+  function openCodePanel(mode, quick = false) {
     if (state.isParsing || state.pendingImage || state.codeMode) return;
     resetSharedImport();
     state.codeMode = mode;
+    state.quickExport = quick;
     els.codeExportPanel.hidden = mode !== "export";
     els.codeImportPanel.hidden = mode !== "import";
     if (mode === "export") {
@@ -2572,6 +2797,7 @@
         label.className = "share-selection";
         const input = document.createElement("input");
         input.type = "checkbox";
+        input.checked = quick;
         input.dataset.person = name;
         input.addEventListener("change", exportSelectionChanged);
         const caption = document.createElement("span");
@@ -2580,7 +2806,8 @@
         els.exportPeopleList.append(label);
       }
       exportSelectionChanged();
-      revealSection(els.codeExportPanel, els.selectAllSchedules);
+      els.exportSelection.open = !quick;
+      revealSection(els.codeExportPanel, quick ? els.generateCodeButton : els.exportSelection.querySelector("summary"));
     } else {
       els.importCodeInput.value = "";
       codeStatus(els.importCodeStatus, "");
@@ -2614,7 +2841,7 @@
     return `Code ready for ${count} schedule${count === 1 ? "" : "s"} · ${code.length.toLocaleString()} characters. ${messageSize}`;
   }
 
-  async function generateShareCode() {
+  async function generateShareCode(action = "code") {
     if (state.isParsing || state.codeMode !== "export") return;
     const names = [...els.exportPeopleList.querySelectorAll("input:checked")].map(input => input.dataset.person);
     if (!names.length) { codeStatus(els.exportCodeStatus, "Select at least one schedule to export.", "error"); return; }
@@ -2624,11 +2851,23 @@
     els.exportFieldOptions.open = false;
     resetShareLink(els.exportSharePanel);
     try {
-      const code = await encodeSchedules(names, els.exportFieldOptions);
+      const code = action !== "code" && els.exportCodeOutput.value || await encodeSchedules(names, els.exportFieldOptions);
       els.exportCodeOutput.value = code;
       populateShareLink(code, els.exportSharePanel);
+      els.exportCodeField.hidden = action !== "code";
+      els.copyCodeButton.hidden = action !== "code";
       codeStatus(els.exportCodeStatus, shareCodeReadyMessage(names.length, code), "success");
-      revealSection(els.exportCodeOutput.closest(".field-group"));
+      if (action === "qr") {
+        if (!els.exportSharePanel.querySelector("textarea").value) throw new Error("This code cannot make a QR. Use Export Code instead.");
+        toggleScheduleQr(els.exportSharePanel);
+      } else if (action === "link") {
+        if (!els.exportSharePanel.querySelector("textarea").value) throw new Error("This code cannot make a link. Use Export Code instead.");
+        els.exportSharePanel.querySelector(".share-link-field").hidden = false;
+        await copyScheduleLink(els.exportSharePanel);
+      } else {
+        els.exportSharePanel.hidden = true;
+        revealSection(els.exportCodeField);
+      }
     } catch (error) {
       els.exportCodeOutput.value = "";
       codeStatus(els.exportCodeStatus, error.message || "The code could not be created.", "error");
@@ -2646,8 +2885,9 @@
     const qr = panel.querySelector(".share-qr");
     qr.hidden = true;
     qr.replaceChildren();
-    const button = panel.querySelector(".toggle-share-qr");
-    button.textContent = "Show QR";
+    const button = shareQrButton(panel);
+    if ([els.exportSharePanel, els.personQuickSharePanel].includes(panel)) panel.querySelector(".share-link-field").hidden = true;
+    else button.textContent = "Show QR";
     button.setAttribute("aria-expanded", "false");
     codeStatus(panel.querySelector(".share-link-status"), "");
   }
@@ -2673,10 +2913,11 @@
   }
 
   function toggleScheduleQr(panel) {
-    const qr = panel.querySelector(".share-qr"), button = panel.querySelector(".toggle-share-qr");
+    const qr = panel.querySelector(".share-qr"), button = shareQrButton(panel);
+    const staticLabel = [els.exportSharePanel, els.personQuickSharePanel].includes(panel);
     const status = panel.querySelector(".share-link-status");
     if (!qr.hidden) {
-      qr.hidden = true; button.textContent = "Show QR"; button.setAttribute("aria-expanded", "false"); return;
+      qr.hidden = true; if (!staticLabel) button.textContent = "Show QR"; button.setAttribute("aria-expanded", "false"); return;
     }
     const link = panel.querySelector("textarea").value;
     if (!link) return;
@@ -2689,7 +2930,7 @@
       const size = code.size + 8;
       svg.setAttribute("viewBox", `0 0 ${size} ${size}`);
       svg.setAttribute("role", "img");
-      svg.setAttribute("aria-label", "Scan to review and add these schedules in Ufree");
+      svg.setAttribute("aria-label", "Scan to review and add these schedules in UFree");
       svg.setAttribute("shape-rendering", "crispEdges");
       const background = document.createElementNS(ns, "rect");
       background.setAttribute("width", String(size)); background.setAttribute("height", String(size)); background.setAttribute("fill", "#fff");
@@ -2697,7 +2938,7 @@
       for (let y = 0; y < code.size; y++) for (let x = 0; x < code.size; x++) if (code.getModule(x, y)) cells.push(`M${x + 4},${y + 4}h1v1h-1z`);
       path.setAttribute("d", cells.join("")); path.setAttribute("fill", "#000");
       svg.append(background, path); qr.replaceChildren(svg); qr.hidden = false;
-      button.textContent = "Hide QR"; button.setAttribute("aria-expanded", "true");
+      if (!staticLabel) button.textContent = "Hide QR"; button.setAttribute("aria-expanded", "true");
       codeStatus(status, code.version > 25 ? "Scan with your phone camera. This QR is dense; select fewer people if scanning is difficult." : "Scan with your phone camera, then open the link. Anyone with the QR or link can read these schedules.");
       revealSection(qr);
     } catch (error) {
@@ -2765,10 +3006,13 @@
     const input = location.href;
     // Consume the fragment before opening dialogs, so refresh cannot import it again.
     try { history.replaceState(null, "", location.pathname + location.search); } catch { /* Read-only browser histories still show the preview. */ }
+    if (!els.personQuickShareModal.hidden) closePersonQuickShare();
+    if (!els.personGroupModal.hidden) closePersonGroup();
     if (!els.personWeekModal.hidden) closePersonWeek();
     if (!els.settingsModal.hidden) closeSettingsModal();
     if (!els.groupWeekModal.hidden) closeGroupWeek();
     if (!els.groupsModal.hidden) closeGroupsModal();
+    if (!els.helpModal.hidden) closeHelp();
     openScheduleModal();
     openCodePanel("import");
     els.importCodeInput.value = input;
@@ -2900,7 +3144,6 @@
   }
 
   async function loadSchedulesFromDevice() {
-    els.statusLine.textContent = "Checking this device for schedule data…";
     try {
       const record = await readLocalScheduleRecord();
       if (!record?.data) {
@@ -2993,6 +3236,13 @@
     showToast(warning || `Schedule removed: ${displayName(name)}`);
   }
 
+  function setStoredPeopleExpanded(expanded) {
+    els.peopleManagerList.hidden = !expanded;
+    els.storedPeopleToggle.textContent = expanded ? "Hide" : "Show";
+    els.storedPeopleToggle.setAttribute("aria-expanded", String(expanded));
+    els.storedPeopleToggle.setAttribute("aria-label", expanded ? "Hide stored people" : "Show stored people");
+  }
+
   function renderPeopleManager() {
     const names = Object.keys(peopleMap()).sort(comparePeopleNames);
     els.peopleManagerCount.textContent = String(names.length);
@@ -3063,7 +3313,7 @@
     }
     els.codeImportPanel.hidden = state.codeMode !== "import";
     els.codeExportPanel.hidden = state.codeMode !== "export";
-    document.getElementById("scheduleModalTitle").textContent = flow === "review" ? "Review schedule" : flow === "code-import" ? "Import schedules" : flow === "code-export" ? "Share schedules" : "Schedule data";
+    document.getElementById("scheduleModalTitle").textContent = flow === "review" ? "Review schedule" : flow === "code-import" ? "Import schedules" : flow === "code-export" ? state.quickExport ? "Quick share" : "Share schedules" : "Schedule data";
     dialog.querySelector(".modal-header p").hidden = Boolean(flow);
     if (flow) dialog.dataset.scheduleFlow = flow;
     else delete dialog.dataset.scheduleFlow;
@@ -3083,8 +3333,11 @@
     renderPeopleManager();
     const importBusy = state.isParsing || Boolean(state.pendingImage) || Boolean(state.codeMode);
     els.exportSchedulesButton.disabled = importBusy || peopleCount === 0;
+    els.homeExportButton.disabled = importBusy || peopleCount === 0;
     els.importCodeButton.disabled = importBusy;
     els.generateCodeButton.disabled = state.isParsing;
+    els.exportQrButton.disabled = state.isParsing;
+    els.copyExportLinkButton.disabled = state.isParsing;
     els.copyCodeButton.disabled = state.isParsing || !els.exportCodeOutput.value;
     els.decodeCodeButton.disabled = state.isParsing || Boolean(state.sharedImport && !els.sharedImportPeople.querySelector("input:checked"));
     els.closeExportButton.disabled = state.isParsing;
@@ -3140,8 +3393,10 @@
     document.body.style.overflow = "hidden";
     if (!wasHidden) return;
     els.advancedScheduleOptions.open = false;
+    setStoredPeopleExpanded(false);
     els.scheduleModal.querySelector(".schedule-modal").scrollTop = 0;
     requestAnimationFrame(() => {
+      if (els.scheduleModal.hidden) return;
       animateModalOpen(els.scheduleModal, els.scheduleModal.querySelector(".schedule-modal"));
       els.closeScheduleModal.focus();
     });
@@ -3179,17 +3434,174 @@
     showToast("All local schedules removed");
   }
 
+  function iconAction(label, path, extraClass = "") {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `secondary-button person-action-icon ${extraClass}`.trim();
+    button.title = label;
+    button.setAttribute("aria-label", label);
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("aria-hidden", "true");
+    const shape = document.createElementNS(svg.namespaceURI, "path");
+    shape.setAttribute("d", path);
+    svg.append(shape); button.append(svg);
+    return button;
+  }
+
+  function shareQrButton(panel) {
+    if (panel === els.exportSharePanel) return els.exportQrButton;
+    if (panel === els.personQuickSharePanel) return els.personQuickQrButton;
+    return panel.querySelector(".toggle-share-qr");
+  }
+
+  function unlockClosedModals() {
+    if (![...document.querySelectorAll(".modal-backdrop")].some(modal => !modal.hidden)) document.body.style.overflow = "";
+  }
+
+  function personQuickShareButtons() {
+    return [els.personQuickUrlButton, els.personQuickQrButton, els.personQuickCodeButton];
+  }
+
+  function resetPersonQuickOutputs() {
+    els.personQuickCode.value = "";
+    els.personQuickCodeField.hidden = true;
+    els.copyPersonQuickCode.disabled = true;
+    resetShareLink(els.personQuickSharePanel);
+    codeStatus(els.personQuickShareStatus, "");
+  }
+
+  function openPersonQuickShare(name, returnFocus) {
+    if (state.isParsing || state.pendingImage || state.codeMode || !peopleMap()[name]) return;
+    state.personShareRequest++;
+    state.personShareName = name;
+    state.personShareBusy = false;
+    state.personShareReturnFocus = returnFocus;
+    els.personQuickShareTitle.textContent = `Share ${displayName(name)}`;
+    resetExportFields(els.personQuickExportFields);
+    resetPersonQuickOutputs();
+    personQuickShareButtons().forEach(button => { button.disabled = false; });
+    els.personQuickShareModal.hidden = false;
+    els.personQuickShareModal.querySelector(".schedule-modal").scrollTop = 0;
+    document.body.style.overflow = "hidden";
+    els.closePersonQuickShare.focus({ preventScroll: true });
+    animateModalOpen(els.personQuickShareModal, els.personQuickShareModal.querySelector(".schedule-modal"));
+  }
+
+  function closePersonQuickShare() {
+    const name = state.personShareName, returnFocus = state.personShareReturnFocus;
+    state.personShareRequest++;
+    state.personShareName = null;
+    state.personShareBusy = false;
+    state.personShareReturnFocus = null;
+    els.personQuickShareModal.hidden = true;
+    resetPersonQuickOutputs();
+    unlockClosedModals();
+    const card = [...els.peopleList.querySelectorAll(".person-card")].find(item => item.dataset.person === name);
+    const expandedShare = state.selectedPerson === name ? document.getElementById("sharePersonScheduleButton") : null;
+    (returnFocus?.isConnected ? returnFocus : expandedShare || card?.querySelector(".person-select-button"))?.focus({ preventScroll: true });
+  }
+
+  function personQuickFieldsChanged() {
+    state.personShareRequest++;
+    resetPersonQuickOutputs();
+    codeStatus(els.personQuickShareStatus, "Export again to apply these details.");
+  }
+
+  async function exportPersonQuickSchedule(action) {
+    const name = state.personShareName;
+    if (!name || !peopleMap()[name] || state.personShareBusy) return;
+    const request = ++state.personShareRequest;
+    state.personShareBusy = true;
+    personQuickShareButtons().forEach(button => { button.disabled = true; });
+    els.personQuickExportFields.open = false;
+    els.personQuickExportFields.querySelectorAll("input, button").forEach(input => { input.disabled = true; });
+    resetPersonQuickOutputs();
+    codeStatus(els.personQuickShareStatus, "Creating this person's share…");
+    try {
+      const code = await encodeSchedules([name], els.personQuickExportFields);
+      if (request !== state.personShareRequest) return;
+      els.personQuickCode.value = code;
+      populateShareLink(code, els.personQuickSharePanel);
+      if (action === "code") {
+        els.personQuickSharePanel.hidden = true;
+        els.personQuickCodeField.hidden = false;
+        els.copyPersonQuickCode.disabled = false;
+        revealSection(els.personQuickCodeField);
+      } else {
+        if (!els.personQuickSharePanel.querySelector("textarea").value) throw new Error("Use Text Code for this schedule instead.");
+        if (action === "qr") toggleScheduleQr(els.personQuickSharePanel);
+        else {
+          els.personQuickSharePanel.querySelector(".share-link-field").hidden = false;
+          await copyScheduleLink(els.personQuickSharePanel);
+          if (request !== state.personShareRequest) return;
+        }
+      }
+      codeStatus(els.personQuickShareStatus, shareCodeReadyMessage(1, code), "success");
+    } catch (error) {
+      if (request === state.personShareRequest) {
+        resetPersonQuickOutputs();
+        codeStatus(els.personQuickShareStatus, error.message || "This schedule could not be shared.", "error");
+      }
+    } finally {
+      if (request === state.personShareRequest) {
+        state.personShareBusy = false;
+        personQuickShareButtons().forEach(button => { button.disabled = false; });
+        els.personQuickExportFields.querySelectorAll("input, button").forEach(input => { input.disabled = false; });
+      }
+    }
+  }
+
+  function openPersonGroup(name) {
+    if (state.isParsing || state.pendingImage || state.codeMode || !peopleMap()[name]) return;
+    state.groupPerson = name;
+    els.personGroupTitle.textContent = `Add ${displayName(name)} to a group`;
+    els.personGroupSelect.replaceChildren();
+    for (const group of state.groups.filter(group => !group.members.includes(name))) {
+      const option = document.createElement("option");
+      option.value = group.id; option.textContent = group.name;
+      els.personGroupSelect.append(option);
+    }
+    const hasOptions = els.personGroupSelect.options.length > 0;
+    els.personGroupField.hidden = !hasOptions;
+    els.personGroupEmpty.hidden = hasOptions;
+    els.personGroupEmpty.textContent = state.groups.length ? "This person already belongs to every group." : "Create a group in Manage groups first.";
+    els.savePersonGroup.disabled = !hasOptions;
+    els.personGroupModal.hidden = false;
+    document.body.style.overflow = "hidden";
+    els.closePersonGroup.focus({ preventScroll: true });
+    animateModalOpen(els.personGroupModal, els.personGroupModal.querySelector(".schedule-modal"));
+  }
+
+  function closePersonGroup() {
+    state.groupPerson = null;
+    els.personGroupModal.hidden = true;
+    unlockClosedModals();
+    document.getElementById("addPersonGroupButton")?.focus({ preventScroll: true });
+  }
+
+  function addPersonToGroup(event) {
+    event.preventDefault();
+    const name = state.groupPerson;
+    const group = state.groups.find(group => group.id === els.personGroupSelect.value);
+    if (!name || !peopleMap()[name] || !group || group.members.includes(name)) return;
+    group.members.push(name);
+    const persisted = saveGroupPreferences();
+    refresh({ preserveScroll: true });
+    closePersonGroup();
+    if (persisted) showToast(`${displayName(name)} added to ${group.name}.`);
+  }
+
   function renderPersonCard(name, day, minute, scope = "main") {
     const busyClass = currentClass(name, day, minute);
     const busy = !isFree(name, day, minute);
     const selected = name === state.selectedPerson;
     const pinned = state.pinnedPeople.has(name);
 
-    const button = document.createElement("button");
-    button.type = "button";
+    const button = document.createElement("div");
+    button.tabIndex = -1;
     button.className = `person-card${semesterIsOlder(peopleMap()[name].semester) ? " semester-expired" : ""}${selected ? " selected" : ""}${pinned ? " pinned" : ""}`;
     button.setAttribute("role", "listitem");
-    button.setAttribute("aria-pressed", String(selected));
 
     const dot = document.createElement("span");
     dot.className = `person-status-dot${busy ? " busy" : ""}`;
@@ -3198,8 +3610,12 @@
     const copy = document.createElement("span");
     copy.className = "person-copy";
 
-    const personName = document.createElement("span");
-    personName.className = "person-name";
+    const personName = document.createElement("button");
+    personName.type = "button";
+    personName.className = "person-name person-select-button";
+    personName.setAttribute("aria-label", `View details for ${displayName(name)}`);
+    personName.setAttribute("aria-pressed", String(selected));
+    personName.setAttribute("aria-describedby", "personOrderHelp");
     personName.textContent = displayName(name);
     if (pinned) {
       const pinMark = document.createElement("span");
@@ -3215,7 +3631,7 @@
       detail.textContent = classLabel(busyClass);
     } else if (busy) {
       const next = nextClassToday(name, day, minute);
-      detail.textContent = `Passing time · next class at ${formatTime(next.start)}`;
+      detail.textContent = `Class Soon · next class at ${formatTime(next.start)}`;
     } else {
       const next = nextClassToday(name, day, minute);
       detail.textContent = next ? `Next ${formatTime(next.start)} · ${classLabel(next)}` : "No more classes today";
@@ -3239,7 +3655,7 @@
 
     const badge = document.createElement("span");
     badge.className = `status-badge ${busy ? "busy" : "free"}`;
-    badge.textContent = busyClass ? "IN CLASS" : busy ? "PASSING\nTIME" : "FREE";
+    badge.textContent = busyClass ? "IN CLASS" : busy ? "Class Soon" : "FREE";
     badge.style.whiteSpace = "pre-line";
 
     button.append(dot, copy, badge);
@@ -3252,6 +3668,10 @@
       if (window.matchMedia("(max-width: 880px)").matches) {
         requestAnimationFrame(() => els.detailPanel.scrollIntoView({ behavior: "smooth", block: "start" }));
       }
+    });
+    button.addEventListener("keydown", event => {
+      if (event.target !== button || event.altKey || !["Enter", " "].includes(event.key)) return;
+      event.preventDefault(); button.click();
     });
 
     return button;
@@ -3488,15 +3908,29 @@
     nameEl.textContent = displayName(name);
     const nameRow = document.createElement("div");
     nameRow.className = "detail-name-row";
-    const fullSchedule = document.createElement("button");
+    const fullSchedule = iconAction(`View full schedule for ${displayName(name)}`, "M5 5h14a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2ZM7 3v4M17 3v4M3 11h18", "full-schedule-button");
     fullSchedule.id = "fullScheduleButton";
-    fullSchedule.type = "button";
-    fullSchedule.className = "secondary-button full-schedule-button";
-    fullSchedule.textContent = "Full schedule";
-    fullSchedule.setAttribute("aria-label", `View full schedule for ${displayName(name)}`);
+    const fullScheduleLabel = document.createElement("span");
+    fullScheduleLabel.className = "nav-button-label";
+    fullScheduleLabel.textContent = "Full schedule";
+    fullSchedule.append(fullScheduleLabel);
     fullSchedule.setAttribute("aria-haspopup", "dialog");
     fullSchedule.addEventListener("click", () => openPersonWeek(name));
-    nameRow.append(nameEl, fullSchedule);
+    const actions = document.createElement("div");
+    actions.className = "person-detail-actions";
+    const addToGroup = iconAction(`Add ${displayName(name)} to a group`, "M12 5v14M5 12h14");
+    addToGroup.id = "addPersonGroupButton";
+    addToGroup.setAttribute("aria-haspopup", "dialog");
+    addToGroup.addEventListener("click", () => openPersonGroup(name));
+    const remove = iconAction(`Delete ${displayName(name)}'s schedule from this device`, "M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7", "person-delete-button");
+    remove.id = "deletePersonScheduleButton";
+    remove.addEventListener("click", () => removePerson(name));
+    const share = iconAction(`Share ${displayName(name)}'s schedule`, "M12 3v12m-4-8 4-4 4 4M5 13v7h14v-7");
+    share.id = "sharePersonScheduleButton";
+    share.setAttribute("aria-haspopup", "dialog");
+    share.addEventListener("click", () => openPersonQuickShare(name, share));
+    actions.append(fullSchedule, addToGroup, remove, share);
+    nameRow.append(nameEl, actions);
     const semesterLabel = document.createElement("p");
     semesterLabel.className = `schedule-semester${semesterIsOlder(peopleMap()[name].semester) ? " semester-older" : ""}`;
     semesterLabel.textContent = scheduleLabel(peopleMap()[name], true);
@@ -3505,7 +3939,7 @@
 
     const badge = document.createElement("span");
     badge.className = `status-badge ${busy ? "busy" : "free"}`;
-    badge.textContent = current ? "IN CLASS" : busy ? "PASSING TIME" : "FREE";
+    badge.textContent = current ? "IN CLASS" : busy ? "Class Soon" : "FREE";
     statusRow.append(badge);
 
     if (current) {
@@ -3579,11 +4013,13 @@
 
     animateDetailIfNeeded(name);
     state.lastDetailPerson = name;
+    scheduleToolbarLayout();
   }
 
   function refresh({ preserveScroll = false } = {}) {
     if (state.activeReorder || state.pendingPersonHold) return;
     if (!state.hasData || state.loadError) {
+      updatePeopleSearchStatus();
       renderDataSetup();
       return;
     }
@@ -3601,7 +4037,7 @@
     }
 
     const { day, minute } = moment;
-    const { free, busy, visible } = visiblePeople(day, minute);
+    const { visible } = visiblePeople(day, minute);
     const peopleCount = Object.keys(peopleMap()).length;
     const oldScroll = els.peopleList.scrollTop;
     const openMenus = [...els.peopleList.querySelectorAll(".group-options[open]")].map(menu => menu.closest(".people-group").dataset.groupId);
@@ -3611,13 +4047,9 @@
     els.peopleHeading.textContent = state.showGroups ? "Groups" : state.showEveryone ? "Everyone" : state.useLiveTime ? "Free now" : "Free";
     setViewToggle(els.viewToggleButton, state.showEveryone ? "Show only free" : "Show everyone", state.showEveryone);
     els.viewToggleButton.querySelector("[data-mode-label]").textContent = state.showEveryone ? "Free" : "All";
-    const nextFreeCountText = `${free.length} of ${peopleCount} free`;
-    els.freeCount.textContent = nextFreeCountText;
-    animateCountIfChanged(nextFreeCountText);
-    state.lastFreeCountText = nextFreeCountText;
-    els.statusLine.textContent = `${state.useLiveTime ? "Live · " : ""}${day} at ${formatTime(state.selectedTime)} · ${busy.length} in class`;
-
     els.peopleList.replaceChildren();
+
+    updatePeopleSearchStatus(visible);
 
     if (peopleCount === 0) {
       els.peopleList.append(createEmptyList("No people in this file", "Replace the schedule file from the Schedules button."));
@@ -3627,7 +4059,7 @@
     }
 
     if (visible.length === 0 && !state.showGroups) {
-      els.peopleList.append(createEmptyList("Nobody is free", "Try another time or choose Show everyone."));
+      els.peopleList.append(createEmptyList(state.peopleSearchQuery.trim() ? "No matching people" : "Nobody is free", state.peopleSearchQuery.trim() ? "Try another name, clear the search, or choose All." : "Try another time or choose Show everyone."));
       state.selectedPerson = null;
       renderEmptyDetail();
       return;
@@ -3637,10 +4069,7 @@
     if (state.showGroups) {
       const grouped = renderGroupedPeople(visible, day, minute);
       displayed = grouped.visible;
-      const shownFree = free.filter(name => grouped.shown.has(name)).length;
-      const text = `${shownFree} of ${grouped.shown.size} free`;
-      els.freeCount.textContent = text;
-      els.statusLine.textContent = `${state.useLiveTime ? "Live · " : ""}${day} at ${formatTime(state.selectedTime)} · ${grouped.shown.size - shownFree} in class · Expanded groups`;
+      updatePeopleSearchStatus(displayed);
     } else visible.forEach(name => els.peopleList.append(renderPersonCard(name, day, minute)));
     for (const section of els.peopleList.querySelectorAll(".people-group")) {
       if (openMenus.includes(section.dataset.groupId)) section.querySelector(".group-options").open = true;
@@ -3649,7 +4078,7 @@
 
     if (state.selectedPerson && !displayed.includes(state.selectedPerson)) {
       state.selectedPerson = null;
-      els.peopleList.querySelectorAll(".person-card.selected").forEach(card => { card.classList.remove("selected"); card.setAttribute("aria-pressed", "false"); });
+      els.peopleList.querySelectorAll(".person-card.selected").forEach(card => { card.classList.remove("selected"); card.querySelector(".person-select-button")?.setAttribute("aria-pressed", "false"); });
     }
 
     const peopleSignature = [
@@ -3801,12 +4230,36 @@
       applyAccentTheme(button.dataset.colorTheme, true);
     });
     els.scheduleDataButton.addEventListener("click", openScheduleModal);
+    els.homeExportButton.addEventListener("click", openQuickExport);
+    els.helpButton.addEventListener("click", openHelp);
+    els.closeHelpModal.addEventListener("click", closeHelp);
+    els.helpModal.addEventListener("click", event => { if (event.target === els.helpModal) closeHelp(); });
     els.settingsButton.addEventListener("click", openSettingsModal);
+    els.storedPeopleToggle.addEventListener("click", () => setStoredPeopleExpanded(els.peopleManagerList.hidden));
+    els.peopleSearchButton.addEventListener("click", togglePeopleSearch);
+    els.peopleSearchInput.addEventListener("input", () => {
+      state.peopleSearchQuery = els.peopleSearchInput.value; refresh({ preserveScroll: true });
+    });
+    els.clearPeopleSearchButton.addEventListener("click", () => {
+      state.peopleSearchQuery = ""; els.peopleSearchInput.value = "";
+      refresh({ preserveScroll: true }); els.peopleSearchInput.focus();
+    });
+    els.peopleSearchPanel.addEventListener("focusout", () => queuePeopleSearchDismiss());
+    document.addEventListener("pointerdown", () => { peopleSearchPointerDown = true; }, { capture: true, passive: true });
+    for (const type of ["pointerup", "pointercancel"]) document.addEventListener(type, () => {
+      peopleSearchPointerDown = false; queuePeopleSearchDismiss();
+    }, { capture: true, passive: true });
+    document.addEventListener("click", event => {
+      if (!withinPeopleSearch(event.target)) queuePeopleSearchDismiss(true);
+    }, true);
+    els.peopleSearchPanel.addEventListener("keydown", event => {
+      if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); togglePeopleSearch(); }
+    });
     els.showGroupsToggle.addEventListener("click", () => {
       state.showGroups = !state.showGroups;
       saveGroupPreferences(); refresh({ preserveScroll: true });
     });
-    els.manageGroupsButton.addEventListener("click", () => openGroupsModal());
+    els.manageGroupsButton.addEventListener("click", () => openGroupsModal(null, els.manageGroupsButton));
     els.closeGroupsModal.addEventListener("click", closeGroupsModal);
     els.newGroupButton.addEventListener("click", () => editGroup());
     els.groupForm.addEventListener("submit", saveGroup);
@@ -3814,6 +4267,16 @@
     els.closeGroupWeekModal.addEventListener("click", closeGroupWeek);
     els.closePersonWeekModal.addEventListener("click", closePersonWeek);
     els.personWeekModal.addEventListener("click", event => { if (event.target === els.personWeekModal) closePersonWeek(); });
+    els.closePersonQuickShare.addEventListener("click", closePersonQuickShare);
+    els.personQuickShareModal.addEventListener("click", event => { if (event.target === els.personQuickShareModal) closePersonQuickShare(); });
+    els.personQuickUrlButton.addEventListener("click", () => exportPersonQuickSchedule("url"));
+    els.personQuickQrButton.addEventListener("click", () => exportPersonQuickSchedule("qr"));
+    els.personQuickCodeButton.addEventListener("click", () => exportPersonQuickSchedule("code"));
+    els.copyPersonQuickCode.addEventListener("click", () => copyExportCode(els.personQuickCode, els.personQuickShareStatus));
+    els.closePersonGroup.addEventListener("click", closePersonGroup);
+    els.personGroupModal.addEventListener("click", event => { if (event.target === els.personGroupModal) closePersonGroup(); });
+    els.personGroupForm.addEventListener("submit", addPersonToGroup);
+    els.personGroupManage.addEventListener("click", () => { closePersonGroup(); openGroupsModal(); });
     els.exportPersonScheduleButton.addEventListener("click", exportPersonSchedule);
     els.copyPersonWeekCodeButton.addEventListener("click", () => copyExportCode(els.personWeekCode, els.personWeekExportStatus));
     els.groupsModal.addEventListener("click", event => { if (event.target === els.groupsModal) closeGroupsModal(); });
@@ -3855,9 +4318,11 @@
       els.exportPeopleList.querySelectorAll("input").forEach(input => { input.checked = els.selectAllSchedules.checked; });
       exportSelectionChanged();
     });
-    els.generateCodeButton.addEventListener("click", generateShareCode);
-    for (const options of [els.exportFieldOptions, els.personExportFieldOptions]) {
-      const changed = options === els.exportFieldOptions ? exportSelectionChanged : personExportFieldsChanged;
+    els.generateCodeButton.addEventListener("click", () => generateShareCode("code"));
+    els.exportQrButton.addEventListener("click", () => generateShareCode("qr"));
+    els.copyExportLinkButton.addEventListener("click", () => generateShareCode("link"));
+    for (const options of [els.exportFieldOptions, els.personExportFieldOptions, els.personQuickExportFields]) {
+      const changed = options === els.exportFieldOptions ? exportSelectionChanged : options === els.personExportFieldOptions ? personExportFieldsChanged : personQuickFieldsChanged;
       options.addEventListener("change", changed);
       options.querySelector(".export-include-all").addEventListener("click", () => {
         options.querySelectorAll("input").forEach(input => { input.checked = true; });
@@ -3865,7 +4330,7 @@
       });
     }
     els.copyCodeButton.addEventListener("click", copyShareCode);
-    for (const panel of [els.exportSharePanel, els.personSharePanel]) {
+    for (const panel of [els.personSharePanel]) {
       panel.querySelector(".copy-share-link").addEventListener("click", () => copyScheduleLink(panel));
       panel.querySelector(".toggle-share-qr").addEventListener("click", () => toggleScheduleQr(panel));
     }
@@ -3903,9 +4368,9 @@
         if (event.key === "Escape") event.preventDefault();
         return;
       }
-      const groupModal = !els.personWeekModal.hidden ? els.personWeekModal : !els.groupWeekModal.hidden ? els.groupWeekModal : !els.groupsModal.hidden ? els.groupsModal : null;
+      const groupModal = !els.personQuickShareModal.hidden ? els.personQuickShareModal : !els.personGroupModal.hidden ? els.personGroupModal : !els.personWeekModal.hidden ? els.personWeekModal : !els.groupWeekModal.hidden ? els.groupWeekModal : !els.groupsModal.hidden ? els.groupsModal : !els.helpModal.hidden ? els.helpModal : !els.settingsModal.hidden ? els.settingsModal : !els.scheduleModal.hidden ? els.scheduleModal : null;
       if (event.key === "Tab" && groupModal) {
-        const focusable = [...groupModal.querySelectorAll('button, input, textarea, summary, [tabindex="0"]')].filter(item => {
+        const focusable = [...groupModal.querySelectorAll('button, input, textarea, select, summary, [tabindex="0"]')].filter(item => {
           const closed = item.closest("details:not([open])");
           return !item.disabled && !item.closest("[hidden]") && (!closed || closed.querySelector(":scope > summary") === item);
         });
@@ -3914,7 +4379,7 @@
         else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
       }
       if (event.key !== "Escape") return;
-      const exportMenu = [els.exportFieldOptions, els.personExportFieldOptions].find(menu => menu.open && !menu.closest("[hidden]"));
+      const exportMenu = [els.exportFieldOptions, els.personExportFieldOptions, els.personQuickExportFields].find(menu => menu.open && !menu.closest("[hidden]"));
       if (exportMenu) { event.preventDefault(); exportMenu.open = false; exportMenu.querySelector("summary").focus(); return; }
       if (state.codeConflict) { event.preventDefault(); finishCodeConflict("old"); return; }
       if (state.pendingPersonHold) {
@@ -3930,9 +4395,12 @@
         els.advancedScheduleOptions.querySelector("summary").focus({ preventScroll: true });
         return;
       }
-      if (!els.personWeekModal.hidden) closePersonWeek();
+      if (!els.personQuickShareModal.hidden) closePersonQuickShare();
+      else if (!els.personGroupModal.hidden) closePersonGroup();
+      else if (!els.personWeekModal.hidden) closePersonWeek();
       else if (!els.groupWeekModal.hidden) closeGroupWeek();
       else if (!els.groupsModal.hidden) closeGroupsModal();
+      else if (!els.helpModal.hidden) closeHelp();
       else if (!els.settingsModal.hidden) closeSettingsModal();
       else if (!els.scheduleModal.hidden) closeScheduleModal();
     });
@@ -3974,7 +4442,7 @@
     if (!("serviceWorker" in navigator)) return;
     if (location.protocol !== "https:" && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") return;
 
-    navigator.serviceWorker.register("./service-worker.js?v=67", { updateViaCache: "none" })
+    navigator.serviceWorker.register("./service-worker.js?v=84", { updateViaCache: "none" })
       .then(registration => registration.update())
       .catch(() => {
         // The app works normally even if PWA caching isn't available.
@@ -4005,6 +4473,7 @@
     setLiveValues();
     syncLiveControls();
     bindEvents();
+    watchToolbarLayout();
     updateScheduleModal();
     updateSettingsModal();
     registerServiceWorker();
@@ -4033,4 +4502,5 @@
 
   init();
 })();
+
 

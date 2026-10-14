@@ -19,7 +19,7 @@ async function app(initial = null, url = base) {
   let copied;
   Object.defineProperty(window.navigator, "clipboard", { value: { writeText: async value => { copied = value; } }, configurable: true });
   if (initial) window.localStorage.setItem("whos-free-local-schedules", JSON.stringify({ data: initial, meta: {} }));
-  for (const file of ["schedule-availability.js", "schedule-share-code.js", "assets/qr/qrcodegen.js", "app.js"]) window.eval(fs.readFileSync(new URL("../" + file, import.meta.url), "utf8"));
+  for (const file of ["schedule-availability.js", "schedule-groups.js", "schedule-share-code.js", "assets/qr/qrcodegen.js", "app.js"]) window.eval(fs.readFileSync(new URL("../" + file, import.meta.url), "utf8"));
   const el = id => window.document.getElementById(id);
   const wait = async predicate => {
     for (let i = 0; i < 150; i++) { if (predicate()) return; await tick(); }
@@ -53,16 +53,16 @@ test("export offers a copyable Ufree link and a locally generated QR; changing s
     a.el("exportSchedulesButton").click(); a.el("selectAllSchedules").click(); a.el("generateCodeButton").click();
     await a.wait(() => !a.el("generateCodeButton").disabled);
     const panel = a.el("exportSharePanel"), link = panel.querySelector("textarea").value;
-    assert.equal(panel.hidden, false);
+    assert.equal(panel.hidden, true);
     assert.deepEqual(Object.keys((await a.window.WhosFreeShareCode.decode(link)).people), ["Alice", "Bob"]);
-    panel.querySelector(".copy-share-link").click(); await tick(); assert.equal(a.copied(), link);
-    const button = panel.querySelector(".toggle-share-qr"); button.click();
+    a.el("copyExportLinkButton").click(); await a.wait(() => !a.el("generateCodeButton").disabled); assert.equal(a.copied(), link);
+    const button = a.el("exportQrButton"); button.click(); await a.wait(() => !a.el("generateCodeButton").disabled);
     const svg = panel.querySelector("svg");
     assert.ok(svg); assert.equal(button.getAttribute("aria-expanded"), "true");
     assert.equal(svg.querySelector("rect").getAttribute("fill"), "#fff");
     assert.equal(svg.querySelector("path").getAttribute("fill"), "#000");
     assert.match(svg.querySelector("path").getAttribute("d"), /^M/);
-    button.click(); assert.equal(panel.querySelector(".share-qr").hidden, true);
+    a.el("generateCodeButton").click(); await a.wait(() => !a.el("generateCodeButton").disabled); assert.equal(panel.querySelector(".share-qr").hidden, true);
     a.el("selectAllSchedules").click();
     assert.equal(panel.hidden, true); assert.equal(panel.querySelector("textarea").value, ""); assert.equal(panel.querySelector("svg"), null);
   } finally { a.window.happyDOM.abort(); }
@@ -135,10 +135,12 @@ test("oversized QR retains the complete link and code, and one-person export con
     await a.wait(() => !a.el("generateCodeButton").disabled);
     const panel = a.el("exportSharePanel"), output = panel.querySelector("textarea");
     const code = a.el("exportCodeOutput").value;
-    output.value = base + "#import=" + "x".repeat(2400);
-    panel.querySelector(".toggle-share-qr").click();
+    const createLink = a.window.WhosFreeShareCode.createLink;
+    a.window.WhosFreeShareCode.createLink = () => base + "#import=" + "x".repeat(2400);
+    a.el("exportQrButton").click(); await a.wait(() => !a.el("generateCodeButton").disabled);
     assert.match(panel.querySelector(".share-link-status").textContent, /Too much data/);
     assert.equal(output.value.length > 2331, true); assert.equal(a.el("exportCodeOutput").value, code);
+    a.window.WhosFreeShareCode.createLink = createLink;
     a.el("closeScheduleModal").click(); a.el("viewToggleButton").click();
     a.el("peopleList").querySelector('[data-person="Alice"]').click(); a.el("fullScheduleButton").click();
     a.el("exportPersonScheduleButton").click(); await a.wait(() => !a.el("exportPersonScheduleButton").disabled);
@@ -184,7 +186,7 @@ test("three-dot export choices start basic and regenerate codes, links and QRs w
     a.el("generateCodeButton").click(); await a.wait(() => !a.el("generateCodeButton").disabled);
     const panel = a.el("exportSharePanel"); exported = await a.window.WhosFreeShareCode.decode(panel.querySelector("textarea").value);
     assert.deepEqual(plain(exported.people), rich.people);
-    panel.querySelector(".toggle-share-qr").click(); assert.ok(panel.querySelector("svg"));
+    a.el("exportQrButton").click(); await a.wait(() => !a.el("generateCodeButton").disabled); assert.ok(panel.querySelector("svg"));
     assert.equal(a.stored(), before);
     a.el("closeExportButton").click(); a.el("exportSchedulesButton").click();
     assert.equal(options.querySelectorAll("input:checked").length, 0);
@@ -208,5 +210,95 @@ test("single-person three-dot choices preserve full teacher names and course det
     options.open = true;
     a.window.document.dispatchEvent(new a.window.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
     assert.equal(options.open, false); assert.equal(a.el("personWeekModal").hidden, false);
+  } finally { a.window.happyDOM.abort(); }
+});
+
+test("home export defaults to Everyone in a collapsed selection and supports each export action directly", async () => {
+  const a = await app(data);
+  try {
+    const before = a.stored();
+    a.el("homeExportButton").click();
+    assert.equal(a.el("scheduleModal").hidden, false);
+    assert.equal(a.el("scheduleModalTitle").textContent, "Quick share");
+    assert.equal(a.el("exportSelection").open, false);
+    assert.equal(a.el("selectAllSchedules").checked, true);
+    assert.equal(a.el("exportPeopleList").querySelectorAll("input:checked").length, 2);
+    assert.match(a.el("exportSelectionSummary").textContent, /Everyone/);
+    assert.equal(a.el("exportCodeField").hidden, true);
+    for (const [id, label] of [["generateCodeButton","Export Code"],["exportQrButton","Export QR"],["copyExportLinkButton","Copy Link"]]) {
+      assert.equal(a.el(id).textContent, label); assert.ok(a.el(id).querySelector('svg[aria-hidden="true"]'));
+    }
+    a.el("copyExportLinkButton").click(); await a.wait(() => !a.el("generateCodeButton").disabled);
+    assert.deepEqual(Object.keys((await a.window.WhosFreeShareCode.decode(a.copied())).people), ["Alice","Bob"]);
+    assert.equal(a.el("exportSharePanel").querySelector(".share-link-field").hidden, false);
+    assert.equal(a.el("exportCodeField").hidden, true);
+    a.el("exportQrButton").click(); await a.wait(() => !a.el("generateCodeButton").disabled);
+    assert.ok(a.el("exportQr").querySelector("svg")); assert.equal(a.el("exportQr").hidden, false);
+    assert.equal(a.el("exportQrButton").textContent, "Export QR");
+    a.el("generateCodeButton").click(); await a.wait(() => !a.el("generateCodeButton").disabled);
+    assert.equal(a.el("exportCodeField").hidden, false); assert.equal(a.el("copyCodeButton").hidden, false);
+    assert.deepEqual(Object.keys((await a.window.WhosFreeShareCode.decode(a.el("exportCodeOutput").value)).people), ["Alice","Bob"]);
+    a.el("exportSelection").open = true;
+    a.el("exportPeopleList").querySelector('[data-person="Bob"]').click();
+    assert.match(a.el("exportSelectionSummary").textContent, /1 of 2/); assert.equal(a.el("exportCodeOutput").value, "");
+    a.el("copyExportLinkButton").click(); await a.wait(() => !a.el("generateCodeButton").disabled);
+    assert.deepEqual(Object.keys((await a.window.WhosFreeShareCode.decode(a.copied())).people), ["Alice"]);
+    assert.equal(a.stored(), before);
+    a.el("closeExportButton").click(); assert.equal(a.el("scheduleModal").hidden, true);
+    assert.equal(a.window.document.activeElement.id, "homeExportButton");
+    assert.equal(a.window.document.body.style.overflow, "");
+  } finally { a.window.happyDOM.abort(); }
+});
+
+test("navigation keeps five actions together, the export icon opens quick share, and Help works", async () => {
+  const a = await app(data);
+  try {
+    const nav = a.window.document.querySelector('nav[aria-label="Main navigation"]');
+    assert.deepEqual([...nav.children].map(button => button.id), ["scheduleDataButton","helpButton","settingsButton","homeExportButton","undoChangesButton"]);
+    assert.equal(a.el("settingsButton").textContent, ""); assert.equal(a.el("settingsButton").getAttribute("aria-label"), "Settings");
+    assert.equal(a.el("homeExportButton").textContent, ""); assert.ok(a.el("homeExportButton").querySelector("svg"));
+    a.el("homeExportButton").click(); assert.equal(a.el("exportSelection").open, false); assert.equal(a.el("selectAllSchedules").checked, true);
+    a.window.document.dispatchEvent(new a.window.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    assert.equal(a.el("scheduleModal").hidden, true); assert.equal(a.window.document.activeElement.id, "homeExportButton");
+    a.el("helpButton").click(); assert.equal(a.el("helpModal").hidden, false);
+    assert.equal(a.window.document.activeElement.id, "closeHelpModal");
+    a.window.document.dispatchEvent(new a.window.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    assert.equal(a.el("helpModal").hidden, true); assert.equal(a.window.document.activeElement.id, "helpButton");
+    a.el("settingsButton").click(); assert.equal(a.el("settingsModal").hidden, false); a.el("closeSettingsModal").click();
+    assert.equal(a.el("showGroupsToggle").querySelector(".group-toggle-label").textContent, "GROUP");
+    a.el("showGroupsToggle").click(); assert.equal(a.el("showGroupsToggle").querySelector(".group-toggle-label").textContent, "GROUP");
+    assert.equal(a.el("manageGroupsButton").hidden, false);
+  } finally { a.window.happyDOM.abort(); }
+});
+
+test("empty devices disable the home export entry point and failed quick exports remain retryable", async () => {
+  const empty = await app(); const a = await app(data);
+  try {
+    assert.equal(empty.el("homeExportButton").disabled, true); assert.equal(empty.el("homeShareButton"), null);
+    empty.el("homeExportButton").click(); assert.equal(empty.el("scheduleModal").hidden, true);
+    a.el("homeExportButton").click();
+    const encode = a.window.WhosFreeShareCode.encode;
+    a.window.WhosFreeShareCode.encode = async () => { throw Error("Try exporting again"); };
+    a.el("exportQrButton").click(); await a.wait(() => !a.el("generateCodeButton").disabled);
+    assert.equal(a.el("exportCodeStatus").dataset.tone, "error"); assert.equal(a.el("closeExportButton").disabled, false);
+    a.window.WhosFreeShareCode.encode = encode;
+    a.el("exportQrButton").click(); await a.wait(() => !a.el("generateCodeButton").disabled); assert.ok(a.el("exportQr").querySelector("svg"));
+    a.el("closeExportButton").click(); assert.equal(a.el("scheduleModal").hidden, true);
+  } finally { empty.window.happyDOM.abort(); a.window.happyDOM.abort(); }
+});
+
+test("quick Copy Link exposes a selectable link when the clipboard is unavailable", async () => {
+  const a = await app(data);
+  try {
+    a.window.navigator.clipboard.writeText = async () => { throw Error("Clipboard denied"); };
+    a.el("homeExportButton").click(); a.el("copyExportLinkButton").click();
+    await a.wait(() => !a.el("generateCodeButton").disabled);
+    const panel = a.el("exportSharePanel"), output = panel.querySelector("textarea");
+    assert.equal(panel.hidden, false); assert.equal(panel.querySelector(".share-link-field").hidden, false);
+    assert.match(panel.querySelector(".share-link-status").textContent, /Select and copy/);
+    assert.equal(a.window.document.activeElement, output);
+    assert.equal(output.selectionEnd, output.value.length);
+    assert.deepEqual(Object.keys((await a.window.WhosFreeShareCode.decode(output.value)).people), ["Alice","Bob"]);
+    a.el("closeExportButton").click(); assert.equal(a.el("scheduleModal").hidden, true);
   } finally { a.window.happyDOM.abort(); }
 });

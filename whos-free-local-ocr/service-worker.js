@@ -1,17 +1,22 @@
-const CACHE_NAME = "whos-free-shell-v13";
+const CACHE_NAME = "whos-free-shell-v84";
 const OCR_CACHE_NAME = "whos-free-ocr-v1";
 const APP_SHELL = [
   "./",
   "./index.html",
-  "./styles.css?v=13",
-  "./app.js?v=13",
-  "./schedule-parser.js?v=13",
-  "./schedule-image-parser.js?v=13",
-  "./manifest.webmanifest",
-  "./assets/favicon.png",
-  "./assets/apple-touch-icon.png",
-  "./assets/icon-192.png",
-  "./assets/icon-512.png"
+  "./styles.css?v=84",
+  "./app.js?v=84",
+  "./schedule-parser.js?v=84",
+  "./schedule-image-parser.js?v=84",
+  "./manifest.webmanifest?v=84",
+  "./assets/favicon.png?v=84",
+  "./assets/apple-touch-icon.png?v=84",
+  "./assets/icon-192.png?v=84",
+  "./assets/icon-512.png?v=84",
+  "./assets/icon-maskable-512.png?v=84",
+  "./assets/UFreeLogo_SVG.svg?v=84",
+  "./assets/UFreeLogo_PNG.png?v=84",
+  "./assets/favicon.svg?v=84",
+  "./favicon.ico?v=84"
 ];
 
 self.addEventListener("install", event => {
@@ -83,3 +88,4 @@ self.addEventListener("notificationclick", event => {
     })
   );
 });
+

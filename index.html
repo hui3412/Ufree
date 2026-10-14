@@ -3,45 +3,55 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://cdn.jsdelivr.net https://www.googletagmanager.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://www.google-analytics.com https://*.google-analytics.com https://www.googletagmanager.com; connect-src 'self' https://www.google-analytics.com https://*.google-analytics.com https://www.googletagmanager.com; worker-src 'self' blob: https://cdn.jsdelivr.net; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; worker-src 'self' blob: https://cdn.jsdelivr.net; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
   <meta name="referrer" content="no-referrer">
   <meta name="theme-color" content="#232428">
   <meta name="description" content="See who's free now and compare Omnivox schedules. Schedule data stays on your device.">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Who's Free?">
-  <title>Who's Free?</title>
+  <meta name="apple-mobile-web-app-title" content="UFree">
+  <title>UFree</title>
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="UFree">
+  <meta property="og:title" content="UFree">
+  <meta property="og:description" content="Find who’s free and share Omnivox schedules. Your schedule data stays on your device.">
+  <meta property="og:url" content="https://hui3412.github.io/Ufree/">
+  <meta property="og:image" content="https://hui3412.github.io/Ufree/assets/UFreeLogo_PNG.png?v=84">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="330">
+  <meta property="og:image:height" content="188">
+  <meta property="og:image:alt" content="Official UFree logo">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="UFree">
+  <meta name="twitter:description" content="Find who’s free and share Omnivox schedules. Your schedule data stays on your device.">
+  <meta name="twitter:image" content="https://hui3412.github.io/Ufree/assets/UFreeLogo_PNG.png?v=84">
+  <meta name="twitter:image:alt" content="Official UFree logo">
 
-  <!-- Google tag (gtag.js) -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-1L4Z6JCNVV"></script>
-  <script>
-    window.dataLayer = window.dataLayer || [];
-    function gtag(){dataLayer.push(arguments);}
-    gtag('js', new Date());
-
-    gtag('config', 'G-1L4Z6JCNVV');
-  </script>
-
-  <link rel="manifest" href="manifest.webmanifest">
-  <link rel="icon" type="image/png" href="assets/favicon.png">
-  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
-  <link rel="stylesheet" href="styles.css?v=67">
+  <link rel="manifest" href="manifest.webmanifest?v=84">
+  <link rel="icon" type="image/x-icon" href="favicon.ico?v=84" sizes="16x16 32x32 48x48">
+  <link rel="icon" type="image/png" href="assets/favicon.png?v=84" sizes="32x32">
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg?v=84" sizes="any">
+  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=84" sizes="180x180">
+  <link rel="stylesheet" href="styles.css?v=84">
 </head>
 <body>
   <div class="app-shell">
     <header class="app-header">
       <div class="brand-copy">
         <div class="brand-row">
-          <span class="brand-dot" aria-hidden="true"></span>
-          <h1>Who's Free?</h1>
+          <h1 class="brand-title"><img class="brand-logo" src="assets/UFreeLogo_SVG.svg?v=84" width="330" height="188" alt="" fetchpriority="high"><span class="brand-name">UFree</span></h1>
         </div>
         <p>Find who's free now, or check any time during the week. Optimized for the Omnivox system.</p>
       </div>
 
-      <div class="header-actions">
-        <button id="undoChangesButton" class="secondary-button header-data-button" type="button" disabled title="No recent changes to undo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10h10a7 7 0 0 1 0 14M3 10l5-5M3 10l5 5" transform="translate(0 -3)"/></svg><span>Undo</span></button>
-        <button id="scheduleDataButton" class="secondary-button header-data-button" type="button" title="Manage schedule data"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4M17 3v4M3 11h18"/></svg><span>Schedules</span></button>
-        <button id="settingsButton" class="secondary-button header-data-button" type="button" title="Open settings"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="m9 3-1 3-3 1-2 5 2 5 3 1 1 3h6l1-3 3-1 2-5-2-5-3-1-1-3Z"/></svg><span>Settings</span></button>
+      <div class="home-header-controls">
+        <nav class="header-actions" aria-label="Main navigation">
+        <button id="scheduleDataButton" class="secondary-button header-data-button" type="button" title="Manage schedule data" aria-label="Schedules"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4M17 3v4M3 11h18"/></svg><span class="nav-button-label">Schedules</span></button>
+        <button id="helpButton" class="secondary-button header-data-button" type="button" title="Help &amp; Tips" aria-label="Help &amp; Tips"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 8.5a2.5 2.5 0 0 1 5 0c0 2-2.5 2-2.5 4M12 16h.01"/></svg><span class="nav-button-label">Help &amp; Tips</span></button>
+        <button id="settingsButton" class="secondary-button header-data-button nav-icon-button" type="button" title="Settings" aria-label="Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.28 5.44L10.52 5.06L10.51 2.62L13.49 2.62L13.48 5.06L14.72 5.44L14.72 5.44L15.87 6.05L17.58 4.31L19.69 6.42L17.95 8.13L18.56 9.28L18.56 9.28L18.94 10.52L21.38 10.51L21.38 13.49L18.94 13.48L18.56 14.72L18.56 14.72L17.95 15.87L19.69 17.58L17.58 19.69L15.87 17.95L14.72 18.56L14.72 18.56L13.48 18.94L13.49 21.38L10.51 21.38L10.52 18.94L9.28 18.56L9.28 18.56L8.13 17.95L6.42 19.69L4.31 17.58L6.05 15.87L5.44 14.72L5.44 14.72L5.06 13.48L2.62 13.49L2.62 10.51L5.06 10.52L5.44 9.28L5.44 9.28L6.05 8.13L4.31 6.42L6.42 4.31L8.13 6.05L9.28 5.44Z"/><circle cx="12" cy="12" r="3.2"/></svg></button>
+        <button id="homeExportButton" class="secondary-button header-data-button nav-icon-button" type="button" title="Export schedules" aria-label="Export schedules"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-4-8 4-4 4 4M5 13v7h14v-7"/></svg></button>
+        <button id="undoChangesButton" class="secondary-button header-data-button nav-icon-button" type="button" disabled title="No recent changes to undo" aria-label="Undo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10h10a7 7 0 0 1 0 14M3 10l5-5M3 10l5 5" transform="translate(0 -3)"/></svg></button>
+        </nav>
       </div>
     </header>
 
@@ -68,19 +78,21 @@
           <div class="people-actions">
             <label class="live-control">
               <input id="liveToggle" type="checkbox" checked>
-              <span>Use current time</span>
+              <span class="live-control-label">Current time</span><svg class="live-control-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
             </label>
             <button id="viewToggleButton" class="secondary-button view-icon-button view-mode-button" type="button" aria-label="Show everyone" title="Show everyone" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="7" r="3"/><path d="M3 21v-3a6 6 0 0 1 12 0v3M16 4a3 3 0 0 1 0 6M18 14a5 5 0 0 1 3 4v3"/></svg><span data-mode-label aria-hidden="true">All</span><span class="visually-hidden" data-toggle-label>Show everyone</span></button>
             <span class="group-view-controls">
-              <button id="showGroupsToggle" class="secondary-button view-icon-button" type="button" aria-label="Show groups" title="Show groups" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span class="visually-hidden" data-toggle-label>Show groups</span></button>
-              <button id="manageGroupsButton" class="secondary-button" type="button" aria-label="Manage groups" title="Manage groups" hidden>Manage</button>
+              <button id="showGroupsToggle" class="secondary-button view-icon-button group-label-button" type="button" aria-label="Show groups" title="Show groups" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span class="group-toggle-label" aria-hidden="true">GROUP</span><span class="visually-hidden" data-toggle-label>Show groups</span></button>
+              <button id="peopleSearchButton" class="secondary-button view-icon-button people-search-button" type="button" aria-label="Search people" title="Search people" aria-expanded="false" aria-controls="peopleSearchPanel"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg></button>
+              <button id="manageGroupsButton" class="secondary-button view-icon-button" type="button" aria-label="Manage groups" title="Manage groups" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="3"/><circle cx="15" cy="17" r="3"/></svg></button>
             </span>
           </div>
         </div>
 
-        <div class="availability-summary" aria-live="polite">
-          <p id="statusLine" class="status-line">Checking this device for schedule data…</p>
-          <span id="freeCount" class="count-badge">0 of 0 free</span>
+        <div id="peopleSearchPanel" class="people-search-panel" role="search" hidden>
+          <label class="visually-hidden" for="peopleSearchInput">Search people by name or nickname</label>
+          <div class="people-search-field"><input id="peopleSearchInput" type="search" placeholder="Search people…" maxlength="120" autocomplete="off" spellcheck="false" aria-describedby="peopleSearchStatus"><button id="clearPeopleSearchButton" class="secondary-button" type="button" aria-label="Clear search" title="Clear search" hidden>×</button></div>
+          <p id="peopleSearchStatus" class="people-search-status" role="status" aria-live="polite" aria-atomic="true"></p>
         </div>
 
         <p id="personOrderHelp" class="visually-hidden">Drag a person to change their order. On touch screens, hold the card briefly before moving; ordinary scrolling does not reorder it. With a person focused, press Alt and Up or Down arrow to move them. Pinned people stay above unpinned people; reorder within either section. Orders are saved separately for the main list and each group. Undo reverses your last order change.</p>
@@ -161,11 +173,18 @@
           <button id="importCodeButton" class="secondary-button" type="button">Import</button>
         </div>
         <div id="codeExportPanel" class="share-code-panel" hidden>
-          <h4>Choose schedules to export</h4>
-          <label class="share-selection"><input id="selectAllSchedules" type="checkbox"><span>Select all</span></label>
-          <div id="exportPeopleList" class="export-people-list"></div>
+          <details id="exportSelection" class="export-selection">
+            <summary><span>People to share</span><span id="exportSelectionSummary" class="export-selection-summary">Choose people</span></summary>
+            <label class="share-selection"><input id="selectAllSchedules" type="checkbox"><span>Everyone</span></label>
+            <div id="exportPeopleList" class="export-people-list"></div>
+          </details>
+          <details class="export-encoding-note"><summary>Why does the text code use Chinese characters?</summary><p>Chinese (CJK) characters, plus some Korean symbols, encode the packed timetable in fewer characters than ordinary letters and numbers. Compression can shorten it further. These are data symbols, not translated text or encryption. Copy the whole code unchanged. Links and QR codes use a URL-safe encoding instead.</p></details>
           <div class="export-generation-actions">
-            <button id="generateCodeButton" class="primary-button" type="button">Generate code</button>
+            <div class="export-action-buttons">
+              <button id="generateCodeButton" class="primary-button action-icon-button" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 7-5 5 5 5m8-10 5 5-5 5m-3-14-2 18"/></svg><span>Export Code</span></button>
+              <button id="exportQrButton" class="secondary-button action-icon-button toggle-share-qr" type="button" aria-expanded="false" aria-controls="exportQr"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="6" height="6" rx=".5"/><rect x="15" y="3" width="6" height="6" rx=".5"/><rect x="3" y="15" width="6" height="6" rx=".5"/><path d="M15 15h3v3h3v3h-6v-3m6-6v3M12 3v3m0 6h-3m3 3v6"/></svg><span data-action-label>Export QR</span></button>
+              <button id="copyExportLinkButton" class="secondary-button action-icon-button copy-share-link" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m10 13 4-4m-6 6-1 1a4 4 0 0 1-6-6l4-4a4 4 0 0 1 6 0m2 2 1-1a4 4 0 0 1 6 6l-4 4a4 4 0 0 1-6 0"/></svg><span>Copy Link</span></button>
+            </div>
             <details id="exportFieldOptions" class="export-field-options">
               <summary aria-label="Choose export details" title="Export details">…</summary>
               <div class="export-options-menu" role="group" aria-label="Additional export details">
@@ -179,17 +198,16 @@
               </div>
             </details>
           </div>
-          <label class="field-group share-code-field"><span>Export code</span><textarea id="exportCodeOutput" rows="5" readonly spellcheck="false" autocapitalize="off" autocomplete="off" aria-describedby="exportCodeStatus"></textarea></label>
+          <label id="exportCodeField" class="field-group share-code-field" hidden><span>Export code</span><textarea id="exportCodeOutput" rows="5" readonly spellcheck="false" autocapitalize="off" autocomplete="off" aria-describedby="exportCodeStatus"></textarea></label>
           <p class="share-code-note">Names, times, classes and rooms by default. Use … to include more. Saved schedules keep all details.</p>
           <div id="exportCodeStatus" class="parser-status" role="status" aria-live="polite"></div>
           <div id="exportSharePanel" class="schedule-share-link" hidden>
-            <label class="field-group"><span>Share link</span><textarea class="share-link-output" rows="2" readonly spellcheck="false" aria-label="Share link"></textarea></label>
-            <div class="modal-actions"><button class="secondary-button copy-share-link" type="button">Copy link</button><button class="secondary-button toggle-share-qr" type="button" aria-expanded="false" aria-controls="exportQr">Show QR</button></div>
+            <label class="field-group share-link-field" hidden><span>Share link</span><textarea class="share-link-output" rows="2" readonly spellcheck="false" aria-label="Share link"></textarea></label>
             <div id="exportQr" class="share-qr" hidden></div>
             <p class="share-link-status parser-status" role="status" aria-live="polite"></p>
           </div>
           <div class="modal-actions">
-            <button id="copyCodeButton" class="secondary-button" type="button" disabled>Copy code</button>
+            <button id="copyCodeButton" class="secondary-button" type="button" disabled hidden>Copy code</button>
             <button id="closeExportButton" class="secondary-button" type="button">Done</button>
           </div>
         </div>
@@ -217,13 +235,13 @@
         </div>
       </section>
 
-      <section class="schedule-action-section people-manager-section" aria-labelledby="peopleManagerTitle">
-        <div class="section-kicker">People</div>
+      <section id="storedPeopleSection" class="schedule-action-section people-manager-section" aria-labelledby="peopleManagerTitle">
         <div class="people-manager-heading">
-          <h3 id="peopleManagerTitle">Stored on this device</h3>
+          <span id="peopleManagerTitle">Stored on this device</span>
           <span id="peopleManagerCount" class="count-badge">0</span>
+          <button id="storedPeopleToggle" class="secondary-button stored-people-toggle" type="button" aria-expanded="false" aria-controls="peopleManagerList" aria-label="Show stored people">Show</button>
         </div>
-        <div id="peopleManagerList" class="people-manager-list"></div>
+        <div id="peopleManagerList" class="people-manager-list" hidden></div>
       </section>
 
       <details id="advancedScheduleOptions" class="schedule-advanced-options">
@@ -342,7 +360,8 @@
         </div>
       </details>
       <footer class="creator-credit settings-credit" aria-label="App credits">
-        <p>Original app by Xander Vatch<br>Fork improvements by Hui En Qian</p>
+        <p class="credit-team">App by David Dajbog and Hui En Quan.</p>
+        <p class="credit-inspiration">Inspiration from Xander Vatch.</p>
       </footer>
     </section>
   </div>
@@ -358,7 +377,7 @@
       <form id="groupForm" class="group-form" hidden>
         <h3 id="groupFormTitle">New group</h3>
         <label class="group-name-field"><span>Group name</span><input id="groupNameInput" type="text" maxlength="60" autocomplete="off" required></label>
-        <p>Choose members.</p>
+        <p id="groupMembersInstructions">Choose members.</p>
         <div id="groupMembersList" class="group-members-list"></div>
         <p id="groupFormError" class="parser-status" data-tone="error" role="alert"></p>
         <div class="modal-actions">
@@ -390,6 +409,7 @@
       </div>
       <p id="personWeekEmpty" class="settings-description" hidden>No classes scheduled.</p>
       <div class="review-grid-scroll" tabindex="0" aria-label="Full weekly schedule. Scroll horizontally for more days."><div id="personWeekGrid" class="review-grid person-week-grid"></div></div>
+      <details class="export-encoding-note"><summary>Why does the text code use Chinese characters?</summary><p>Chinese (CJK) characters, plus some Korean symbols, encode the packed timetable in fewer characters than ordinary letters and numbers. Compression can shorten it further. These are data symbols, not translated text or encryption. Copy the whole code unchanged. Links and QR codes use a URL-safe encoding instead.</p></details>
       <div class="export-generation-actions">
         <button id="exportPersonScheduleButton" class="primary-button" type="button">Export this schedule</button>
         <details id="personExportFieldOptions" class="export-field-options">
@@ -417,6 +437,94 @@
         </div>
       </div>
       <p id="personWeekExportStatus" class="parser-status" role="status" aria-live="polite"></p>
+    </section>
+  </div>
+
+  <div id="helpModal" class="modal-backdrop" hidden>
+    <section class="settings-modal help-modal panel" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+      <div class="modal-header"><h2 id="helpTitle">Help &amp; Tips</h2><button id="closeHelpModal" class="modal-close" type="button" aria-label="Close help">×</button></div>
+      <p class="help-feedback">Have an idea, found a bug, or want to suggest an improvement? Send feedback to <a href="mailto:ufree_info@proton.me">ufree_info@proton.me</a>.</p>
+      <div class="help-topics" aria-label="Using UFree">
+        <details class="help-topic"><summary>Add and edit schedules</summary><p>Open Schedules to import an Omnivox screenshot or create a timetable manually. Picture recognition runs on your device. Review the detected names, days, times, rooms and classes before saving, and correct any uncertain results. The stored-people list starts collapsed; choose Show to edit a saved timetable or its semester. PDF and JSON imports are also available.</p></details>
+        <details class="help-topic"><summary>Find who is free</summary><p>Current time follows the clock. Turn it off to choose a day and time, including weekends. All shows everyone; Free shows available people. Class Soon means someone has a short gap before their next class. Use the magnifying glass beside GROUP to search names and nicknames; the search field opens below the buttons. Search respects All/Free and Groups. Leaving the search field closes it and clears the filter; press the magnifying glass to reopen it. The clear button keeps the field open. Select a person for their next class and today's timetable, then use Full schedule to see the week.</p></details>
+        <details class="help-topic"><summary>People and individual actions</summary><p>Select a person's name to reveal Full schedule, +, the red trash icon and Share. On a small screen, the page scrolls to these details. + adds them to an existing group. Trash deletes their schedule from this device after confirmation. Share exports only that person's schedule as a URL, QR code or text code.</p></details>
+        <details class="help-topic"><summary>Groups and shared availability</summary><p>Turn on GROUP and use the group management icon beside search to create or edit groups. Choose Edit beside a group to rename it and remove members with the red trash icons. A person can belong to several groups. Hide or show a group's members, and open its … menu to move the group to the top or view weekly availability. Save group applies the changes; Cancel discards them. Removing a member preserves their schedule and other group memberships. Group preferences also let you control whether ungrouped people appear.</p></details>
+        <details class="help-topic"><summary>Share and import</summary><p>The export icon opens quick sharing with Everyone selected. Expand People to share to choose fewer people. Export Code creates text you can copy; Export QR displays a scannable code; Copy Link creates a URL. Times, class names and rooms are included by default. Use … to include teachers, course codes, semesters and other saved details. Open a received link, scan a QR with your phone camera, or paste a text code in Schedules → Import. Review the people before confirming; nothing is saved automatically. Anyone with your export can read the selected schedule details.</p></details>
+        <details class="help-topic"><summary>Reorder, pin and undo</summary><p>Drag a person to reorder the list on desktop, or hold and move their card on touch screens. With the person's name focused, Alt + Up or Down moves them using the keyboard. Groups remember their own order. Pin people in Settings to keep them above unpinned people. The back arrow undoes recent schedule and ordering changes during the current page session.</p></details>
+        <details class="help-topic"><summary>Settings and notifications</summary><p>Open the cog for nicknames, pinned people, notification preferences and appearance. Choose a light or dark theme and an accent colour. Notifications need your browser's permission; keep UFree open for its time checks. Nicknames, groups and preferences stay on this device and are not included in schedule exports.</p></details>
+        <details class="help-topic"><summary>Keep a backup</summary><p>Schedules are saved in this browser on this device, with no automatic sync between devices. Export a code or a JSON backup from Schedules before clearing website data, switching browsers or changing devices. Import the backup to restore your timetables. Undo does not survive closing or reloading the page.</p></details>
+      </div>
+      <section class="help-privacy" aria-labelledby="privacyNoticeTitle">
+        <h3 id="privacyNoticeTitle">Privacy Notice</h3>
+        <p><strong>No accounts required.</strong> Use the entire app without signing up or creating an account.</p>
+        <p><strong>No app data collection.</strong> UFree has no analytics or tracking. It does not collect or send your personal data, schedules, pictures, usage metrics or identifiers to an application server. Recognition, availability checks and export processing run on your device.</p>
+        <p><strong>Stored locally.</strong> Your schedules and settings stay in your device's browser storage, protected by the browser's site-storage isolation. UFree does not encrypt that storage itself. Clearing website data removes your saved information.</p>
+        <p><strong>Hosting and sharing.</strong> The website host and asset providers receive normal network requests, which can include your IP address and browser information. Only exports you choose to share reveal schedule data to recipients. Sending feedback by email shares what you include in that message.</p>
+      </section>
+      <footer class="creator-credit settings-credit" aria-label="App credits">
+        <p class="credit-team">App by David Dajbog and Hui En Quan.</p>
+        <p class="credit-inspiration">Inspiration from Xander Vatch.</p>
+      </footer>
+      <details id="iosShortcutGuide" class="help-topic ios-shortcut-guide">
+        <summary>Add UFree to your iPhone Home Screen with Shortcuts</summary>
+        <ol>
+          <li>Copy UFree's website address from your browser, leaving out any shared-code fragment after #.</li>
+          <li>Open Apple's <strong>Shortcuts</strong> app and tap <strong>+</strong> to create a shortcut.</li>
+          <li>Add the <strong>URL</strong> action and paste UFree's address.</li>
+          <li>Add <strong>Open URLs</strong> below it, using the URL from the first action.</li>
+          <li>Name the shortcut <strong>UFree</strong>. Open its <strong>Details</strong>, then tap <strong>Add to Home Screen</strong>.</li>
+          <li>Choose the name and icon, then tap <strong>Add</strong>. Tap the new icon to open UFree in your browser.</li>
+        </ol>
+        <p><a href="https://support.apple.com/guide/shortcuts/add-a-shortcut-to-the-home-screen-apd735880972/ios" target="_blank" rel="noopener noreferrer">Apple's Home Screen shortcut guide</a></p>
+      </details>
+    </section>
+  </div>
+
+  <div id="personQuickShareModal" class="modal-backdrop" hidden>
+    <section class="schedule-modal person-quick-share-modal panel" role="dialog" aria-modal="true" aria-labelledby="personQuickShareTitle">
+      <div class="modal-header"><div><h2 id="personQuickShareTitle">Share schedule</h2><p>Only this person's schedule will be exported.</p></div><button id="closePersonQuickShare" class="modal-close" type="button" aria-label="Close person sharing">×</button></div>
+      <details class="export-encoding-note"><summary>Why does the text code use Chinese characters?</summary><p>Chinese (CJK) characters, plus some Korean symbols, encode the packed timetable in fewer characters than ordinary letters and numbers. Compression can shorten it further. These are data symbols, not translated text or encryption. Copy the whole code unchanged. Links and QR codes use a URL-safe encoding instead.</p></details>
+      <div class="export-generation-actions">
+        <div class="export-action-buttons">
+          <button id="personQuickUrlButton" class="secondary-button action-icon-button" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-4-8 4-4 4 4M5 13v7h14v-7"/></svg><span>URL</span></button>
+          <button id="personQuickQrButton" class="secondary-button action-icon-button" type="button" aria-expanded="false" aria-controls="personQuickQr"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-4-8 4-4 4 4M5 13v7h14v-7"/></svg><span>QR Code</span></button>
+          <button id="personQuickCodeButton" class="secondary-button action-icon-button" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-4-8 4-4 4 4M5 13v7h14v-7"/></svg><span>Text Code</span></button>
+        </div>
+        <details id="personQuickExportFields" class="export-field-options">
+          <summary aria-label="Choose export details" title="Export details">…</summary>
+          <div class="export-options-menu" role="group" aria-label="Additional export details">
+            <label class="share-selection"><input type="checkbox" data-export-field="instructor"><span>Teacher’s full name</span></label>
+            <label class="share-selection"><input type="checkbox" data-export-field="course_code"><span>Course code</span></label>
+            <label class="share-selection"><input type="checkbox" data-export-field="section"><span>Section</span></label>
+            <label class="share-selection"><input type="checkbox" data-export-field="semester"><span>Semester</span></label>
+            <label class="share-selection"><input type="checkbox" data-export-field="extras"><span>Other saved schedule details</span></label>
+            <button class="secondary-button export-include-all" type="button">Include all</button>
+            <p class="share-code-note">More details make larger codes and QRs.</p>
+          </div>
+        </details>
+      </div>
+      <p class="share-code-note">Names, times, classes and rooms by default. Anyone with the URL, QR or code can read this schedule.</p>
+      <div id="personQuickCodeField" class="share-code-panel" hidden>
+        <label class="field-group share-code-field"><span>Text code</span><textarea id="personQuickCode" rows="4" readonly spellcheck="false" autocapitalize="off"></textarea></label>
+        <button id="copyPersonQuickCode" class="secondary-button" type="button" disabled>Copy text code</button>
+      </div>
+      <div id="personQuickSharePanel" class="schedule-share-link" hidden>
+        <label class="field-group share-link-field"><span>URL</span><textarea class="share-link-output" rows="2" readonly spellcheck="false" aria-label="Schedule URL"></textarea></label>
+        <div id="personQuickQr" class="share-qr" hidden></div>
+        <p class="share-link-status parser-status" role="status" aria-live="polite"></p>
+      </div>
+      <p id="personQuickShareStatus" class="parser-status" role="status" aria-live="polite"></p>
+    </section>
+  </div>
+
+  <div id="personGroupModal" class="modal-backdrop" hidden>
+    <section class="schedule-modal person-group-modal panel" role="dialog" aria-modal="true" aria-labelledby="personGroupTitle">
+      <div class="modal-header"><h2 id="personGroupTitle">Add to group</h2><button id="closePersonGroup" class="modal-close" type="button" aria-label="Close add to group">×</button></div>
+      <form id="personGroupForm">
+        <label id="personGroupField" class="field-group"><span>Existing group</span><select id="personGroupSelect" required></select></label>
+        <p id="personGroupEmpty" class="settings-description" hidden></p>
+        <div class="modal-actions"><button id="savePersonGroup" class="primary-button" type="submit">Add to group</button><button id="personGroupManage" class="secondary-button" type="button">Manage groups</button></div>
+      </form>
     </section>
   </div>
 
@@ -462,13 +570,14 @@
     }
   </script>
   <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js" defer></script>
-  <script src="schedule-parser.js?v=67" defer></script>
-  <script src="schedule-image-parser.js?v=67" defer></script>
-  <script src="schedule-availability.js?v=67" defer></script>
-  <script src="schedule-share-code.js?v=67" defer></script>
-  <script src="assets/qr/qrcodegen.js?v=67" defer></script>
-  <script src="schedule-groups.js?v=67" defer></script>
-  <script src="app.js?v=67" defer></script>
+  <script src="schedule-parser.js?v=84" defer></script>
+  <script src="schedule-image-parser.js?v=84" defer></script>
+  <script src="schedule-availability.js?v=84" defer></script>
+  <script src="schedule-share-code.js?v=84" defer></script>
+  <script src="assets/qr/qrcodegen.js?v=84" defer></script>
+  <script src="schedule-groups.js?v=84" defer></script>
+  <script src="app.js?v=84" defer></script>
 </body>
 </html>
+
 

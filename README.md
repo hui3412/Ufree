@@ -1,15 +1,69 @@
-# Ufree
-App by David D. and Hui En Quan
+# UFree
 
 link: [www.youfree.ca](https://www.youfree.ca)
 
+### Version 82 — Compact group controls
 
-<br>
-<br>
-<br>
+October 14, 2026
 
-Credit:
-Idea by Xander V.
+- Make the main group management button icon-only at every width, retaining its accessible name and tooltip.
+- Remove Edit Group from each group's … menu. Editing stays in the group management panel; the dropdown keeps Send group to top and Weekly availability with a smaller footprint.
+
+### Version 81 — Keyboard search exit
+
+October 14, 2026
+
+- Also collapse search when keyboard focus returns to its icon. Press the icon again to reopen the field.
+
+### Version 80 — Search closes when you leave
+
+October 14, 2026
+
+- Keep the search icon and close the search field automatically when focus leaves it or the user clicks outside. Reopen it with the icon. Closing clears the filter; using the field's clear button keeps it open.
+- Let outside clicks finish before collapsing so selecting people and using group controls still work. Preserve keyboard focus when filtered cards are rebuilt.
+
+### Version 79 — Stored people Show/Hide button
+
+October 14, 2026
+
+- Replace the boxed plus beside Stored on this device with a compact Show/Hide button. The list stays collapsed by default and resets when the Schedules panel reopens.
+
+### Version 78 — Search and group editing
+
+October 14, 2026
+
+- Open the compact magnifying glass beside GROUP to search names and nicknames in the current All/Free or Groups view. The input opens below the row; clearing or closing it restores that view.
+- Choose Edit Group from a group's … menu to rename it or remove members with red icon buttons. Save applies changes and Cancel discards them; schedules and other memberships are preserved. Add people remains available in a disclosure.
+- Fit the expanded controls at narrow widths with adaptive labels and retain normal page scrolling.
+
+### Version 77 — Help, privacy and page scrolling
+
+October 14, 2026
+
+- Expand Help & Tips with collapsible feature guides, feedback at ufree_info@proton.me and a collapsed Apple Shortcuts Home Screen guide at the very bottom.
+- Remove Google Analytics and its CSP permissions. Explain local browser storage, no accounts or app tracking, and normal hosting/asset requests without claiming app-level encryption.
+- Explain compact CJK/Hangul text-code encoding inside every schedule export workflow.
+- Use natural page scrolling for People and person details at all widths, avoiding nested desktop scroll traps.
+
+### Version 76 — Expanded person action row and credit hierarchy
+
+October 13, 2026
+
+- Select a person to reveal Share beside Full schedule, + and Delete; the card itself now shows only the person's name and schedule status.
+- Keep all four actions on one row, using the calendar icon alone for Full schedule when space is limited.
+- Show the larger team credit on its own line with the smaller inspiration credit centered immediately below, and outline the stored-people expand/collapse symbol with a square border.
+
+### Version 74 — Individual sharing and cleaner UFree controls
+
+October 13, 2026
+
+- Share one person's schedule directly from their card as a URL, QR code or text code, with optional export details.
+- Select a person to open Full schedule, add them to an existing group with +, or delete their local schedule with confirmation and session Undo.
+- Label the between-class busy status Class Soon and collapse the stored-people list by default.
+- Remove the home live-status summary and group shared-break forecast while retaining the weekly group availability tool.
+- Use UFree throughout the app, install metadata, notifications and sharing; keep existing device storage compatible.
+- Place team credits at the bottom of Help and Settings.
+
 ## Fork updates — last updated October 5, 2026
 
 
@@ -324,7 +378,7 @@ Theme settings are remembered locally on that device.
 
 ## Notifications
 
-When enabled, Who's Free? looks for breaks between two classes where the gap is **more than 10 minutes**. Time before the first class and after the last class is not treated as a break.
+When enabled, UFree looks for breaks between two classes where the gap is **more than 10 minutes**. Time before the first class and after the last class is not treated as a break.
 
 If several unmuted people start a qualifying break in the same minute, Who's Free? sends one grouped notification.
 
@@ -380,3 +434,14 @@ The **Share schedules.json** button shares/downloads only the schedule database.
   - Time text accepts both `08:15` and French-style `08 h 15`, including ranges using `à`.
 - Shared `schedules.json` files now carry the Who's Free? website URL (`https://xander444.github.io/Whos-Free/`).
 - On devices with the Web Share API, the share sheet includes the website link alongside the JSON file.
+
+## Credits
+
+App by David Dajbog and Hui En Quan. Inspiration from Xander Vatch.
+
+
+
+
+## v83: Official UFree branding
+
+The supplied SVG replaces the text masthead, including the legacy entry point. The supplied PNG is referenced in Open Graph and Twitter metadata. Browser, iOS, installable-app and notification icons use the official logo; square and maskable variants preserve its proportions. Branding assets are included in the offline shell.

@@ -2441,3 +2441,10 @@ input[type="time"],
 .review-grid-block:focus-visible { outline: 3px solid #fff; z-index: 2; }
 .review-break { color: #baf1ca; background: #16442c; pointer-events: none; }
 .review-class[hidden] { display: none; }
+
+
+/* Official UFree identity: retain the master logo’s aspect ratio in every theme. */
+.brand-copy .brand-title { display: flex; align-items: center; gap: 16px; line-height: 1.1; margin: 0; color: var(--text); }
+.brand-name { font-size: clamp(2.4rem, 6vw, 3.25rem); font-weight: 500; letter-spacing: -.025em; white-space: nowrap; }
+.brand-logo { display: block; width: 112px; height: auto; max-width: 100%; object-fit: contain; }
+@media (max-width: 480px) { .brand-logo { width: 96px; } }

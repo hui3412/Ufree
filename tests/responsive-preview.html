@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>UFree responsive layout checks</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 20px; font: 14px/1.4 system-ui, sans-serif; background: #eee; color: #222; }
+    h1 { font-size: 20px; margin: 0 0 8px; }
+    .controls { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin: 12px 0; }
+    button, select { font: inherit; padding: 8px 10px; }
+    iframe { display: block; border: 0; background: white; box-shadow: 0 0 0 1px #999; }
+    table { border-collapse: collapse; margin: 16px 0; }
+    th, td { padding: 5px 10px; border: 1px solid #aaa; text-align: left; }
+    #status { margin: 8px 0; }
+    .pass { color: #14632c; }
+    .fail { color: #a01616; }
+  </style>
+</head>
+<body>
+  <h1>UFree responsive layout checks</h1>
+  <p>Developer test page. The frame runs the live app with real viewport sizes and this browser's local data.</p>
+  <div class="controls">
+    <label>Viewport <select id="viewport"></select></label>
+    <button id="audit" type="button">Check all sizes</button>
+    <button id="reload" type="button">Reload app</button>
+    <a href="../">Open app</a>
+  </div>
+  <p id="status" role="status">Loading app…</p>
+  <iframe id="app" src="../" title="Live UFree app"></iframe>
+  <table id="results" hidden>
+    <thead><tr><th>Viewport</th><th>Header</th><th>People controls</th><th>Overflow</th><th>Visible labels</th></tr></thead>
+    <tbody></tbody>
+  </table>
+  <script>
+    const sizes = [[280,640],[320,568],[350,700],[360,800],[375,812],[390,844],[414,896],[568,320],[667,375],[844,390],[768,1024],[1024,768],[1440,900],[1920,1080]];
+    const frame = document.querySelector('#app');
+    const freshAppUrl = () => `../?layout-check=${Date.now()}`;
+    const viewport = document.querySelector('#viewport');
+    const status = document.querySelector('#status');
+    const auditButton = document.querySelector('#audit');
+    const results = document.querySelector('#results');
+    for (const [width,height] of sizes) {
+      const option = document.createElement('option');
+      option.value = `${width},${height}`;
+      option.textContent = `${width} × ${height}`;
+      viewport.append(option);
+    }
+    viewport.value = '375,812';
+    function resize() {
+      const [width,height] = viewport.value.split(',').map(Number);
+      frame.style.width = `${width}px`;
+      frame.style.height = `${height}px`;
+    }
+    function settled() {
+      return new Promise(resolve => frame.contentWindow.requestAnimationFrame(() =>
+        frame.contentWindow.requestAnimationFrame(() => frame.contentWindow.requestAnimationFrame(resolve))));
+    }
+    function measure() {
+      const doc = frame.contentDocument;
+      const rect = element => element.getBoundingClientRect();
+      const visible = element => frame.contentWindow.getComputedStyle(element).display !== 'none';
+      const nav = doc.querySelector('.header-actions');
+      const buttons = [...nav.children];
+      const description = doc.querySelector('.brand-copy > p');
+      const toolbar = doc.querySelector('.people-actions');
+      const peopleControls = [...toolbar.children].flatMap(element => element.matches('.group-view-controls') ? [...element.children] : [element]).filter(visible);
+      const center = element => rect(element).top + rect(element).height / 2;
+      const sameLine = elements => elements.every(element => Math.abs(center(element) - center(elements[0])) < 2);
+      const inside = (elements,container) => elements.every(element => rect(element).left >= rect(container).left - 1 && rect(element).right <= rect(container).right + 1);
+      const header = sameLine(buttons) && inside(buttons,nav)
+        && Math.abs(rect(buttons[0]).left - rect(description).left) < 1
+        && rect(nav).top >= rect(description).bottom;
+      const people = sameLine(peopleControls) && inside(peopleControls,toolbar);
+      const overflow = doc.documentElement.scrollWidth <= frame.contentWindow.innerWidth;
+      const labels = [...doc.querySelectorAll('.nav-button-label, .group-toggle-label, [data-mode-label]')].filter(visible).map(element => element.textContent.trim()).join(', ') || 'Icons';
+      return { size: viewport.selectedOptions[0].textContent, header, people, overflow, labels };
+    }
+    async function checkCurrent() {
+      await settled();
+      const result = measure();
+      status.textContent = `${result.size}: header ${result.header ? 'PASS' : 'FAIL'}, people controls ${result.people ? 'PASS' : 'FAIL'}, no overflow ${result.overflow ? 'PASS' : 'FAIL'}. Labels: ${result.labels}.`;
+      return result;
+    }
+    viewport.addEventListener('change', () => { resize(); checkCurrent(); });
+    document.querySelector('#reload').addEventListener('click', () => { frame.src = freshAppUrl(); });
+    frame.addEventListener('load', checkCurrent);
+    auditButton.addEventListener('click', async () => {
+      auditButton.disabled = true;
+      const previous = viewport.value;
+      const rows = results.querySelector('tbody');
+      rows.replaceChildren();
+      results.hidden = false;
+      let failures = 0;
+      for (const [width,height] of sizes) {
+        viewport.value = `${width},${height}`;
+        resize();
+        const result = await checkCurrent();
+        failures += Number(!result.header || !result.people || !result.overflow);
+        const row = document.createElement('tr');
+        for (const value of [result.size,result.header,result.people,result.overflow,result.labels]) {
+          const cell = document.createElement('td');
+          cell.textContent = typeof value === 'boolean' ? (value ? 'PASS' : 'FAIL') : value;
+          if (typeof value === 'boolean') cell.className = value ? 'pass' : 'fail';
+          row.append(cell);
+        }
+        rows.append(row);
+      }
+      viewport.value = previous;
+      resize();
+      await settled();
+      status.textContent = `${sizes.length} sizes checked. ${failures} failed. ${frame.contentDocument.querySelector('#manageGroupsButton').hidden ? 'Groups closed.' : 'Groups open.'}`;
+      auditButton.disabled = false;
+    });
+    resize();
+    frame.src = freshAppUrl();
+  </script>
+</body>
+</html>
