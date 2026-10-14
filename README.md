@@ -2,6 +2,12 @@
 
 link: [www.youfree.ca](https://www.youfree.ca)
 
+### Version 79 — Stored people Show/Hide button
+
+October 14, 2026
+
+- Replace the boxed plus beside Stored on this device with a compact Show/Hide button. The list stays collapsed by default and resets when the Schedules panel reopens.
+
 ### Version 78 — Search and group editing
 
 October 14, 2026
