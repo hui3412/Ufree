@@ -42,19 +42,28 @@ async function app(initial = data, groups = [{ id: "team", name: "Team", members
     throw Error("UI operation did not finish");
   };
   const card = name => [...el("peopleList").querySelectorAll(".person-card")].find(item => item.dataset.person === name);
+  const share = name => {
+    card(name).querySelector(".person-select-button").click();
+    const button = el("sharePersonScheduleButton");
+    button.click();
+    return button;
+  };
   await wait(() => card("Alice"));
-  return { window, el, wait, card, scrolls, copied: () => copied, confirmMessage: () => confirmMessage, stored: () => window.localStorage.getItem("whos-free-local-schedules") };
+  return { window, el, wait, card, share, scrolls, copied: () => copied, confirmMessage: () => confirmMessage, stored: () => window.localStorage.getItem("whos-free-local-schedules") };
 }
 
-test("card sharing is a separate accessible action and all three methods export only that person", async () => {
+test("sharing appears only in the expanded four-button row and all three methods export only that person", async () => {
   const a = await app();
   try {
     const before = a.stored();
     assert.equal(a.window.document.querySelectorAll("button button").length, 0);
-    a.card("Alice").querySelector(".person-card-share").click();
+    assert.equal(a.el("sharePersonScheduleButton"), null);
+    assert.equal(a.card("Alice").querySelector(".person-card-share"), null);
+    a.share("Alice");
+    assert.deepEqual([...a.el("sharePersonScheduleButton").parentElement.children].map(button => button.id), ["fullScheduleButton", "addPersonGroupButton", "deletePersonScheduleButton", "sharePersonScheduleButton"]);
     assert.equal(a.el("personQuickShareModal").hidden, false);
     assert.equal(a.el("personQuickShareTitle").textContent, "Share Ali");
-    assert.equal(a.el("detailPanel").querySelector(".detail-name-row"), null, "sharing does not select a card");
+    assert.equal(a.card("Alice").querySelector(".person-select-button").getAttribute("aria-pressed"), "true", "sharing preserves the selected person");
     for (const id of ["personQuickUrlButton", "personQuickQrButton", "personQuickCodeButton"]) assert.ok(a.el(id).querySelector("svg"));
     a.el("personQuickCodeButton").click();
     await a.wait(() => !a.el("personQuickCodeButton").disabled);
@@ -79,7 +88,7 @@ test("card sharing is a separate accessible action and all three methods export 
 test("single-person field selection and clipboard fallback preserve the full canonical schedule", async () => {
   const a = await app();
   try {
-    a.card("Alice").querySelector(".person-card-share").click();
+    a.share("Alice");
     a.el("personQuickExportFields").querySelector(".export-include-all").click();
     a.window.navigator.clipboard.writeText = async () => { throw Error("Denied"); };
     a.el("personQuickUrlButton").click(); await a.wait(() => !a.el("personQuickUrlButton").disabled);
@@ -101,12 +110,12 @@ test("closing during export cancels stale results, restores focus, and does not 
     const code = await encode({ people: { Alice: data.people.Alice } });
     let finish;
     a.window.WhosFreeShareCode.encode = () => new Promise(resolve => { finish = resolve; });
-    const share = a.card("Alice").querySelector(".person-card-share");
-    share.click(); a.el("personQuickCodeButton").click();
+    const share = a.share("Alice");
+    a.el("personQuickCodeButton").click();
     a.window.document.dispatchEvent(new a.window.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
     assert.equal(a.el("personQuickShareModal").hidden, true);
     assert.equal(a.window.document.activeElement, share);
-    a.card("Bob").querySelector(".person-card-share").click();
+    a.share("Bob");
     finish(code); await tick();
     assert.equal(a.el("personQuickShareTitle").textContent, "Share Bob");
     assert.equal(a.el("personQuickCode").value, "");
@@ -118,6 +127,11 @@ test("closing during export cancels stale results, restores focus, and does not 
     a.window.WhosFreeShareCode.encode = encode;
     a.el("personQuickCodeButton").click(); await a.wait(() => !a.el("personQuickCodeButton").disabled);
     assert.deepEqual(Object.keys((await a.window.WhosFreeShareCode.decode(a.el("personQuickCode").value)).people), ["Bob"]);
+    a.el("liveToggle").dispatchEvent(new a.window.Event("change", { bubbles: true }));
+    const refreshedShare = a.el("sharePersonScheduleButton");
+    assert.equal(refreshedShare?.getAttribute("aria-label"), "Share Bob's schedule");
+    a.el("closePersonQuickShare").click();
+    assert.equal(a.window.document.activeElement === refreshedShare, true, `focus returns to the current expanded share button after a refresh (focused ${a.window.document.activeElement?.tagName}.${a.window.document.activeElement?.className})`);
   } finally { await a.window.happyDOM.abort(); }
 });
 
@@ -201,7 +215,8 @@ test("name-button keyboard reordering still preserves pins and supports Undo aft
     assert.equal(a.window.document.activeElement, a.card("Bob"));
     a.el("undoChangesButton").click(); await a.wait(() => names()[1] === "Bob");
     assert.deepEqual(names(), ["Alice", "Bob", "Charlie"]);
-    a.card("Bob").querySelector(".person-card-share").dispatchEvent(new a.window.KeyboardEvent("keydown", { key: "ArrowDown", altKey: true, bubbles: true, cancelable: true }));
+    a.card("Bob").querySelector(".person-select-button").click();
+    a.el("sharePersonScheduleButton").dispatchEvent(new a.window.KeyboardEvent("keydown", { key: "ArrowDown", altKey: true, bubbles: true, cancelable: true }));
     assert.deepEqual(names(), ["Alice", "Bob", "Charlie"]);
   } finally { await a.window.happyDOM.abort(); }
 });
