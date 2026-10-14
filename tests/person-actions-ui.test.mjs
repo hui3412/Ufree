@@ -225,7 +225,8 @@ test("Class Soon, collapsed people, removed summary/forecast, UFree identity, an
   const a = await app();
   try {
     assert.equal(a.window.document.title, "UFree");
-    assert.equal(a.window.document.querySelector("h1 img").alt, "UFree");
+    assert.equal(a.window.document.querySelector("h1").textContent, "UFree");
+    assert.equal(a.window.document.querySelector("h1 img").alt, "");
     assert.match(a.window.document.querySelector("h1 img").getAttribute("src"), /UFreeLogo_SVG\.svg/);
     assert.equal(JSON.parse(fs.readFileSync(new URL("../manifest.webmanifest", import.meta.url))).name, "UFree");
     assert.equal(a.el("statusLine"), null); assert.equal(a.el("freeCount"), null);

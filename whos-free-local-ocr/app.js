@@ -427,8 +427,8 @@
 
     await showSystemNotification(title, {
       body,
-      icon: "./assets/icon-192.png?v=83",
-      badge: "./assets/icon-192.png?v=83",
+      icon: "./assets/icon-192.png?v=84",
+      badge: "./assets/icon-192.png?v=84",
       tag: `whos-free-break-${dateKey()}-${breaks[0].start}`,
       data: { url: "./" },
     });
@@ -515,8 +515,8 @@
     }
     const ok = await showSystemNotification("UFree notifications work", {
       body: "You'll get grouped alerts when friends start breaks longer than 10 minutes.",
-      icon: "./assets/icon-192.png?v=83",
-      badge: "./assets/icon-192.png?v=83",
+      icon: "./assets/icon-192.png?v=84",
+      badge: "./assets/icon-192.png?v=84",
       tag: "whos-free-test",
       data: { url: "./" },
     });
@@ -2159,7 +2159,7 @@
     if (!("serviceWorker" in navigator)) return;
     if (location.protocol !== "https:" && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") return;
 
-    navigator.serviceWorker.register("./service-worker.js?v=83", { updateViaCache: "none" })
+    navigator.serviceWorker.register("./service-worker.js?v=84", { updateViaCache: "none" })
       .then(registration => registration.update())
       .catch(() => {
         // The app works normally even if PWA caching isn't available.
