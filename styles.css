@@ -2799,3 +2799,30 @@ button:disabled { cursor: not-allowed; }
   #showGroupsToggle.group-label-button.compact-label { width: 36px; min-width: 36px; }
 }
 
+
+/* Main content scrolls with the page, including when the pointer is over cards. */
+.main-grid { min-height: 0; align-items: start; }
+.people-panel, .detail-panel { min-height: 0; max-height: none; overflow: visible; overscroll-behavior: auto; }
+.people-list { overflow: visible; overscroll-behavior: auto; }
+
+.help-feedback, .help-privacy p, .help-topic p, .help-topic li, .export-encoding-note p {
+  font-size: .88rem;
+  line-height: 1.6;
+  color: var(--muted);
+}
+.help-modal a { color: var(--text); text-underline-offset: 3px; overflow-wrap: anywhere; }
+.help-feedback { margin: 0 0 20px; }
+.help-topics { gap: 0; }
+.help-topic { border-bottom: 1px solid var(--border); }
+.help-topic > summary { padding: 13px 0; min-height: 44px; cursor: pointer; font-size: .93rem; font-weight: 600; }
+.help-topic p { margin: 0 0 14px; }
+.help-topic ol { margin: 0 0 14px; padding-left: 23px; }
+.help-topic li + li { margin-top: 8px; }
+.help-privacy { margin-top: 24px; }
+.help-privacy h3 { margin: 0 0 12px; font-size: 1rem; }
+.help-privacy p { margin: 0 0 12px; }
+.help-privacy strong { color: var(--text); }
+.ios-shortcut-guide { margin-top: 20px; border-top: 1px solid var(--border); border-bottom: 0; }
+.export-encoding-note { margin: 10px 0 14px; color: var(--muted); }
+.export-encoding-note summary { cursor: pointer; font-size: .8rem; padding: 8px 0; }
+.export-encoding-note p { margin: 3px 0 0; }

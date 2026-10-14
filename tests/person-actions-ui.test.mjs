@@ -239,8 +239,37 @@ test("Class Soon, collapsed people, removed summary/forecast, UFree identity, an
     a.card("Alice").click(); assert.equal(a.el("detailPanel").querySelector(".status-badge").textContent, "Class Soon");
     for (const id of ["settingsModal", "helpModal"]) {
       const dialog = a.el(id).querySelector('[role="dialog"]');
-      assert.equal(dialog.lastElementChild.tagName, "FOOTER");
-      assert.equal(dialog.lastElementChild.textContent.replace(/\s+/g, " ").trim(), "App by David Dajbog and Hui En Quan. Inspiration from Xander Vatch.");
+      const footer = dialog.querySelector("footer");
+      assert.equal(id === "helpModal" ? dialog.lastElementChild.id : dialog.lastElementChild.tagName, id === "helpModal" ? "iosShortcutGuide" : "FOOTER");
+      assert.equal(footer.textContent.replace(/\s+/g, " ").trim(), "App by David Dajbog and Hui En Quan. Inspiration from Xander Vatch.");
     }
+  } finally { await a.window.happyDOM.abort(); }
+});
+
+test("Help opens with the bottom iOS guide collapsed, restores focus and allows page scrolling after close", async () => {
+  const a = await app();
+  try {
+    a.el("helpButton").click();
+    assert.equal(a.el("helpModal").hidden, false);
+    assert.equal(a.el("helpTitle").textContent, "Help & Tips");
+    const guide = a.el("iosShortcutGuide");
+    assert.equal(guide.open, false);
+    guide.open = true;
+    a.el("closeHelpModal").click();
+    assert.equal(a.window.document.activeElement.id, "helpButton");
+    assert.equal(a.window.document.body.style.overflow, "");
+    a.el("helpButton").click();
+    assert.equal(guide.open, false);
+    a.window.document.dispatchEvent(new a.window.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    assert.equal(a.el("helpModal").hidden, true);
+    const before = a.stored();
+    let wheelReachedPage = false;
+    a.window.document.addEventListener("wheel", event => { wheelReachedPage = !event.defaultPrevented; }, { once: true });
+    a.card("Alice").dispatchEvent(new a.window.WheelEvent("wheel", { deltaY: 400, bubbles: true, cancelable: true }));
+    assert.equal(wheelReachedPage, true);
+    for (const selector of [".people-panel", ".people-list", ".detail-panel"]) {
+      assert.equal(a.window.getComputedStyle(a.window.document.querySelector(selector)).overflow, "visible");
+    }
+    assert.equal(a.stored(), before);
   } finally { await a.window.happyDOM.abort(); }
 });
