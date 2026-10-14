@@ -554,8 +554,8 @@
 
     await showSystemNotification(title, {
       body,
-      icon: "./assets/icon-192.png?v=85",
-      badge: "./assets/icon-192.png?v=85",
+      icon: "./assets/icon-192.png?v=86",
+      badge: "./assets/icon-192.png?v=86",
       tag: `whos-free-break-${dateKey()}-${breaks[0].start}`,
       data: { url: "./" },
     });
@@ -642,8 +642,8 @@
     }
     const ok = await showSystemNotification("UFree notifications work", {
       body: "You'll get grouped alerts when friends start breaks longer than 10 minutes.",
-      icon: "./assets/icon-192.png?v=85",
-      badge: "./assets/icon-192.png?v=85",
+      icon: "./assets/icon-192.png?v=86",
+      badge: "./assets/icon-192.png?v=86",
       tag: "whos-free-test",
       data: { url: "./" },
     });
@@ -1389,7 +1389,12 @@
         [...document.querySelectorAll(".modal-backdrop")].some(modal => !modal.hidden)) return;
     mobileNavOpen = true;
     mobileNavOverflow = document.body.style.overflow;
-    mobileNavBackground = [...document.querySelectorAll(".brand-copy, .control-bar, .main-grid")].map(element => ({ element, inert: element.hasAttribute("inert") }));
+    const background = [
+      ...document.querySelectorAll(".brand-copy, .control-bar, .main-grid"),
+      ...[...document.body.children].filter(element => element !== mobileNavBackdrop &&
+        !element.classList.contains("app-shell") && !["SCRIPT", "TEMPLATE"].includes(element.tagName)),
+    ];
+    mobileNavBackground = background.map(element => ({ element, inert: element.hasAttribute("inert") }));
     // The button is inside brand-copy; keep all background controls out of the tab order.
     mobileNavBackground.forEach(({ element }) => element.setAttribute("inert", ""));
     document.body.style.overflow = "hidden";
@@ -4539,7 +4544,7 @@
     if (!("serviceWorker" in navigator)) return;
     if (location.protocol !== "https:" && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") return;
 
-    navigator.serviceWorker.register("./service-worker.js?v=85", { updateViaCache: "none" })
+    navigator.serviceWorker.register("./service-worker.js?v=86", { updateViaCache: "none" })
       .then(registration => registration.update())
       .catch(() => {
         // The app works normally even if PWA caching isn't available.

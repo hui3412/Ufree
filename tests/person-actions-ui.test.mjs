@@ -433,6 +433,7 @@ test("mobile menu isolates the background, traps focus and restores page scrolli
     assert.equal(menu.hasAttribute("inert"), false);
     assert.equal(a.window.document.querySelector(".main-grid").hasAttribute("inert"), true);
     assert.equal(a.window.document.body.style.overflow, "hidden");
+    assert.equal(a.el("scheduleFileInput").hasAttribute("inert"), true);
     assert.equal(a.window.document.activeElement.id, "closeMobileMenuButton");
     const sendKey = (key, shiftKey = false) => a.window.document.activeElement.dispatchEvent(new a.window.KeyboardEvent("keydown", { key, shiftKey, bubbles: true, cancelable: true }));
     sendKey("Tab", true);
@@ -444,6 +445,7 @@ test("mobile menu isolates the background, traps focus and restores page scrolli
     assert.equal(a.window.document.activeElement.id, "mobileMenuButton");
     assert.equal(a.window.document.body.style.overflow, "auto");
     assert.equal(a.window.document.querySelector(".main-grid").hasAttribute("inert"), false);
+    assert.equal(a.el("scheduleFileInput").hasAttribute("inert"), false);
     toggle.click(); a.el("mobileNavBackdrop").click();
     assert.equal(menu.hasAttribute("inert"), true);
     assert.equal(a.window.document.body.style.overflow, "auto");
