@@ -17,6 +17,9 @@ const tick = () => new Promise(resolve => setTimeout(resolve, 20));
 async function app(initial = data, groups = [{ id: "team", name: "Team", members: ["Bob"], hidden: false }]) {
   const window = new Window({ url: base, settings: { disableJavaScriptFileLoading: true, disableCSSFileLoading: true } });
   window.document.write(fs.readFileSync(new URL("../index.html", import.meta.url), "utf8"));
+  const stylesheet = window.document.createElement("style");
+  stylesheet.textContent = fs.readFileSync(new URL("../styles.css", import.meta.url), "utf8");
+  window.document.head.append(stylesheet);
   window.setInterval = () => 0;
   window.matchMedia = () => ({ matches: true, addEventListener() {} });
   Object.assign(window, { TextEncoder, TextDecoder, Blob, CompressionStream, DecompressionStream });
@@ -65,6 +68,7 @@ test("card sharing is a separate accessible action and all three methods export 
     assert.deepEqual(Object.keys((await a.window.WhosFreeShareCode.decode(url)).people), ["Alice"]);
     a.el("personQuickQrButton").click(); await a.wait(() => !a.el("personQuickQrButton").disabled);
     assert.ok(a.el("personQuickQr").querySelector("svg"));
+    assert.equal(a.window.getComputedStyle(a.el("personQuickSharePanel").querySelector(".share-link-field")).display, "none", "QR mode hides the URL field even when field-group sets display:flex");
     assert.equal(a.el("personQuickQrButton").getAttribute("aria-expanded"), "true");
     assert.equal(a.el("personQuickCodeField").hidden, true);
     assert.ok(a.el("personQuickQrButton").querySelector("svg"), "QR state does not replace the sharing symbol");
@@ -146,6 +150,7 @@ test("an empty group picker explains the requirement and traps focus without cha
     a.card("Alice").click(); a.el("addPersonGroupButton").click();
     assert.equal(a.el("savePersonGroup").disabled, true);
     assert.match(a.el("personGroupEmpty").textContent, /Create a group/);
+    assert.equal(a.window.getComputedStyle(a.el("personGroupField")).display, "none", "the empty group's select is actually hidden");
     a.window.document.dispatchEvent(new a.window.KeyboardEvent("keydown", { key: "Tab", shiftKey: true, bubbles: true, cancelable: true }));
     assert.equal(a.window.document.activeElement, a.el("personGroupManage"));
     a.window.document.dispatchEvent(new a.window.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));

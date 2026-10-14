@@ -2733,6 +2733,7 @@ button:disabled { cursor: not-allowed; }
 .people-manager-section[open] > summary::after { content: "−"; }
 .people-manager-section[open] .people-manager-list { margin-top: 12px; }
 .person-quick-share-modal, .person-group-modal { width: min(540px, 100%); }
+#personQuickShareModal [hidden], #personGroupModal [hidden] { display: none !important; }
 .person-quick-share-modal .modal-header h2 { overflow-wrap: anywhere; }
 .person-quick-share-modal .export-generation-actions { margin-top: 16px; }
 .person-quick-share-modal .share-qr { max-width: 360px; }
