@@ -1808,15 +1808,48 @@
     return value.normalize("NFD").replace(/\p{M}/gu, "").toLocaleLowerCase();
   }
 
-  function togglePeopleSearch() {
-    const opening = els.peopleSearchPanel.hidden;
-    els.peopleSearchPanel.hidden = !opening;
-    els.peopleSearchButton.setAttribute("aria-expanded", String(opening));
-    if (opening) els.peopleSearchInput.focus();
-    else {
-      state.peopleSearchQuery = ""; els.peopleSearchInput.value = "";
-      refresh({ preserveScroll: true }); els.peopleSearchButton.focus({ preventScroll: true });
+  function closePeopleSearch(restoreFocus = false) {
+    if (els.peopleSearchPanel.hidden) return;
+    const focused = document.activeElement;
+    const card = focused?.closest?.(".person-card");
+    const personFocus = focused?.matches?.(".person-select-button") && card
+      ? { name: card.dataset.person, scope: card.dataset.orderScope } : null;
+    const hadFilter = Boolean(state.peopleSearchQuery.trim());
+    els.peopleSearchPanel.hidden = true;
+    els.peopleSearchButton.setAttribute("aria-expanded", "false");
+    state.peopleSearchQuery = ""; els.peopleSearchInput.value = "";
+    if (hadFilter) refresh({ preserveScroll: true });
+    else updatePeopleSearchStatus();
+    if (restoreFocus) els.peopleSearchButton.focus({ preventScroll: true });
+    else if (els.peopleSearchPanel.contains(focused)) focused.blur();
+    else if (personFocus && !focused.isConnected) {
+      [...els.peopleList.querySelectorAll(".person-card")].find(item => item.dataset.person === personFocus.name && item.dataset.orderScope === personFocus.scope)?.querySelector(".person-select-button")?.focus({ preventScroll: true });
     }
+  }
+
+  function togglePeopleSearch() {
+    if (!els.peopleSearchPanel.hidden) { closePeopleSearch(true); return; }
+    els.peopleSearchPanel.hidden = false;
+    els.peopleSearchButton.setAttribute("aria-expanded", "true");
+    els.peopleSearchInput.focus();
+  }
+
+  let peopleSearchDismissFrame = null;
+  let peopleSearchPointerDown = false;
+  let peopleSearchOutsideClick = false;
+  const withinPeopleSearch = target => target && (els.peopleSearchPanel.contains(target) || els.peopleSearchButton.contains(target));
+  function queuePeopleSearchDismiss(outsideClick = false) {
+    if (els.peopleSearchPanel.hidden) return;
+    peopleSearchOutsideClick ||= outsideClick;
+    if (peopleSearchDismissFrame !== null) return;
+    peopleSearchDismissFrame = requestAnimationFrame(() => {
+      peopleSearchDismissFrame = null;
+      const clickedOutside = peopleSearchOutsideClick;
+      peopleSearchOutsideClick = false;
+      // Wait for a pointer click to finish before hiding or rebuilding its target.
+      if (peopleSearchPointerDown || els.peopleSearchPanel.hidden) return;
+      if (clickedOutside || !withinPeopleSearch(document.activeElement)) closePeopleSearch();
+    });
   }
 
   function updatePeopleSearchStatus(names = []) {
@@ -4216,6 +4249,14 @@
       state.peopleSearchQuery = ""; els.peopleSearchInput.value = "";
       refresh({ preserveScroll: true }); els.peopleSearchInput.focus();
     });
+    els.peopleSearchPanel.addEventListener("focusout", () => queuePeopleSearchDismiss());
+    document.addEventListener("pointerdown", () => { peopleSearchPointerDown = true; }, { capture: true, passive: true });
+    for (const type of ["pointerup", "pointercancel"]) document.addEventListener(type, () => {
+      peopleSearchPointerDown = false; queuePeopleSearchDismiss();
+    }, { capture: true, passive: true });
+    document.addEventListener("click", event => {
+      if (!withinPeopleSearch(event.target)) queuePeopleSearchDismiss(true);
+    }, true);
     els.peopleSearchPanel.addEventListener("keydown", event => {
       if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); togglePeopleSearch(); }
     });

@@ -373,3 +373,38 @@ test("cancel and close discard group drafts, duplicate names are rejected, and e
     assert.deepEqual(JSON.parse(a.window.localStorage.getItem("whos-free-groups-v1")).groups.find(group=>group.name==="New").members,["Alice"]);
   } finally { await a.window.happyDOM.abort(); }
 });
+
+test("leaving search closes and clears it, while using its clear button keeps it open", async () => {
+  const a = await app();
+  try {
+    const input = a.el("peopleSearchInput"), panel = a.el("peopleSearchPanel");
+    const query = text => { input.value = text; input.dispatchEvent(new a.window.Event("input", { bubbles: true })); };
+    a.el("peopleSearchButton").click(); query("Alice");
+    a.el("clearPeopleSearchButton").focus(); await tick();
+    assert.equal(panel.hidden, false);
+    a.el("clearPeopleSearchButton").click(); await tick();
+    assert.equal(panel.hidden, false); assert.equal(a.window.document.activeElement, input);
+    query("Bob"); a.el("scheduleDataButton").focus(); await a.wait(() => panel.hidden);
+    assert.equal(input.value, ""); assert.equal(a.el("peopleSearchButton").getAttribute("aria-expanded"), "false");
+    assert.equal(a.window.document.activeElement, a.el("scheduleDataButton")); assert.ok(a.card("Alice")); assert.ok(a.card("Bob"));
+    a.el("peopleSearchButton").click(); assert.equal(panel.hidden, false); assert.equal(a.window.document.activeElement, input);
+    query("Alice"); a.card("Alice").querySelector(".person-select-button").focus(); await a.wait(() => panel.hidden);
+    assert.equal(a.window.document.activeElement.closest(".person-card").dataset.person, "Alice"); assert.ok(a.card("Bob"));
+  } finally { await a.window.happyDOM.abort(); }
+});
+
+test("outside pointer clicks finish selecting people before search closes, and blank-area clicks also dismiss it", async () => {
+  const a = await app();
+  try {
+    const input = a.el("peopleSearchInput"), panel = a.el("peopleSearchPanel"), before = a.stored();
+    a.el("peopleSearchButton").click(); input.value = "Alice"; input.dispatchEvent(new a.window.Event("input", { bubbles: true }));
+    const person = a.card("Alice").querySelector(".person-select-button");
+    person.dispatchEvent(new a.window.Event("pointerdown", { bubbles: true })); person.focus(); await tick();
+    assert.equal(panel.hidden, false, "the pressed card must stay in place until the click finishes");
+    person.dispatchEvent(new a.window.Event("pointerup", { bubbles: true })); person.click(); await a.wait(() => panel.hidden);
+    assert.ok(a.card("Alice").classList.contains("selected")); assert.ok(a.card("Bob")); assert.equal(input.value, "");
+    a.el("peopleSearchButton").click(); input.value = "Bob"; input.dispatchEvent(new a.window.Event("input", { bubbles: true }));
+    a.window.document.querySelector("h1").click(); await a.wait(() => panel.hidden);
+    assert.equal(input.value, ""); assert.equal(a.stored(), before);
+  } finally { await a.window.happyDOM.abort(); }
+});

@@ -2,6 +2,13 @@
 
 link: [www.youfree.ca](https://www.youfree.ca)
 
+### Version 80 — Search closes when you leave
+
+October 14, 2026
+
+- Keep the search icon and close the search field automatically when focus leaves it or the user clicks outside. Reopen it with the icon. Closing clears the filter; using the field's clear button keeps it open.
+- Let outside clicks finish before collapsing so selecting people and using group controls still work. Preserve keyboard focus when filtered cards are rebuilt.
+
 ### Version 79 — Stored people Show/Hide button
 
 October 14, 2026
