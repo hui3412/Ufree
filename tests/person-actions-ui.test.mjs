@@ -14,9 +14,24 @@ const data = { people: {
 const plain = value => JSON.parse(JSON.stringify(value));
 const tick = () => new Promise(resolve => setTimeout(resolve, 20));
 
-async function app(initial = data, groups = [{ id: "team", name: "Team", members: ["Bob"], hidden: false }], mobile = false) {
+async function app(initial = data, groups = [{ id: "team", name: "Team", members: ["Bob"], hidden: false }], mobile = false, options = {}) {
   const window = new Window({ url: base, settings: { disableJavaScriptFileLoading: true, disableCSSFileLoading: true } });
   window.document.write(fs.readFileSync(new URL("../index.html", import.meta.url), "utf8"));
+  if (options.missingControl) window.document.getElementById(options.missingControl)?.remove();
+  if (Object.hasOwn(options, "idbRecord")) Object.defineProperty(window, "indexedDB", { value: {
+    open() {
+      const request = {};
+      queueMicrotask(() => {
+        request.result = { close() {}, transaction() { return { objectStore() { return { get() {
+          const read = { result: options.idbRecord };
+          queueMicrotask(() => read.onsuccess());
+          return read;
+        } }; } }; } };
+        request.onsuccess();
+      });
+      return request;
+    }
+  }, configurable: true });
   const stylesheet = window.document.createElement("style");
   stylesheet.textContent = fs.readFileSync(new URL("../styles.css", import.meta.url), "utf8");
   window.document.head.append(stylesheet);
@@ -228,7 +243,7 @@ test("Class Soon, collapsed people, removed summary/forecast, UFree identity, an
   const a = await app();
   try {
     assert.equal(a.window.document.title, "UFree");
-    assert.equal(a.window.document.querySelector("h1").textContent, "UFree");
+    assert.equal(a.window.document.querySelector("h1").textContent, "UFree?");
     assert.equal(a.window.document.querySelector("h1 img").alt, "");
     assert.match(a.window.document.querySelector("h1 img").getAttribute("src"), /UFreeLogo_SVG\.svg/);
     assert.equal(JSON.parse(fs.readFileSync(new URL("../manifest.webmanifest", import.meta.url))).name, "UFree");
@@ -512,5 +527,59 @@ test("enabled Undo works from the mobile drawer and releases the page", async ()
     assert.equal(a.el("mobileMenuButton").getAttribute("aria-expanded"), "false");
     assert.equal(a.window.document.body.style.overflow, "");
     assert.equal(a.window.document.querySelector(".main-grid").hasAttribute("inert"), false);
+  } finally { await a.window.happyDOM.abort(); }
+});
+
+for (const mobile of [false, true]) test(`saved schedules still load with an incomplete ${mobile ? 'mobile' : 'desktop'} navigation shell`, async () => {
+  const a = await app(data, undefined, mobile, { missingControl: 'mobileMenuButton' });
+  try {
+    assert.ok(a.card('Alice'));
+    assert.ok(a.card('Bob'));
+    assert.equal(a.window.document.documentElement.classList.contains('navigation-fallback'), true);
+    assert.equal(a.el('homeNavigation').hasAttribute('inert'), false);
+    a.el('scheduleDataButton').click();
+    assert.equal(a.el('scheduleModal').hidden, false);
+    a.el('closeScheduleModal').click();
+    assert.equal(a.el('scheduleModal').hidden, true);
+    assert.deepEqual(JSON.parse(a.stored()).data, data, 'loading never clears old schedules');
+  } finally { await a.window.happyDOM.abort(); }
+});
+
+test('an empty IndexedDB still loads the existing localStorage schedules and preferences', async () => {
+  const a = await app(data, undefined, false, { idbRecord: undefined });
+  try {
+    assert.ok(a.card('Alice'));
+    assert.ok(a.card('Bob'));
+    assert.deepEqual(JSON.parse(a.stored()).data, data);
+    assert.equal(a.card('Alice').querySelector('.person-select-button').textContent.includes('Ali'), true);
+    assert.deepEqual(JSON.parse(a.window.localStorage.getItem('whos-free-groups-v1')).groups[0].members, ['Bob']);
+  } finally { await a.window.happyDOM.abort(); }
+});
+
+test('an existing IndexedDB record takes priority over an older fallback without merging stale people', async () => {
+  const current = { people: { Alice: data.people.Alice } };
+  const a = await app(data, [], false, { idbRecord: { data: current, meta: {} } });
+  try {
+    assert.ok(a.card('Alice'));
+    assert.equal(a.card('Bob'), undefined);
+    assert.deepEqual(JSON.parse(a.stored()).data, data, 'reading does not overwrite either stored copy');
+  } finally { await a.window.happyDOM.abort(); }
+});
+
+test('published shell keeps the header siblings and release asset versions consistent', async () => {
+  const a = await app();
+  try {
+    const doc = a.window.document;
+    assert.equal(a.el('homeNavigation').parentElement.className, 'app-header');
+    assert.equal(doc.querySelector('.brand-copy > p').parentElement.className, 'brand-copy');
+    assert.equal(a.el('mobileMenuButton').closest('.brand-top-row').querySelectorAll('.brand-row').length, 1);
+    assert.equal(doc.querySelectorAll('#mobileMenuButton').length, 1);
+    assert.equal(doc.querySelectorAll('.header-actions > button').length, 5);
+    const version = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version.split('.')[0];
+    for (const element of doc.querySelectorAll('script[src], link[href], .brand-logo')) {
+      const url = element.getAttribute('src') || element.getAttribute('href');
+      if (!url || url.startsWith('https:')) continue;
+      assert.equal(new URL(url, base).searchParams.get('v'), version, url);
+    }
   } finally { await a.window.happyDOM.abort(); }
 });

@@ -399,7 +399,7 @@
     if (!canAnimate()) return;
     const targets = [
       document.querySelector(".brand-copy"),
-      mobileNavMedia.matches ? null : document.querySelector(".header-actions"),
+      usesMobileNavigation() ? null : document.querySelector(".header-actions"),
       document.querySelector(".control-bar"),
       document.querySelector(".people-panel"),
       document.querySelector(".detail-panel"),
@@ -554,8 +554,8 @@
 
     await showSystemNotification(title, {
       body,
-      icon: "./assets/icon-192.png?v=86",
-      badge: "./assets/icon-192.png?v=86",
+      icon: "./assets/icon-192.png?v=87",
+      badge: "./assets/icon-192.png?v=87",
       tag: `whos-free-break-${dateKey()}-${breaks[0].start}`,
       data: { url: "./" },
     });
@@ -642,8 +642,8 @@
     }
     const ok = await showSystemNotification("UFree notifications work", {
       body: "You'll get grouped alerts when friends start breaks longer than 10 minutes.",
-      icon: "./assets/icon-192.png?v=86",
-      badge: "./assets/icon-192.png?v=86",
+      icon: "./assets/icon-192.png?v=87",
+      badge: "./assets/icon-192.png?v=87",
       tag: "whos-free-test",
       data: { url: "./" },
     });
@@ -1344,6 +1344,8 @@
   const mobileNavigation = document.getElementById("homeNavigation");
   const mobileNavBackdrop = document.getElementById("mobileNavBackdrop");
   const closeMobileMenuButton = document.getElementById("closeMobileMenuButton");
+  const mobileNavAvailable = Boolean(mobileMenuButton && mobileNavigation && mobileNavBackdrop && closeMobileMenuButton);
+  const usesMobileNavigation = () => mobileNavAvailable && mobileNavMedia.matches;
   let mobileNavOpen = false;
   let mobileNavBackground = [];
   let mobileNavOverflow = "";
@@ -1369,9 +1371,10 @@
   }
 
   function syncMobileNavigation() {
+    if (!mobileNavAvailable) return;
     const wasOpen = mobileNavOpen;
     const hadMenuFocus = mobileNavigation.contains(document.activeElement) || document.activeElement === mobileMenuButton;
-    if (!mobileNavMedia.matches) {
+    if (!usesMobileNavigation()) {
       closeMobileNavigation(false);
       mobileNavigation.removeAttribute("inert");
       mobileNavigation.removeAttribute("aria-hidden");
@@ -1385,7 +1388,7 @@
   }
 
   function openMobileNavigation() {
-    if (!mobileNavMedia.matches || mobileNavOpen || state.importProgress ||
+    if (!usesMobileNavigation() || mobileNavOpen || state.importProgress ||
         [...document.querySelectorAll(".modal-backdrop")].some(modal => !modal.hidden)) return;
     mobileNavOpen = true;
     mobileNavOverflow = document.body.style.overflow;
@@ -1412,10 +1415,18 @@
 
   function returnHomeActionFocus(button) {
     if ([...document.querySelectorAll(".modal-backdrop")].some(modal => !modal.hidden)) return;
-    (mobileNavMedia.matches ? mobileMenuButton : button).focus({ preventScroll: true });
+    (usesMobileNavigation() ? mobileMenuButton : button)?.focus({ preventScroll: true });
   }
 
   function bindMobileNavigation() {
+    // A partial or older HTML shell must never prevent loading saved schedules.
+    if (!mobileNavAvailable) {
+      document.documentElement.classList.add("navigation-fallback");
+      mobileNavigation?.removeAttribute("inert");
+      mobileNavigation?.removeAttribute("aria-hidden");
+      if (mobileNavBackdrop) mobileNavBackdrop.hidden = true;
+      return;
+    }
     mobileMenuButton.addEventListener("click", () => mobileNavOpen ? closeMobileNavigation() : openMobileNavigation());
     closeMobileMenuButton.addEventListener("click", () => closeMobileNavigation());
     mobileNavBackdrop.addEventListener("click", () => closeMobileNavigation());
@@ -1442,7 +1453,7 @@
     // Start with full labels so widening the row restores them automatically.
     els.helpButton.classList.remove("compact-label");
     els.scheduleDataButton.classList.remove("compact-label");
-    if (!mobileNavMedia.matches) {
+    if (!usesMobileNavigation()) {
       if (!fits(nav)) els.helpButton.classList.add("compact-label");
       if (!fits(nav)) els.scheduleDataButton.classList.add("compact-label");
     }
@@ -2542,7 +2553,12 @@
     try {
       const record = await idbGet(LOCAL_SCHEDULE_KEY);
       state.storageBackend = "indexeddb";
-      return record || null;
+      if (record) return record;
+      // Older sessions may have used localStorage while IndexedDB was unavailable.
+      // An empty, newly available database must not hide that existing copy.
+      const fallback = fallbackRead();
+      if (fallback) state.storageBackend = "localstorage";
+      return fallback;
     } catch {
       try {
         const record = fallbackRead();
@@ -2852,7 +2868,7 @@
   function openQuickExport(event) {
     if (state.isParsing || state.pendingImage || state.codeMode || !Object.keys(peopleMap()).length) return;
     if (!els.helpModal.hidden) closeHelp();
-    state.quickExportReturnFocus = mobileNavMedia.matches ? mobileMenuButton : event?.currentTarget || els.homeExportButton;
+    state.quickExportReturnFocus = usesMobileNavigation() ? mobileMenuButton : event?.currentTarget || els.homeExportButton;
     openScheduleModal();
     openCodePanel("export", true);
   }
@@ -4544,7 +4560,7 @@
     if (!("serviceWorker" in navigator)) return;
     if (location.protocol !== "https:" && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") return;
 
-    navigator.serviceWorker.register("./service-worker.js?v=86", { updateViaCache: "none" })
+    navigator.serviceWorker.register("./service-worker.js?v=87", { updateViaCache: "none" })
       .then(registration => registration.update())
       .catch(() => {
         // The app works normally even if PWA caching isn't available.
@@ -4584,8 +4600,10 @@
     openSharedLink();
 
     loadSchedulesFromDevice().then(() => {
-      cleanPeoplePreferences();
-      if (state.hasData) cleanGroupPreferences();
+      if (state.hasData) {
+        cleanPeoplePreferences();
+        cleanGroupPreferences();
+      }
       refresh({ preserveScroll: true });
       updateSettingsModal();
       checkBreakNotifications();

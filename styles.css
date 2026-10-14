@@ -2890,3 +2890,11 @@ button:disabled { cursor: not-allowed; }
 @media (prefers-reduced-motion: reduce) {
   .home-header-controls, .home-header-controls.is-open { transition: none; }
 }
+
+/* Keep navigation usable if an older HTML shell lacks a drawer control. */
+.navigation-fallback .mobile-menu-button, .navigation-fallback .mobile-nav-heading { display: none; }
+@media (max-width: 900px) {
+  .navigation-fallback .home-header-controls { position: static; width: 100%; padding: 0; margin-top: 16px; transform: none; visibility: visible; pointer-events: auto; box-shadow: none; overflow: visible; }
+  .navigation-fallback .home-header-controls .header-actions { flex-direction: row; flex-wrap: wrap; justify-content: flex-start; }
+  .navigation-fallback .home-header-controls .header-data-button { width: auto; }
+}
