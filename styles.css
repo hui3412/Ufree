@@ -2835,7 +2835,7 @@ button:disabled { cursor: not-allowed; }
 #clearPeopleSearchButton { flex: 0 0 44px; min-height: 44px; padding: 0; font-size: 22px; }
 .people-search-status { margin: 6px 0 0; font-size: .78rem; line-height: 1.4; color: var(--muted); }
 #manageGroupsButton svg, .live-control-icon { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-#manageGroupsButton.compact-label { width: 42px; min-width: 42px; padding: 0; }
+.people-actions #manageGroupsButton { width: 42px; min-width: 42px; padding: 0; }
 .live-control-icon { display: none; }
 .live-control.compact-label .live-control-label { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .live-control.compact-label .live-control-icon { display: block; }
@@ -2845,7 +2845,6 @@ button:disabled { cursor: not-allowed; }
 .group-add-people { margin-top: 16px; }
 .group-add-people > summary { min-height: 44px; padding: 10px 0; cursor: pointer; }
 .group-editor-empty, .group-add-people > p { color: var(--muted); font-size: .88rem; }
-.people-group:has(.group-options[open]) .people-group-header { padding-bottom: 158px; }
 @media (max-width: 300px) {
-  .people-search-button, #manageGroupsButton.compact-label { width: 36px; min-width: 36px; }
+  .people-search-button, .people-actions #manageGroupsButton { width: 36px; min-width: 36px; }
 }
