@@ -14,14 +14,17 @@ const data = { people: {
 const plain = value => JSON.parse(JSON.stringify(value));
 const tick = () => new Promise(resolve => setTimeout(resolve, 20));
 
-async function app(initial = data, groups = [{ id: "team", name: "Team", members: ["Bob"], hidden: false }]) {
+async function app(initial = data, groups = [{ id: "team", name: "Team", members: ["Bob"], hidden: false }], mobile = false) {
   const window = new Window({ url: base, settings: { disableJavaScriptFileLoading: true, disableCSSFileLoading: true } });
   window.document.write(fs.readFileSync(new URL("../index.html", import.meta.url), "utf8"));
   const stylesheet = window.document.createElement("style");
   stylesheet.textContent = fs.readFileSync(new URL("../styles.css", import.meta.url), "utf8");
   window.document.head.append(stylesheet);
   window.setInterval = () => 0;
-  window.matchMedia = () => ({ matches: true, addEventListener() {} });
+  const mobileListeners = [];
+  const mobileQuery = { matches: mobile, addEventListener(type, callback) { if (type === "change") mobileListeners.push(callback); } };
+  window.matchMedia = query => query.replace(/\s/g, "") === "(max-width:900px)" ? mobileQuery : { matches: query.includes("prefers-reduced-motion") || (mobile && query.includes("max-width")), addEventListener() {} };
+  const setMobile = value => { mobileQuery.matches = value; mobileListeners.forEach(callback => callback({ matches: value })); };
   Object.assign(window, { TextEncoder, TextDecoder, Blob, CompressionStream, DecompressionStream });
   let copied, confirmMessage;
   window.confirm = message => { confirmMessage = message; return true; };
@@ -49,7 +52,7 @@ async function app(initial = data, groups = [{ id: "team", name: "Team", members
     return button;
   };
   await wait(() => card("Alice"));
-  return { window, el, wait, card, share, scrolls, copied: () => copied, confirmMessage: () => confirmMessage, stored: () => window.localStorage.getItem("whos-free-local-schedules") };
+  return { window, el, wait, card, share, scrolls, setMobile, copied: () => copied, confirmMessage: () => confirmMessage, stored: () => window.localStorage.getItem("whos-free-local-schedules") };
 }
 
 test("sharing appears only in the expanded four-button row and all three methods export only that person", async () => {
@@ -136,7 +139,7 @@ test("closing during export cancels stale results, restores focus, and does not 
 });
 
 test("the expanded detail plus adds only the selected person to an existing group", async () => {
-  const a = await app();
+  const a = await app(data, [{ id: "team", name: "Team", members: ["Bob"], hidden: false }], true);
   try {
     const before = a.stored();
     assert.equal(a.el("addPersonGroupButton"), null);
@@ -415,3 +418,97 @@ test("outside pointer clicks finish selecting people before search closes, and b
   } finally { await a.window.happyDOM.abort(); }
 });
 
+
+
+test("mobile menu isolates the background, traps focus and restores page scrolling on Escape and outside tap", async () => {
+  const a = await app(data, [], true);
+  try {
+    const before = a.stored(), menu = a.el("homeNavigation"), toggle = a.el("mobileMenuButton");
+    assert.equal(menu.hasAttribute("inert"), true);
+    assert.equal(toggle.getAttribute("aria-expanded"), "false");
+    a.window.document.body.style.overflow = "auto";
+    toggle.click();
+    assert.equal(menu.getAttribute("role"), "dialog");
+    assert.equal(menu.getAttribute("aria-modal"), "true");
+    assert.equal(menu.hasAttribute("inert"), false);
+    assert.equal(a.window.document.querySelector(".main-grid").hasAttribute("inert"), true);
+    assert.equal(a.window.document.body.style.overflow, "hidden");
+    assert.equal(a.window.document.activeElement.id, "closeMobileMenuButton");
+    const sendKey = (key, shiftKey = false) => a.window.document.activeElement.dispatchEvent(new a.window.KeyboardEvent("keydown", { key, shiftKey, bubbles: true, cancelable: true }));
+    sendKey("Tab", true);
+    assert.equal(a.window.document.activeElement.id, "homeExportButton", "disabled Undo is skipped");
+    sendKey("Tab");
+    assert.equal(a.window.document.activeElement.id, "closeMobileMenuButton");
+    sendKey("Escape");
+    assert.equal(toggle.getAttribute("aria-expanded"), "false");
+    assert.equal(a.window.document.activeElement.id, "mobileMenuButton");
+    assert.equal(a.window.document.body.style.overflow, "auto");
+    assert.equal(a.window.document.querySelector(".main-grid").hasAttribute("inert"), false);
+    toggle.click(); a.el("mobileNavBackdrop").click();
+    assert.equal(menu.hasAttribute("inert"), true);
+    assert.equal(a.window.document.body.style.overflow, "auto");
+    assert.equal(a.stored(), before);
+  } finally { await a.window.happyDOM.abort(); }
+});
+
+test("mobile navigation reuses exactly five existing actions, closes before opening their dialogs and returns focus to the toggle", async () => {
+  const a = await app(data, [], true);
+  try {
+    const ids = ["scheduleDataButton", "helpButton", "settingsButton", "homeExportButton", "undoChangesButton"];
+    assert.deepEqual([...a.el("homeNavigation").querySelector("nav").children].map(e => e.id), ids);
+    for (const id of ids) {
+      assert.equal(a.window.document.querySelectorAll(`#${id}`).length, 1);
+      assert.ok(a.el(id).querySelector("svg"));
+      assert.ok(a.el(id).querySelector("span").textContent.trim());
+    }
+    for (const [action, dialog, close] of [["scheduleDataButton","scheduleModal","closeScheduleModal"],["helpButton","helpModal","closeHelpModal"],["settingsButton","settingsModal","closeSettingsModal"],["homeExportButton","scheduleModal","closeScheduleModal"]]) {
+      a.el("mobileMenuButton").click(); a.el(action).click();
+      await a.wait(() => !a.el(dialog).hidden);
+      assert.equal(a.el("mobileMenuButton").getAttribute("aria-expanded"), "false");
+      assert.equal(a.el("mobileNavBackdrop").hidden, true);
+      assert.equal(a.window.document.body.style.overflow, "hidden");
+      a.el(close).click();
+      assert.equal(a.el(dialog).hidden, true);
+      assert.equal(a.window.document.body.style.overflow, "");
+      assert.equal(a.window.document.activeElement.id, "mobileMenuButton");
+    }
+  } finally { await a.window.happyDOM.abort(); }
+});
+
+test("crossing the navigation breakpoint closes the drawer and restores desktop actions without leaving background controls inert", async () => {
+  const a = await app(data, [], true);
+  try {
+    a.el("mobileMenuButton").click(); a.setMobile(false);
+    assert.equal(a.el("mobileMenuButton").getAttribute("aria-expanded"), "false");
+    assert.equal(a.el("homeNavigation").hasAttribute("inert"), false);
+    assert.equal(a.el("homeNavigation").hasAttribute("aria-hidden"), false);
+    assert.equal(a.el("homeNavigation").hasAttribute("aria-modal"), false);
+    assert.equal(a.el("mobileNavBackdrop").hidden, true);
+    assert.equal(a.window.document.body.style.overflow, "");
+    assert.equal(a.window.document.querySelector(".main-grid").hasAttribute("inert"), false);
+    assert.equal(a.window.document.activeElement.id, "scheduleDataButton");
+    a.setMobile(true);
+    assert.equal(a.el("homeNavigation").hasAttribute("inert"), true);
+    assert.equal(a.window.document.activeElement.id, "mobileMenuButton");
+    a.el("mobileMenuButton").click(); a.el("closeMobileMenuButton").click();
+    assert.equal(a.window.document.body.style.overflow, "");
+  } finally { await a.window.happyDOM.abort(); }
+});
+
+
+test("enabled Undo works from the mobile drawer and releases the page", async () => {
+  const a = await app(data, [], true);
+  try {
+    a.card("Alice").querySelector(".person-select-button").click();
+    a.el("deletePersonScheduleButton").click();
+    await a.wait(() => !a.el("undoChangesButton").disabled);
+    assert.equal(a.el("undoChangesButton").disabled, false);
+    assert.equal(a.card("Alice"), undefined);
+    a.el("mobileMenuButton").click(); a.el("undoChangesButton").click();
+    await a.wait(() => a.card("Alice"));
+    assert.ok(a.card("Alice"));
+    assert.equal(a.el("mobileMenuButton").getAttribute("aria-expanded"), "false");
+    assert.equal(a.window.document.body.style.overflow, "");
+    assert.equal(a.window.document.querySelector(".main-grid").hasAttribute("inert"), false);
+  } finally { await a.window.happyDOM.abort(); }
+});

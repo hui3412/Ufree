@@ -69,9 +69,18 @@
       const center = element => rect(element).top + rect(element).height / 2;
       const sameLine = elements => elements.every(element => Math.abs(center(element) - center(elements[0])) < 2);
       const inside = (elements,container) => elements.every(element => rect(element).left >= rect(container).left - 1 && rect(element).right <= rect(container).right + 1);
-      const header = sameLine(buttons) && inside(buttons,nav)
-        && Math.abs(rect(buttons[0]).left - rect(description).left) < 1
-        && rect(nav).top >= rect(description).bottom;
+      const toggle = doc.querySelector('#mobileMenuButton');
+      const brand = doc.querySelector('.brand-copy');
+      const brandRow = doc.querySelector('.brand-row');
+      const mobile = visible(toggle);
+      const header = mobile
+        ? Math.abs(rect(toggle).right - rect(brand).right) < 1
+          && Math.abs(center(toggle) - center(brandRow)) < 2
+          && rect(toggle).left >= rect(brandRow).right
+          && frame.contentWindow.getComputedStyle(nav.parentElement).visibility === 'hidden'
+        : sameLine(buttons) && inside(buttons,nav)
+          && rect(nav).left >= rect(brand).right
+          && Math.abs(rect(nav).right - rect(doc.querySelector('.app-header')).right) < 1;
       const people = sameLine(peopleControls) && inside(peopleControls,toolbar);
       const overflow = doc.documentElement.scrollWidth <= frame.contentWindow.innerWidth;
       const labels = [...doc.querySelectorAll('.nav-button-label, .group-toggle-label, [data-mode-label]')].filter(visible).map(element => element.textContent.trim()).join(', ') || 'Icons';
@@ -118,3 +127,4 @@
   </script>
 </body>
 </html>
+

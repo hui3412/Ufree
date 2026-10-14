@@ -399,7 +399,7 @@
     if (!canAnimate()) return;
     const targets = [
       document.querySelector(".brand-copy"),
-      document.querySelector(".header-actions"),
+      mobileNavMedia.matches ? null : document.querySelector(".header-actions"),
       document.querySelector(".control-bar"),
       document.querySelector(".people-panel"),
       document.querySelector(".detail-panel"),
@@ -554,8 +554,8 @@
 
     await showSystemNotification(title, {
       body,
-      icon: "./assets/icon-192.png?v=84",
-      badge: "./assets/icon-192.png?v=84",
+      icon: "./assets/icon-192.png?v=85",
+      badge: "./assets/icon-192.png?v=85",
       tag: `whos-free-break-${dateKey()}-${breaks[0].start}`,
       data: { url: "./" },
     });
@@ -642,8 +642,8 @@
     }
     const ok = await showSystemNotification("UFree notifications work", {
       body: "You'll get grouped alerts when friends start breaks longer than 10 minutes.",
-      icon: "./assets/icon-192.png?v=84",
-      badge: "./assets/icon-192.png?v=84",
+      icon: "./assets/icon-192.png?v=85",
+      badge: "./assets/icon-192.png?v=85",
       tag: "whos-free-test",
       data: { url: "./" },
     });
@@ -803,6 +803,7 @@
   function closeSettingsModal() {
     els.settingsModal.hidden = true;
     if (els.scheduleModal.hidden) document.body.style.overflow = "";
+    returnHomeActionFocus(els.settingsButton);
   }
 
   function toMinutes(hhmm) {
@@ -1338,6 +1339,88 @@
     showToast(persisted ? `${group.name} moved to top.` : "Group moved for this session, but could not be saved on this device.");
   }
 
+  const mobileNavMedia = window.matchMedia("(max-width: 900px)");
+  const mobileMenuButton = document.getElementById("mobileMenuButton");
+  const mobileNavigation = document.getElementById("homeNavigation");
+  const mobileNavBackdrop = document.getElementById("mobileNavBackdrop");
+  const closeMobileMenuButton = document.getElementById("closeMobileMenuButton");
+  let mobileNavOpen = false;
+  let mobileNavBackground = [];
+  let mobileNavOverflow = "";
+
+  function closeMobileNavigation(restoreFocus = true) {
+    if (!mobileNavOpen) return;
+    mobileNavOpen = false;
+    mobileNavigation.classList.remove("is-open");
+    mobileNavigation.removeAttribute("role");
+    mobileNavigation.removeAttribute("aria-modal");
+    mobileNavigation.removeAttribute("aria-labelledby");
+    mobileNavigation.setAttribute("inert", "");
+    mobileNavigation.setAttribute("aria-hidden", "true");
+    mobileNavBackdrop.hidden = true;
+    mobileMenuButton.setAttribute("aria-expanded", "false");
+    mobileMenuButton.setAttribute("aria-label", "Open main menu");
+    for (const { element, inert } of mobileNavBackground) {
+      if (!inert) element.removeAttribute("inert");
+    }
+    mobileNavBackground = [];
+    document.body.style.overflow = mobileNavOverflow;
+    if (restoreFocus) mobileMenuButton.focus({ preventScroll: true });
+  }
+
+  function syncMobileNavigation() {
+    const wasOpen = mobileNavOpen;
+    const hadMenuFocus = mobileNavigation.contains(document.activeElement) || document.activeElement === mobileMenuButton;
+    if (!mobileNavMedia.matches) {
+      closeMobileNavigation(false);
+      mobileNavigation.removeAttribute("inert");
+      mobileNavigation.removeAttribute("aria-hidden");
+      if (wasOpen || hadMenuFocus) els.scheduleDataButton.focus({ preventScroll: true });
+    } else if (!mobileNavOpen) {
+      mobileNavigation.setAttribute("inert", "");
+      mobileNavigation.setAttribute("aria-hidden", "true");
+      if (hadMenuFocus) mobileMenuButton.focus({ preventScroll: true });
+    }
+    scheduleToolbarLayout();
+  }
+
+  function openMobileNavigation() {
+    if (!mobileNavMedia.matches || mobileNavOpen || state.importProgress ||
+        [...document.querySelectorAll(".modal-backdrop")].some(modal => !modal.hidden)) return;
+    mobileNavOpen = true;
+    mobileNavOverflow = document.body.style.overflow;
+    mobileNavBackground = [...document.querySelectorAll(".brand-copy, .control-bar, .main-grid")].map(element => ({ element, inert: element.hasAttribute("inert") }));
+    // The button is inside brand-copy; keep all background controls out of the tab order.
+    mobileNavBackground.forEach(({ element }) => element.setAttribute("inert", ""));
+    document.body.style.overflow = "hidden";
+    mobileNavigation.removeAttribute("inert");
+    mobileNavigation.removeAttribute("aria-hidden");
+    mobileNavigation.setAttribute("role", "dialog");
+    mobileNavigation.setAttribute("aria-modal", "true");
+    mobileNavigation.setAttribute("aria-labelledby", "mobileNavTitle");
+    mobileNavigation.classList.add("is-open");
+    mobileNavBackdrop.hidden = false;
+    mobileMenuButton.setAttribute("aria-expanded", "true");
+    mobileMenuButton.setAttribute("aria-label", "Close main menu");
+    closeMobileMenuButton.focus({ preventScroll: true });
+  }
+
+  function returnHomeActionFocus(button) {
+    if ([...document.querySelectorAll(".modal-backdrop")].some(modal => !modal.hidden)) return;
+    (mobileNavMedia.matches ? mobileMenuButton : button).focus({ preventScroll: true });
+  }
+
+  function bindMobileNavigation() {
+    mobileMenuButton.addEventListener("click", () => mobileNavOpen ? closeMobileNavigation() : openMobileNavigation());
+    closeMobileMenuButton.addEventListener("click", () => closeMobileNavigation());
+    mobileNavBackdrop.addEventListener("click", () => closeMobileNavigation());
+    mobileNavigation.addEventListener("click", event => {
+      if (mobileNavOpen && event.target.closest(".header-actions button")) closeMobileNavigation();
+    }, true);
+    mobileNavMedia.addEventListener?.("change", syncMobileNavigation);
+    syncMobileNavigation();
+  }
+
   let toolbarLayoutFrame = null;
 
   function fitToolbarLabels() {
@@ -1354,8 +1437,10 @@
     // Start with full labels so widening the row restores them automatically.
     els.helpButton.classList.remove("compact-label");
     els.scheduleDataButton.classList.remove("compact-label");
-    if (!fits(nav)) els.helpButton.classList.add("compact-label");
-    if (!fits(nav)) els.scheduleDataButton.classList.add("compact-label");
+    if (!mobileNavMedia.matches) {
+      if (!fits(nav)) els.helpButton.classList.add("compact-label");
+      if (!fits(nav)) els.scheduleDataButton.classList.add("compact-label");
+    }
 
     els.showGroupsToggle.classList.remove("compact-label");
     els.viewToggleButton.classList.remove("compact-label");
@@ -2762,7 +2847,7 @@
   function openQuickExport(event) {
     if (state.isParsing || state.pendingImage || state.codeMode || !Object.keys(peopleMap()).length) return;
     if (!els.helpModal.hidden) closeHelp();
-    state.quickExportReturnFocus = event?.currentTarget || els.homeExportButton;
+    state.quickExportReturnFocus = mobileNavMedia.matches ? mobileMenuButton : event?.currentTarget || els.homeExportButton;
     openScheduleModal();
     openCodePanel("export", true);
   }
@@ -2779,7 +2864,7 @@
   function closeHelp() {
     els.helpModal.hidden = true;
     if (![els.scheduleModal, els.settingsModal, els.groupsModal, els.groupWeekModal, els.personWeekModal].some(modal => !modal.hidden)) document.body.style.overflow = "";
-    els.helpButton.focus({ preventScroll: true });
+    returnHomeActionFocus(els.helpButton);
   }
 
   function openCodePanel(mode, quick = false) {
@@ -3403,10 +3488,12 @@
   }
 
   function closeScheduleModal() {
+    const navigationReturnFocus = state.quickExportReturnFocus;
     if (state.codeMode && state.isParsing) return;
     if (state.codeMode) closeCodePanels();
     els.scheduleModal.hidden = true;
     if (els.settingsModal.hidden) document.body.style.overflow = "";
+    returnHomeActionFocus(navigationReturnFocus || els.scheduleDataButton);
   }
 
   async function removeSchedules() {
@@ -4357,6 +4444,16 @@
     });
 
     document.addEventListener("keydown", event => {
+      if (mobileNavOpen) {
+        if (event.key === "Escape") { event.preventDefault(); closeMobileNavigation(); }
+        else if (event.key === "Tab") {
+          const buttons = [...mobileNavigation.querySelectorAll("button")].filter(button => !button.disabled);
+          const first = buttons[0], last = buttons[buttons.length - 1];
+          if (event.shiftKey && (document.activeElement === first || !mobileNavigation.contains(document.activeElement))) { event.preventDefault(); last?.focus(); }
+          else if (!event.shiftKey && (document.activeElement === last || !mobileNavigation.contains(document.activeElement))) { event.preventDefault(); first?.focus(); }
+        }
+        return;
+      }
       if (state.importProgress) {
         if (event.key === "Tab") {
           const focusable = [...els.importProgressOverlay.querySelectorAll('input, button')].filter(item => !item.disabled && !item.closest("[hidden]"));
@@ -4442,7 +4539,7 @@
     if (!("serviceWorker" in navigator)) return;
     if (location.protocol !== "https:" && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") return;
 
-    navigator.serviceWorker.register("./service-worker.js?v=84", { updateViaCache: "none" })
+    navigator.serviceWorker.register("./service-worker.js?v=85", { updateViaCache: "none" })
       .then(registration => registration.update())
       .catch(() => {
         // The app works normally even if PWA caching isn't available.
@@ -4473,6 +4570,7 @@
     setLiveValues();
     syncLiveControls();
     bindEvents();
+    bindMobileNavigation();
     watchToolbarLayout();
     updateScheduleModal();
     updateSettingsModal();

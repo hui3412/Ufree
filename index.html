@@ -16,7 +16,7 @@
   <meta property="og:title" content="UFree">
   <meta property="og:description" content="Find who’s free and share Omnivox schedules. Your schedule data stays on your device.">
   <meta property="og:url" content="https://hui3412.github.io/Ufree/">
-  <meta property="og:image" content="https://hui3412.github.io/Ufree/assets/UFreeLogo_PNG.png?v=84">
+  <meta property="og:image" content="https://hui3412.github.io/Ufree/assets/UFreeLogo_PNG.png?v=85">
   <meta property="og:image:type" content="image/png">
   <meta property="og:image:width" content="330">
   <meta property="og:image:height" content="188">
@@ -24,33 +24,38 @@
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="UFree">
   <meta name="twitter:description" content="Find who’s free and share Omnivox schedules. Your schedule data stays on your device.">
-  <meta name="twitter:image" content="https://hui3412.github.io/Ufree/assets/UFreeLogo_PNG.png?v=84">
+  <meta name="twitter:image" content="https://hui3412.github.io/Ufree/assets/UFreeLogo_PNG.png?v=85">
   <meta name="twitter:image:alt" content="Official UFree logo">
 
-  <link rel="manifest" href="manifest.webmanifest?v=84">
-  <link rel="icon" type="image/x-icon" href="favicon.ico?v=84" sizes="16x16 32x32 48x48">
-  <link rel="icon" type="image/png" href="assets/favicon.png?v=84" sizes="32x32">
-  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg?v=84" sizes="any">
-  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=84" sizes="180x180">
-  <link rel="stylesheet" href="styles.css?v=84">
+  <link rel="manifest" href="manifest.webmanifest?v=85">
+  <link rel="icon" type="image/x-icon" href="favicon.ico?v=85" sizes="16x16 32x32 48x48">
+  <link rel="icon" type="image/png" href="assets/favicon.png?v=85" sizes="32x32">
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg?v=85" sizes="any">
+  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=85" sizes="180x180">
+  <link rel="stylesheet" href="styles.css?v=85">
 </head>
 <body>
+  <div id="mobileNavBackdrop" class="mobile-nav-backdrop" aria-hidden="true" hidden></div>
   <div class="app-shell">
     <header class="app-header">
       <div class="brand-copy">
+        <div class="brand-top-row">
         <div class="brand-row">
-          <h1 class="brand-title"><img class="brand-logo" src="assets/UFreeLogo_SVG.svg?v=84" width="330" height="188" alt="" fetchpriority="high"><span class="brand-name">UFree</span></h1>
+          <h1 class="brand-title"><img class="brand-logo" src="assets/UFreeLogo_SVG.svg?v=85" width="330" height="188" alt="" fetchpriority="high"><span class="brand-name">UFree</span></h1>
+        </div>
+        <button id="mobileMenuButton" class="secondary-button mobile-menu-button" type="button" aria-label="Open main menu" aria-controls="homeNavigation" aria-expanded="false" aria-haspopup="dialog"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
         </div>
         <p>Find who's free now, or check any time during the week. Optimized for the Omnivox system.</p>
       </div>
 
-      <div class="home-header-controls">
+      <div id="homeNavigation" class="home-header-controls">
+        <div class="mobile-nav-heading"><h2 id="mobileNavTitle">Main menu</h2><button id="closeMobileMenuButton" class="secondary-button mobile-menu-button" type="button" aria-label="Close main menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div>
         <nav class="header-actions" aria-label="Main navigation">
         <button id="scheduleDataButton" class="secondary-button header-data-button" type="button" title="Manage schedule data" aria-label="Schedules"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4M17 3v4M3 11h18"/></svg><span class="nav-button-label">Schedules</span></button>
         <button id="helpButton" class="secondary-button header-data-button" type="button" title="Help &amp; Tips" aria-label="Help &amp; Tips"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 8.5a2.5 2.5 0 0 1 5 0c0 2-2.5 2-2.5 4M12 16h.01"/></svg><span class="nav-button-label">Help &amp; Tips</span></button>
-        <button id="settingsButton" class="secondary-button header-data-button nav-icon-button" type="button" title="Settings" aria-label="Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.28 5.44L10.52 5.06L10.51 2.62L13.49 2.62L13.48 5.06L14.72 5.44L14.72 5.44L15.87 6.05L17.58 4.31L19.69 6.42L17.95 8.13L18.56 9.28L18.56 9.28L18.94 10.52L21.38 10.51L21.38 13.49L18.94 13.48L18.56 14.72L18.56 14.72L17.95 15.87L19.69 17.58L17.58 19.69L15.87 17.95L14.72 18.56L14.72 18.56L13.48 18.94L13.49 21.38L10.51 21.38L10.52 18.94L9.28 18.56L9.28 18.56L8.13 17.95L6.42 19.69L4.31 17.58L6.05 15.87L5.44 14.72L5.44 14.72L5.06 13.48L2.62 13.49L2.62 10.51L5.06 10.52L5.44 9.28L5.44 9.28L6.05 8.13L4.31 6.42L6.42 4.31L8.13 6.05L9.28 5.44Z"/><circle cx="12" cy="12" r="3.2"/></svg></button>
-        <button id="homeExportButton" class="secondary-button header-data-button nav-icon-button" type="button" title="Export schedules" aria-label="Export schedules"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-4-8 4-4 4 4M5 13v7h14v-7"/></svg></button>
-        <button id="undoChangesButton" class="secondary-button header-data-button nav-icon-button" type="button" disabled title="No recent changes to undo" aria-label="Undo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10h10a7 7 0 0 1 0 14M3 10l5-5M3 10l5 5" transform="translate(0 -3)"/></svg></button>
+        <button id="settingsButton" class="secondary-button header-data-button nav-icon-button" type="button" title="Settings" aria-label="Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.28 5.44L10.52 5.06L10.51 2.62L13.49 2.62L13.48 5.06L14.72 5.44L14.72 5.44L15.87 6.05L17.58 4.31L19.69 6.42L17.95 8.13L18.56 9.28L18.56 9.28L18.94 10.52L21.38 10.51L21.38 13.49L18.94 13.48L18.56 14.72L18.56 14.72L17.95 15.87L19.69 17.58L17.58 19.69L15.87 17.95L14.72 18.56L14.72 18.56L13.48 18.94L13.49 21.38L10.51 21.38L10.52 18.94L9.28 18.56L9.28 18.56L8.13 17.95L6.42 19.69L4.31 17.58L6.05 15.87L5.44 14.72L5.44 14.72L5.06 13.48L2.62 13.49L2.62 10.51L5.06 10.52L5.44 9.28L5.44 9.28L6.05 8.13L4.31 6.42L6.42 4.31L8.13 6.05L9.28 5.44Z"/><circle cx="12" cy="12" r="3.2"/></svg><span class="nav-extra-label">Settings</span></button>
+        <button id="homeExportButton" class="secondary-button header-data-button nav-icon-button" type="button" title="Export schedules" aria-label="Export schedules"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-4-8 4-4 4 4M5 13v7h14v-7"/></svg><span class="nav-extra-label">Export</span></button>
+        <button id="undoChangesButton" class="secondary-button header-data-button nav-icon-button" type="button" disabled title="No recent changes to undo" aria-label="Undo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10h10a7 7 0 0 1 0 14M3 10l5-5M3 10l5 5" transform="translate(0 -3)"/></svg><span class="nav-extra-label">Undo</span></button>
         </nav>
       </div>
     </header>
@@ -570,13 +575,13 @@
     }
   </script>
   <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js" defer></script>
-  <script src="schedule-parser.js?v=84" defer></script>
-  <script src="schedule-image-parser.js?v=84" defer></script>
-  <script src="schedule-availability.js?v=84" defer></script>
-  <script src="schedule-share-code.js?v=84" defer></script>
-  <script src="assets/qr/qrcodegen.js?v=84" defer></script>
-  <script src="schedule-groups.js?v=84" defer></script>
-  <script src="app.js?v=84" defer></script>
+  <script src="schedule-parser.js?v=85" defer></script>
+  <script src="schedule-image-parser.js?v=85" defer></script>
+  <script src="schedule-availability.js?v=85" defer></script>
+  <script src="schedule-share-code.js?v=85" defer></script>
+  <script src="assets/qr/qrcodegen.js?v=85" defer></script>
+  <script src="schedule-groups.js?v=85" defer></script>
+  <script src="app.js?v=85" defer></script>
 </body>
 </html>
 

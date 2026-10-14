@@ -13,7 +13,7 @@ async function app(initial = null, url = base) {
   const window = new Window({ url, settings: { disableJavaScriptFileLoading: true, disableCSSFileLoading: true } });
   window.document.write(fs.readFileSync(new URL("../index.html", import.meta.url), "utf8"));
   window.setInterval = () => 0;
-  window.matchMedia = () => ({ matches: true, addEventListener() {} });
+  window.matchMedia = query => ({ matches: query.includes("prefers-reduced-motion"), addEventListener() {} });
   window.confirm = () => true;
   Object.assign(window, { TextEncoder, TextDecoder, Blob, CompressionStream, DecompressionStream });
   let copied;
@@ -255,8 +255,8 @@ test("navigation keeps five actions together, the export icon opens quick share,
   try {
     const nav = a.window.document.querySelector('nav[aria-label="Main navigation"]');
     assert.deepEqual([...nav.children].map(button => button.id), ["scheduleDataButton","helpButton","settingsButton","homeExportButton","undoChangesButton"]);
-    assert.equal(a.el("settingsButton").textContent, ""); assert.equal(a.el("settingsButton").getAttribute("aria-label"), "Settings");
-    assert.equal(a.el("homeExportButton").textContent, ""); assert.ok(a.el("homeExportButton").querySelector("svg"));
+    assert.equal(a.el("settingsButton").querySelector(".nav-extra-label").textContent, "Settings"); assert.equal(a.el("settingsButton").getAttribute("aria-label"), "Settings");
+    assert.equal(a.el("homeExportButton").querySelector(".nav-extra-label").textContent, "Export"); assert.ok(a.el("homeExportButton").querySelector("svg"));
     a.el("homeExportButton").click(); assert.equal(a.el("exportSelection").open, false); assert.equal(a.el("selectAllSchedules").checked, true);
     a.window.document.dispatchEvent(new a.window.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
     assert.equal(a.el("scheduleModal").hidden, true); assert.equal(a.window.document.activeElement.id, "homeExportButton");
@@ -302,3 +302,4 @@ test("quick Copy Link exposes a selectable link when the clipboard is unavailabl
     a.el("closeExportButton").click(); assert.equal(a.el("scheduleModal").hidden, true);
   } finally { a.window.happyDOM.abort(); }
 });
+
