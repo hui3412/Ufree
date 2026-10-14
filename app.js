@@ -1163,11 +1163,7 @@
     card.title = "Drag to reorder, or hold then move on touch screens. Keyboard: Alt + Up or Down arrow.";
     card.setAttribute("aria-keyshortcuts", "Alt+ArrowUp Alt+ArrowDown");
     card.setAttribute("aria-describedby", "personOrderHelp");
-    card.addEventListener("pointerdown", event => {
-      card.draggable = !window.matchMedia("(pointer: coarse)").matches && !event.target.closest?.(".person-card-share");
-    });
     card.addEventListener("dragstart", event => {
-      if (event.target.closest?.(".person-card-share")) { event.preventDefault(); return; }
       if (state.activeReorder) { event.preventDefault(); return; }
       state.activeReorder = { name, scope, card, target: null };
       card.classList.add("person-dragging");
@@ -1191,7 +1187,6 @@
     };
     card.addEventListener("touchstart", event => {
       cancelHold();
-      if (event.target.closest?.(".person-card-share")) return;
       if (event.touches.length !== 1) { if (state.activeReorder?.card === card) finishPersonReorder(true); return; }
       if (state.activeReorder || state.isParsing) return;
       const touch = event.touches[0];
@@ -1234,7 +1229,6 @@
       if (state.pendingPersonHold?.card === card || state.activeReorder?.card === card || window.matchMedia("(pointer: coarse)").matches) event.preventDefault();
     });
     card.addEventListener("keydown", event => {
-      if (event.target.closest?.(".person-card-share")) return;
       if (event.key === "Escape" && state.activeReorder) { event.preventDefault(); finishPersonReorder(true); return; }
       if (!event.altKey || !["ArrowUp", "ArrowDown"].includes(event.key)) return;
       event.preventDefault();
@@ -1359,6 +1353,11 @@
       els.showGroupsToggle.classList.add("compact-label");
     }
     if (!fits(peopleActions)) els.viewToggleButton.classList.add("compact-label");
+    const fullSchedule = document.getElementById("fullScheduleButton");
+    if (fullSchedule) {
+      fullSchedule.classList.remove("compact-label");
+      if (!fits(fullSchedule.closest(".person-detail-actions"))) fullSchedule.classList.add("compact-label");
+    }
   }
 
   function scheduleToolbarLayout() {
@@ -3368,7 +3367,8 @@
     resetPersonQuickOutputs();
     unlockClosedModals();
     const card = [...els.peopleList.querySelectorAll(".person-card")].find(item => item.dataset.person === name);
-    (returnFocus?.isConnected ? returnFocus : card?.querySelector(".person-card-share"))?.focus({ preventScroll: true });
+    const expandedShare = state.selectedPerson === name ? document.getElementById("sharePersonScheduleButton") : null;
+    (returnFocus?.isConnected ? returnFocus : expandedShare || card?.querySelector(".person-select-button"))?.focus({ preventScroll: true });
   }
 
   function personQuickFieldsChanged() {
@@ -3479,8 +3479,6 @@
     const copy = document.createElement("span");
     copy.className = "person-copy";
 
-    const nameRow = document.createElement("span");
-    nameRow.className = "person-card-name-row";
     const personName = document.createElement("button");
     personName.type = "button";
     personName.className = "person-name person-select-button";
@@ -3508,15 +3506,7 @@
       detail.textContent = next ? `Next ${formatTime(next.start)} · ${classLabel(next)}` : "No more classes today";
     }
 
-    const share = iconAction(`Share ${displayName(name)}'s schedule`, "M12 3v12m-4-8 4-4 4 4M5 13v7h14v-7", "person-card-share");
-    share.setAttribute("aria-haspopup", "dialog");
-    share.addEventListener("click", event => {
-      event.stopPropagation();
-      if (state.activeReorder || Date.now() < state.suppressCardClickUntil) return;
-      openPersonQuickShare(name, share);
-    });
-    nameRow.append(personName, share);
-    copy.append(nameRow, detail);
+    copy.append(personName, detail);
     if (semesterIsOlder(peopleMap()[name].semester)) {
       const label = document.createElement("span");
       label.className = `schedule-semester${semesterIsOlder(peopleMap()[name].semester) ? " semester-older" : ""}`;
@@ -3787,12 +3777,12 @@
     nameEl.textContent = displayName(name);
     const nameRow = document.createElement("div");
     nameRow.className = "detail-name-row";
-    const fullSchedule = document.createElement("button");
+    const fullSchedule = iconAction(`View full schedule for ${displayName(name)}`, "M5 5h14a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2ZM7 3v4M17 3v4M3 11h18", "full-schedule-button");
     fullSchedule.id = "fullScheduleButton";
-    fullSchedule.type = "button";
-    fullSchedule.className = "secondary-button full-schedule-button";
-    fullSchedule.textContent = "Full schedule";
-    fullSchedule.setAttribute("aria-label", `View full schedule for ${displayName(name)}`);
+    const fullScheduleLabel = document.createElement("span");
+    fullScheduleLabel.className = "nav-button-label";
+    fullScheduleLabel.textContent = "Full schedule";
+    fullSchedule.append(fullScheduleLabel);
     fullSchedule.setAttribute("aria-haspopup", "dialog");
     fullSchedule.addEventListener("click", () => openPersonWeek(name));
     const actions = document.createElement("div");
@@ -3804,7 +3794,11 @@
     const remove = iconAction(`Delete ${displayName(name)}'s schedule from this device`, "M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7", "person-delete-button");
     remove.id = "deletePersonScheduleButton";
     remove.addEventListener("click", () => removePerson(name));
-    actions.append(fullSchedule, addToGroup, remove);
+    const share = iconAction(`Share ${displayName(name)}'s schedule`, "M12 3v12m-4-8 4-4 4 4M5 13v7h14v-7");
+    share.id = "sharePersonScheduleButton";
+    share.setAttribute("aria-haspopup", "dialog");
+    share.addEventListener("click", () => openPersonQuickShare(name, share));
+    actions.append(fullSchedule, addToGroup, remove, share);
     nameRow.append(nameEl, actions);
     const semesterLabel = document.createElement("p");
     semesterLabel.className = `schedule-semester${semesterIsOlder(peopleMap()[name].semester) ? " semester-older" : ""}`;
@@ -3888,6 +3882,7 @@
 
     animateDetailIfNeeded(name);
     state.lastDetailPerson = name;
+    scheduleToolbarLayout();
   }
 
   function refresh({ preserveScroll = false } = {}) {
@@ -4292,7 +4287,7 @@
     if (!("serviceWorker" in navigator)) return;
     if (location.protocol !== "https:" && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") return;
 
-    navigator.serviceWorker.register("./service-worker.js?v=75", { updateViaCache: "none" })
+    navigator.serviceWorker.register("./service-worker.js?v=76", { updateViaCache: "none" })
       .then(registration => registration.update())
       .catch(() => {
         // The app works normally even if PWA caching isn't available.

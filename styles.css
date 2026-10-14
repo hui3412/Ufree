@@ -2705,7 +2705,7 @@ button:disabled { cursor: not-allowed; }
 .appearance-settings-section .theme-swatch.mint { background: #40d99a; }
 .appearance-settings-section .theme-swatch.orange { background: #ff9f43; }
 
-.settings-credit { margin: 20px 0 0; padding-top: 0; text-align: center; line-height: 1.5; font-weight: 400; }
+.settings-credit { display: block; margin: 20px 0 0; padding-top: 0; text-align: center; line-height: 1.5; font-weight: 400; }
 
 .detail-name-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; }
 .detail-name-row h2 { min-width: 0; overflow-wrap: anywhere; }
@@ -2717,19 +2717,18 @@ button:disabled { cursor: not-allowed; }
 .person-week-modal .modal-header h2 { overflow-wrap: anywhere; }
 .person-week-modal .parser-status { margin-bottom: 0; }
 
-.person-card-name-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .person-select-button { min-width: 0; border: 0; padding: 0; color: inherit; background: transparent; font-family: inherit; text-align: left; cursor: pointer; overflow-wrap: anywhere; }
 .person-action-icon { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; width: 40px; min-width: 40px; min-height: 40px; padding: 0; }
 .person-action-icon svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.person-card-share { width: 32px; min-width: 32px; min-height: 36px; background: transparent; }
-.person-card-share:hover { background: var(--button-hover); }
-.person-detail-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.person-detail-actions { display: flex; align-items: center; flex-wrap: nowrap; gap: 8px; min-width: 0; max-width: 100%; }
+.person-detail-actions .full-schedule-button { width: auto; min-width: 40px; min-height: 44px; gap: 6px; padding: 0 12px; }
+.person-detail-actions .full-schedule-button.compact-label { width: 40px; padding: 0; gap: 0; }
 .person-delete-button { color: #eb7777; background: color-mix(in srgb, #e24444 10%, var(--button)); }
 .person-delete-button:hover { color: #ffaaaa; background: color-mix(in srgb, #e24444 20%, var(--button)); }
 :root[data-theme="light"] .person-delete-button { color: #b42323; }
 .people-manager-section > summary { cursor: pointer; min-height: 44px; gap: 12px; list-style: none; }
 .people-manager-section > summary::-webkit-details-marker { display: none; }
-.people-manager-section > summary::after { content: "+"; color: var(--muted); }
+.people-manager-section > summary::after { content: "+"; color: var(--text); display: inline-flex; align-items: center; justify-content: center; flex: 0 0 28px; width: 28px; height: 28px; border: 1.5px solid var(--muted); border-radius: 0; line-height: 1; }
 .people-manager-section[open] > summary::after { content: "−"; }
 .people-manager-section[open] .people-manager-list { margin-top: 12px; }
 .person-quick-share-modal, .person-group-modal { width: min(540px, 100%); }
@@ -2738,7 +2737,8 @@ button:disabled { cursor: not-allowed; }
 .person-quick-share-modal .export-generation-actions { margin-top: 16px; }
 .person-quick-share-modal .share-qr { max-width: 360px; }
 .person-group-modal select { width: 100%; }
-.settings-credit p + p { margin-top: 4px; }
+.settings-credit .credit-team { display: block; font-size: .98rem; font-weight: 500; }
+.settings-credit .credit-inspiration { display: block; margin-top: 3px; font-size: .76rem; font-weight: 400; text-align: center; }
 
 .app-header { flex-direction: column; align-items: stretch; gap: 16px; }
 .brand-copy { flex: 0 0 auto; min-width: 0; }

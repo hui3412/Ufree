@@ -2,6 +2,14 @@
 
 link: [www.youfree.ca](https://www.youfree.ca)
 
+### Version 76 — Expanded person action row and credit hierarchy
+
+October 13, 2026
+
+- Select a person to reveal Share beside Full schedule, + and Delete; the card itself now shows only the person's name and schedule status.
+- Keep all four actions on one row, using the calendar icon alone for Full schedule when space is limited.
+- Show the larger team credit on its own line with the smaller inspiration credit centered immediately below, and outline the stored-people expand/collapse symbol with a square border.
+
 ### Version 74 — Individual sharing and cleaner UFree controls
 
 October 13, 2026
