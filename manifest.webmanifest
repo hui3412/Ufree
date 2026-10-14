@@ -1,6 +1,6 @@
 {
-  "name": "Who's Free?",
-  "short_name": "Who's Free?",
+  "name": "UFree",
+  "short_name": "UFree",
   "description": "See who's free, add schedule pictures or Omnivox PDFs, and keep schedule data on your device.",
   "start_url": "./",
   "scope": "./",
@@ -8,15 +8,7 @@
   "background_color": "#232428",
   "theme_color": "#232428",
   "icons": [
-    {
-      "src": "assets/icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png"
-    },
-    {
-      "src": "assets/icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png"
-    }
+    { "src": "assets/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "assets/icon-512.png", "sizes": "512x512", "type": "image/png" }
   ]
 }

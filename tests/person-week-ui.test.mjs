@@ -47,7 +47,7 @@ test("full week includes exact times and weekends; direct export uses the canoni
     assert.equal(el("personWeekModal").hidden, false);
     assert.equal(el("personWeekTitle").textContent, "Ali");
     assert.match(el("personWeekSemester").textContent, /Fall 2026/);
-    assert.equal(el("fullScheduleButton").previousElementSibling.tagName, "H2");
+    assert.equal(el("fullScheduleButton").closest(".detail-name-row").querySelector("h2").textContent, "Ali");
     assert.equal(el("personWeekGrid").querySelectorAll(".review-day").length, 7);
     const blocks = [...el("personWeekGrid").querySelectorAll(".person-week-block")];
     assert.deepEqual(blocks.map(block => [block.dataset.day, block.dataset.start, block.dataset.end]), data.people.Alice.classes.map(item => [item.day, item.start, item.end]));
