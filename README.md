@@ -1,15 +1,18 @@
-# Ufree
-App by David D. and Hui En Quan
+# UFree
 
 link: [www.youfree.ca](https://www.youfree.ca)
 
+### Version 74 — Individual sharing and cleaner UFree controls
 
-<br>
-<br>
-<br>
+October 13, 2026
 
-Credit:
-Idea by Xander V.
+- Share one person's schedule directly from their card as a URL, QR code or text code, with optional export details.
+- Select a person to open Full schedule, add them to an existing group with +, or delete their local schedule with confirmation and session Undo.
+- Label the between-class busy status Class Soon and collapse the stored-people list by default.
+- Remove the home live-status summary and group shared-break forecast while retaining the weekly group availability tool.
+- Use UFree throughout the app, install metadata, notifications and sharing; keep existing device storage compatible.
+- Place team credits at the bottom of Help and Settings.
+
 ## Fork updates — last updated October 5, 2026
 
 
@@ -324,7 +327,7 @@ Theme settings are remembered locally on that device.
 
 ## Notifications
 
-When enabled, Who's Free? looks for breaks between two classes where the gap is **more than 10 minutes**. Time before the first class and after the last class is not treated as a break.
+When enabled, UFree looks for breaks between two classes where the gap is **more than 10 minutes**. Time before the first class and after the last class is not treated as a break.
 
 If several unmuted people start a qualifying break in the same minute, Who's Free? sends one grouped notification.
 
@@ -380,3 +383,8 @@ The **Share schedules.json** button shares/downloads only the schedule database.
   - Time text accepts both `08:15` and French-style `08 h 15`, including ranges using `à`.
 - Shared `schedules.json` files now carry the Who's Free? website URL (`https://xander444.github.io/Whos-Free/`).
 - On devices with the Web Share API, the share sheet includes the website link alongside the JSON file.
+
+## Credits
+
+App by David Dajbog and Hui En Quan. Inspiration from Xander Vatch.
+

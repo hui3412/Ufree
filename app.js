@@ -15,6 +15,11 @@
     selectedPerson: null,
     weekPerson: null,
     personWeekRequest: 0,
+    personShareName: null,
+    personShareRequest: 0,
+    personShareBusy: false,
+    personShareReturnFocus: null,
+    groupPerson: null,
     showEveryone: false,
     theme: loadTheme(),
     loadError: null,
@@ -48,7 +53,6 @@
     accentTheme: "blue",
     lastPeopleSignature: "",
     lastDetailPerson: null,
-    lastFreeCountText: "",
     recentChanges: [],
   };
 
@@ -167,8 +171,6 @@
     timeInput: document.getElementById("timeInput"),
     peopleHeading: document.getElementById("peopleHeading"),
     viewToggleButton: document.getElementById("viewToggleButton"),
-    freeCount: document.getElementById("freeCount"),
-    statusLine: document.getElementById("statusLine"),
     peopleList: document.getElementById("peopleList"),
     showGroupsToggle: document.getElementById("showGroupsToggle"),
     manageGroupsButton: document.getElementById("manageGroupsButton"),
@@ -201,6 +203,27 @@
     personWeekCode: document.getElementById("personWeekCode"),
     personWeekExportStatus: document.getElementById("personWeekExportStatus"),
     copyPersonWeekCodeButton: document.getElementById("copyPersonWeekCodeButton"),
+    personQuickShareModal: document.getElementById("personQuickShareModal"),
+    personQuickShareTitle: document.getElementById("personQuickShareTitle"),
+    closePersonQuickShare: document.getElementById("closePersonQuickShare"),
+    personQuickUrlButton: document.getElementById("personQuickUrlButton"),
+    personQuickQrButton: document.getElementById("personQuickQrButton"),
+    personQuickCodeButton: document.getElementById("personQuickCodeButton"),
+    personQuickExportFields: document.getElementById("personQuickExportFields"),
+    personQuickCodeField: document.getElementById("personQuickCodeField"),
+    personQuickCode: document.getElementById("personQuickCode"),
+    copyPersonQuickCode: document.getElementById("copyPersonQuickCode"),
+    personQuickSharePanel: document.getElementById("personQuickSharePanel"),
+    personQuickShareStatus: document.getElementById("personQuickShareStatus"),
+    personGroupModal: document.getElementById("personGroupModal"),
+    personGroupTitle: document.getElementById("personGroupTitle"),
+    closePersonGroup: document.getElementById("closePersonGroup"),
+    personGroupForm: document.getElementById("personGroupForm"),
+    personGroupField: document.getElementById("personGroupField"),
+    personGroupSelect: document.getElementById("personGroupSelect"),
+    personGroupEmpty: document.getElementById("personGroupEmpty"),
+    savePersonGroup: document.getElementById("savePersonGroup"),
+    personGroupManage: document.getElementById("personGroupManage"),
     toast: document.getElementById("toast"),
     dataSetupTemplate: document.getElementById("dataSetupTemplate"),
   };
@@ -360,15 +383,6 @@
         { scaleX: 1, duration: 0.32, stagger: 0.03, ease: "power2.out", clearProps: "transform" }
       );
     }
-  }
-
-  function animateCountIfChanged(nextText) {
-    if (!canAnimate() || state.lastFreeCountText === nextText) return;
-    window.gsap.fromTo(
-      els.freeCount,
-      { scale: 0.96 },
-      { scale: 1, duration: 0.2, ease: "back.out(1.7)", clearProps: "transform" }
-    );
   }
 
   function animateAppEntrance() {
@@ -560,7 +574,7 @@
 
   function notificationSupportText() {
     if (!("Notification" in window)) {
-      return { tone: "error", text: "Notifications are not supported in this browser. On iPhone, add Who's Free? to the Home Screen and open it from there." };
+      return { tone: "error", text: "Notifications are not supported in this browser. On iPhone, add UFree to the Home Screen and open it from there." };
     }
     if (Notification.permission === "denied") {
       return { tone: "error", text: "Notifications are blocked. Re-enable them in your browser or device settings." };
@@ -568,7 +582,7 @@
     if (Notification.permission === "granted") {
       return { tone: "success", text: state.notificationsEnabled ? "Break notifications are on." : "Notification permission is ready. Turn alerts on whenever you want." };
     }
-    return { tone: "neutral", text: "Turn alerts on to let Who's Free? ask for notification permission." };
+    return { tone: "neutral", text: "Turn alerts on to let UFree ask for notification permission." };
   }
 
   async function handleNotificationToggle() {
@@ -616,7 +630,7 @@
       showToast("Turn notifications on first");
       return;
     }
-    const ok = await showSystemNotification("Who's Free? notifications work", {
+    const ok = await showSystemNotification("UFree notifications work", {
       body: "You'll get grouped alerts when friends start breaks longer than 10 minutes.",
       icon: "./assets/icon-192.png",
       badge: "./assets/icon-192.png",
@@ -1149,7 +1163,11 @@
     card.title = "Drag to reorder, or hold then move on touch screens. Keyboard: Alt + Up or Down arrow.";
     card.setAttribute("aria-keyshortcuts", "Alt+ArrowUp Alt+ArrowDown");
     card.setAttribute("aria-describedby", "personOrderHelp");
+    card.addEventListener("pointerdown", event => {
+      card.draggable = !window.matchMedia("(pointer: coarse)").matches && !event.target.closest?.(".person-card-share");
+    });
     card.addEventListener("dragstart", event => {
+      if (event.target.closest?.(".person-card-share")) { event.preventDefault(); return; }
       if (state.activeReorder) { event.preventDefault(); return; }
       state.activeReorder = { name, scope, card, target: null };
       card.classList.add("person-dragging");
@@ -1173,6 +1191,7 @@
     };
     card.addEventListener("touchstart", event => {
       cancelHold();
+      if (event.target.closest?.(".person-card-share")) return;
       if (event.touches.length !== 1) { if (state.activeReorder?.card === card) finishPersonReorder(true); return; }
       if (state.activeReorder || state.isParsing) return;
       const touch = event.touches[0];
@@ -1215,6 +1234,7 @@
       if (state.pendingPersonHold?.card === card || state.activeReorder?.card === card || window.matchMedia("(pointer: coarse)").matches) event.preventDefault();
     });
     card.addEventListener("keydown", event => {
+      if (event.target.closest?.(".person-card-share")) return;
       if (event.key === "Escape" && state.activeReorder) { event.preventDefault(); finishPersonReorder(true); return; }
       if (!event.altKey || !["ArrowUp", "ArrowDown"].includes(event.key)) return;
       event.preventDefault();
@@ -1491,15 +1511,9 @@
     const header = document.createElement("div"); header.className = "people-group-header";
     const copy = document.createElement("div");
     const heading = document.createElement("h3"); heading.textContent = title;
-    const detail = document.createElement("p");
     const count = document.createElement("small");
     count.textContent = `${members.filter(name => isFree(name, day, minute)).length} of ${members.length} free`;
     copy.append(heading, count);
-    if (group && !collapsed) {
-      const weekly = window.WhosFreeGroups.week(group, peopleMap());
-      detail.textContent = sharedTimeText(weekly, day, minute);
-      copy.append(detail);
-    }
     const actions = document.createElement("div"); actions.className = "people-group-actions";
     const hide = document.createElement("button"); hide.type = "button";
     hide.className = "secondary-button group-hide";
@@ -1779,11 +1793,7 @@
 
   function renderDataSetup() {
     updateGroupToolbar();
-    els.peopleHeading.textContent = "Who's Free?";
-    els.freeCount.textContent = "Local only";
-    els.statusLine.textContent = state.loadError
-      ? "Schedule data needs your attention."
-      : "Add a schedule picture or create one manually.";
+    els.peopleHeading.textContent = "UFree";
     els.viewToggleButton.disabled = true;
     els.peopleList.replaceChildren();
 
@@ -2059,8 +2069,8 @@
           gap.className = passing ? "review-passing" : "review-break";
           gap.style.top = `${occupiedUntil - first}px`;
           gap.style.height = `${start - occupiedUntil}px`;
-          gap.textContent = `${passing ? "Passing time" : "Break"} ${start - occupiedUntil} min`;
-          gap.title = `${day} ${passing ? "passing time" : "break"} ${clock(occupiedUntil)}–${clock(start)}`;
+          gap.textContent = `${passing ? "Class Soon" : "Break"} ${start - occupiedUntil} min`;
+          gap.title = `${day} ${passing ? "Class Soon" : "break"} ${clock(occupiedUntil)}–${clock(start)}`;
           track.append(gap);
         }
         const block = document.createElement("button");
@@ -2521,7 +2531,7 @@
       }
 
       if (failures.length > 1) {
-        console.warn("Who’s Free? PDF import errors\n" + failures.join("\n"));
+        console.warn("UFree PDF import errors\n" + failures.join("\n"));
       }
 
     } catch (error) {
@@ -2557,13 +2567,13 @@
   async function shareSchedules() {
     if (!state.hasData) return;
     const file = new File([databaseJsonText()], "schedules.json", { type: "application/json" });
-    const shareText = `Import this schedules.json into Who's Free?\n${APP_URL}`;
+    const shareText = `Import this schedules.json into UFree\n${APP_URL}`;
 
     try {
       if (navigator.share && navigator.canShare?.({ files: [file] })) {
         try {
           await navigator.share({
-            title: "Who's Free? schedules",
+            title: "UFree schedules",
             text: shareText,
             url: APP_URL,
             files: [file],
@@ -2571,7 +2581,7 @@
         } catch (error) {
           if (error?.name === "AbortError") return;
           await navigator.share({
-            title: "Who's Free? schedules",
+            title: "UFree schedules",
             text: shareText,
             files: [file],
           });
@@ -2584,7 +2594,7 @@
     }
 
     downloadDatabaseFile(file);
-    showToast("Downloaded schedules.json — the Who's Free? link is included in the file");
+    showToast("Downloaded schedules.json — the UFree link is included in the file");
   }
 
   function codeStatus(element, message, tone = "") {
@@ -2752,9 +2762,9 @@
     const qr = panel.querySelector(".share-qr");
     qr.hidden = true;
     qr.replaceChildren();
-    const button = panel === els.exportSharePanel ? els.exportQrButton : panel.querySelector(".toggle-share-qr");
-    if (panel === els.exportSharePanel) panel.querySelector(".share-link-field").hidden = true;
-    if (panel !== els.exportSharePanel) button.textContent = "Show QR";
+    const button = shareQrButton(panel);
+    if ([els.exportSharePanel, els.personQuickSharePanel].includes(panel)) panel.querySelector(".share-link-field").hidden = true;
+    else button.textContent = "Show QR";
     button.setAttribute("aria-expanded", "false");
     codeStatus(panel.querySelector(".share-link-status"), "");
   }
@@ -2780,10 +2790,11 @@
   }
 
   function toggleScheduleQr(panel) {
-    const qr = panel.querySelector(".share-qr"), button = panel === els.exportSharePanel ? els.exportQrButton : panel.querySelector(".toggle-share-qr");
+    const qr = panel.querySelector(".share-qr"), button = shareQrButton(panel);
+    const staticLabel = [els.exportSharePanel, els.personQuickSharePanel].includes(panel);
     const status = panel.querySelector(".share-link-status");
     if (!qr.hidden) {
-      qr.hidden = true; if (panel !== els.exportSharePanel) button.textContent = "Show QR"; button.setAttribute("aria-expanded", "false"); return;
+      qr.hidden = true; if (!staticLabel) button.textContent = "Show QR"; button.setAttribute("aria-expanded", "false"); return;
     }
     const link = panel.querySelector("textarea").value;
     if (!link) return;
@@ -2796,7 +2807,7 @@
       const size = code.size + 8;
       svg.setAttribute("viewBox", `0 0 ${size} ${size}`);
       svg.setAttribute("role", "img");
-      svg.setAttribute("aria-label", "Scan to review and add these schedules in Ufree");
+      svg.setAttribute("aria-label", "Scan to review and add these schedules in UFree");
       svg.setAttribute("shape-rendering", "crispEdges");
       const background = document.createElementNS(ns, "rect");
       background.setAttribute("width", String(size)); background.setAttribute("height", String(size)); background.setAttribute("fill", "#fff");
@@ -2804,7 +2815,7 @@
       for (let y = 0; y < code.size; y++) for (let x = 0; x < code.size; x++) if (code.getModule(x, y)) cells.push(`M${x + 4},${y + 4}h1v1h-1z`);
       path.setAttribute("d", cells.join("")); path.setAttribute("fill", "#000");
       svg.append(background, path); qr.replaceChildren(svg); qr.hidden = false;
-      if (panel !== els.exportSharePanel) button.textContent = "Hide QR"; button.setAttribute("aria-expanded", "true");
+      if (!staticLabel) button.textContent = "Hide QR"; button.setAttribute("aria-expanded", "true");
       codeStatus(status, code.version > 25 ? "Scan with your phone camera. This QR is dense; select fewer people if scanning is difficult." : "Scan with your phone camera, then open the link. Anyone with the QR or link can read these schedules.");
       revealSection(qr);
     } catch (error) {
@@ -2872,6 +2883,8 @@
     const input = location.href;
     // Consume the fragment before opening dialogs, so refresh cannot import it again.
     try { history.replaceState(null, "", location.pathname + location.search); } catch { /* Read-only browser histories still show the preview. */ }
+    if (!els.personQuickShareModal.hidden) closePersonQuickShare();
+    if (!els.personGroupModal.hidden) closePersonGroup();
     if (!els.personWeekModal.hidden) closePersonWeek();
     if (!els.settingsModal.hidden) closeSettingsModal();
     if (!els.groupWeekModal.hidden) closeGroupWeek();
@@ -3008,7 +3021,6 @@
   }
 
   async function loadSchedulesFromDevice() {
-    els.statusLine.textContent = "Checking this device for schedule data…";
     try {
       const record = await readLocalScheduleRecord();
       if (!record?.data) {
@@ -3251,6 +3263,7 @@
     document.body.style.overflow = "hidden";
     if (!wasHidden) return;
     els.advancedScheduleOptions.open = false;
+    document.getElementById("storedPeopleSection").open = false;
     els.scheduleModal.querySelector(".schedule-modal").scrollTop = 0;
     requestAnimationFrame(() => {
       if (els.scheduleModal.hidden) return;
@@ -3291,17 +3304,173 @@
     showToast("All local schedules removed");
   }
 
+  function iconAction(label, path, extraClass = "") {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `secondary-button person-action-icon ${extraClass}`.trim();
+    button.title = label;
+    button.setAttribute("aria-label", label);
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("aria-hidden", "true");
+    const shape = document.createElementNS(svg.namespaceURI, "path");
+    shape.setAttribute("d", path);
+    svg.append(shape); button.append(svg);
+    return button;
+  }
+
+  function shareQrButton(panel) {
+    if (panel === els.exportSharePanel) return els.exportQrButton;
+    if (panel === els.personQuickSharePanel) return els.personQuickQrButton;
+    return panel.querySelector(".toggle-share-qr");
+  }
+
+  function unlockClosedModals() {
+    if (![...document.querySelectorAll(".modal-backdrop")].some(modal => !modal.hidden)) document.body.style.overflow = "";
+  }
+
+  function personQuickShareButtons() {
+    return [els.personQuickUrlButton, els.personQuickQrButton, els.personQuickCodeButton];
+  }
+
+  function resetPersonQuickOutputs() {
+    els.personQuickCode.value = "";
+    els.personQuickCodeField.hidden = true;
+    els.copyPersonQuickCode.disabled = true;
+    resetShareLink(els.personQuickSharePanel);
+    codeStatus(els.personQuickShareStatus, "");
+  }
+
+  function openPersonQuickShare(name, returnFocus) {
+    if (state.isParsing || state.pendingImage || state.codeMode || !peopleMap()[name]) return;
+    state.personShareRequest++;
+    state.personShareName = name;
+    state.personShareBusy = false;
+    state.personShareReturnFocus = returnFocus;
+    els.personQuickShareTitle.textContent = `Share ${displayName(name)}`;
+    resetExportFields(els.personQuickExportFields);
+    resetPersonQuickOutputs();
+    personQuickShareButtons().forEach(button => { button.disabled = false; });
+    els.personQuickShareModal.hidden = false;
+    els.personQuickShareModal.querySelector(".schedule-modal").scrollTop = 0;
+    document.body.style.overflow = "hidden";
+    els.closePersonQuickShare.focus({ preventScroll: true });
+    animateModalOpen(els.personQuickShareModal, els.personQuickShareModal.querySelector(".schedule-modal"));
+  }
+
+  function closePersonQuickShare() {
+    const name = state.personShareName, returnFocus = state.personShareReturnFocus;
+    state.personShareRequest++;
+    state.personShareName = null;
+    state.personShareBusy = false;
+    state.personShareReturnFocus = null;
+    els.personQuickShareModal.hidden = true;
+    resetPersonQuickOutputs();
+    unlockClosedModals();
+    const card = [...els.peopleList.querySelectorAll(".person-card")].find(item => item.dataset.person === name);
+    (returnFocus?.isConnected ? returnFocus : card?.querySelector(".person-card-share"))?.focus({ preventScroll: true });
+  }
+
+  function personQuickFieldsChanged() {
+    state.personShareRequest++;
+    resetPersonQuickOutputs();
+    codeStatus(els.personQuickShareStatus, "Export again to apply these details.");
+  }
+
+  async function exportPersonQuickSchedule(action) {
+    const name = state.personShareName;
+    if (!name || !peopleMap()[name] || state.personShareBusy) return;
+    const request = ++state.personShareRequest;
+    state.personShareBusy = true;
+    personQuickShareButtons().forEach(button => { button.disabled = true; });
+    els.personQuickExportFields.open = false;
+    els.personQuickExportFields.querySelectorAll("input, button").forEach(input => { input.disabled = true; });
+    resetPersonQuickOutputs();
+    codeStatus(els.personQuickShareStatus, "Creating this person's share…");
+    try {
+      const code = await encodeSchedules([name], els.personQuickExportFields);
+      if (request !== state.personShareRequest) return;
+      els.personQuickCode.value = code;
+      populateShareLink(code, els.personQuickSharePanel);
+      if (action === "code") {
+        els.personQuickSharePanel.hidden = true;
+        els.personQuickCodeField.hidden = false;
+        els.copyPersonQuickCode.disabled = false;
+        revealSection(els.personQuickCodeField);
+      } else {
+        if (!els.personQuickSharePanel.querySelector("textarea").value) throw new Error("Use Text Code for this schedule instead.");
+        if (action === "qr") toggleScheduleQr(els.personQuickSharePanel);
+        else {
+          els.personQuickSharePanel.querySelector(".share-link-field").hidden = false;
+          await copyScheduleLink(els.personQuickSharePanel);
+          if (request !== state.personShareRequest) return;
+        }
+      }
+      codeStatus(els.personQuickShareStatus, shareCodeReadyMessage(1, code), "success");
+    } catch (error) {
+      if (request === state.personShareRequest) {
+        resetPersonQuickOutputs();
+        codeStatus(els.personQuickShareStatus, error.message || "This schedule could not be shared.", "error");
+      }
+    } finally {
+      if (request === state.personShareRequest) {
+        state.personShareBusy = false;
+        personQuickShareButtons().forEach(button => { button.disabled = false; });
+        els.personQuickExportFields.querySelectorAll("input, button").forEach(input => { input.disabled = false; });
+      }
+    }
+  }
+
+  function openPersonGroup(name) {
+    if (state.isParsing || state.pendingImage || state.codeMode || !peopleMap()[name]) return;
+    state.groupPerson = name;
+    els.personGroupTitle.textContent = `Add ${displayName(name)} to a group`;
+    els.personGroupSelect.replaceChildren();
+    for (const group of state.groups.filter(group => !group.members.includes(name))) {
+      const option = document.createElement("option");
+      option.value = group.id; option.textContent = group.name;
+      els.personGroupSelect.append(option);
+    }
+    const hasOptions = els.personGroupSelect.options.length > 0;
+    els.personGroupField.hidden = !hasOptions;
+    els.personGroupEmpty.hidden = hasOptions;
+    els.personGroupEmpty.textContent = state.groups.length ? "This person already belongs to every group." : "Create a group in Manage groups first.";
+    els.savePersonGroup.disabled = !hasOptions;
+    els.personGroupModal.hidden = false;
+    document.body.style.overflow = "hidden";
+    els.closePersonGroup.focus({ preventScroll: true });
+    animateModalOpen(els.personGroupModal, els.personGroupModal.querySelector(".schedule-modal"));
+  }
+
+  function closePersonGroup() {
+    state.groupPerson = null;
+    els.personGroupModal.hidden = true;
+    unlockClosedModals();
+    document.getElementById("addPersonGroupButton")?.focus({ preventScroll: true });
+  }
+
+  function addPersonToGroup(event) {
+    event.preventDefault();
+    const name = state.groupPerson;
+    const group = state.groups.find(group => group.id === els.personGroupSelect.value);
+    if (!name || !peopleMap()[name] || !group || group.members.includes(name)) return;
+    group.members.push(name);
+    const persisted = saveGroupPreferences();
+    refresh({ preserveScroll: true });
+    closePersonGroup();
+    if (persisted) showToast(`${displayName(name)} added to ${group.name}.`);
+  }
+
   function renderPersonCard(name, day, minute, scope = "main") {
     const busyClass = currentClass(name, day, minute);
     const busy = !isFree(name, day, minute);
     const selected = name === state.selectedPerson;
     const pinned = state.pinnedPeople.has(name);
 
-    const button = document.createElement("button");
-    button.type = "button";
+    const button = document.createElement("div");
+    button.tabIndex = -1;
     button.className = `person-card${semesterIsOlder(peopleMap()[name].semester) ? " semester-expired" : ""}${selected ? " selected" : ""}${pinned ? " pinned" : ""}`;
     button.setAttribute("role", "listitem");
-    button.setAttribute("aria-pressed", String(selected));
 
     const dot = document.createElement("span");
     dot.className = `person-status-dot${busy ? " busy" : ""}`;
@@ -3310,8 +3479,14 @@
     const copy = document.createElement("span");
     copy.className = "person-copy";
 
-    const personName = document.createElement("span");
-    personName.className = "person-name";
+    const nameRow = document.createElement("span");
+    nameRow.className = "person-card-name-row";
+    const personName = document.createElement("button");
+    personName.type = "button";
+    personName.className = "person-name person-select-button";
+    personName.setAttribute("aria-label", `View details for ${displayName(name)}`);
+    personName.setAttribute("aria-pressed", String(selected));
+    personName.setAttribute("aria-describedby", "personOrderHelp");
     personName.textContent = displayName(name);
     if (pinned) {
       const pinMark = document.createElement("span");
@@ -3327,13 +3502,21 @@
       detail.textContent = classLabel(busyClass);
     } else if (busy) {
       const next = nextClassToday(name, day, minute);
-      detail.textContent = `Passing time · next class at ${formatTime(next.start)}`;
+      detail.textContent = `Class Soon · next class at ${formatTime(next.start)}`;
     } else {
       const next = nextClassToday(name, day, minute);
       detail.textContent = next ? `Next ${formatTime(next.start)} · ${classLabel(next)}` : "No more classes today";
     }
 
-    copy.append(personName, detail);
+    const share = iconAction(`Share ${displayName(name)}'s schedule`, "M12 3v12m-4-8 4-4 4 4M5 13v7h14v-7", "person-card-share");
+    share.setAttribute("aria-haspopup", "dialog");
+    share.addEventListener("click", event => {
+      event.stopPropagation();
+      if (state.activeReorder || Date.now() < state.suppressCardClickUntil) return;
+      openPersonQuickShare(name, share);
+    });
+    nameRow.append(personName, share);
+    copy.append(nameRow, detail);
     if (semesterIsOlder(peopleMap()[name].semester)) {
       const label = document.createElement("span");
       label.className = `schedule-semester${semesterIsOlder(peopleMap()[name].semester) ? " semester-older" : ""}`;
@@ -3351,7 +3534,7 @@
 
     const badge = document.createElement("span");
     badge.className = `status-badge ${busy ? "busy" : "free"}`;
-    badge.textContent = busyClass ? "IN CLASS" : busy ? "PASSING\nTIME" : "FREE";
+    badge.textContent = busyClass ? "IN CLASS" : busy ? "Class Soon" : "FREE";
     badge.style.whiteSpace = "pre-line";
 
     button.append(dot, copy, badge);
@@ -3364,6 +3547,10 @@
       if (window.matchMedia("(max-width: 880px)").matches) {
         requestAnimationFrame(() => els.detailPanel.scrollIntoView({ behavior: "smooth", block: "start" }));
       }
+    });
+    button.addEventListener("keydown", event => {
+      if (event.target !== button || event.altKey || !["Enter", " "].includes(event.key)) return;
+      event.preventDefault(); button.click();
     });
 
     return button;
@@ -3608,7 +3795,17 @@
     fullSchedule.setAttribute("aria-label", `View full schedule for ${displayName(name)}`);
     fullSchedule.setAttribute("aria-haspopup", "dialog");
     fullSchedule.addEventListener("click", () => openPersonWeek(name));
-    nameRow.append(nameEl, fullSchedule);
+    const actions = document.createElement("div");
+    actions.className = "person-detail-actions";
+    const addToGroup = iconAction(`Add ${displayName(name)} to a group`, "M12 5v14M5 12h14");
+    addToGroup.id = "addPersonGroupButton";
+    addToGroup.setAttribute("aria-haspopup", "dialog");
+    addToGroup.addEventListener("click", () => openPersonGroup(name));
+    const remove = iconAction(`Delete ${displayName(name)}'s schedule from this device`, "M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7", "person-delete-button");
+    remove.id = "deletePersonScheduleButton";
+    remove.addEventListener("click", () => removePerson(name));
+    actions.append(fullSchedule, addToGroup, remove);
+    nameRow.append(nameEl, actions);
     const semesterLabel = document.createElement("p");
     semesterLabel.className = `schedule-semester${semesterIsOlder(peopleMap()[name].semester) ? " semester-older" : ""}`;
     semesterLabel.textContent = scheduleLabel(peopleMap()[name], true);
@@ -3617,7 +3814,7 @@
 
     const badge = document.createElement("span");
     badge.className = `status-badge ${busy ? "busy" : "free"}`;
-    badge.textContent = current ? "IN CLASS" : busy ? "PASSING TIME" : "FREE";
+    badge.textContent = current ? "IN CLASS" : busy ? "Class Soon" : "FREE";
     statusRow.append(badge);
 
     if (current) {
@@ -3713,7 +3910,7 @@
     }
 
     const { day, minute } = moment;
-    const { free, busy, visible } = visiblePeople(day, minute);
+    const { visible } = visiblePeople(day, minute);
     const peopleCount = Object.keys(peopleMap()).length;
     const oldScroll = els.peopleList.scrollTop;
     const openMenus = [...els.peopleList.querySelectorAll(".group-options[open]")].map(menu => menu.closest(".people-group").dataset.groupId);
@@ -3723,12 +3920,6 @@
     els.peopleHeading.textContent = state.showGroups ? "Groups" : state.showEveryone ? "Everyone" : state.useLiveTime ? "Free now" : "Free";
     setViewToggle(els.viewToggleButton, state.showEveryone ? "Show only free" : "Show everyone", state.showEveryone);
     els.viewToggleButton.querySelector("[data-mode-label]").textContent = state.showEveryone ? "Free" : "All";
-    const nextFreeCountText = `${free.length} of ${peopleCount} free`;
-    els.freeCount.textContent = nextFreeCountText;
-    animateCountIfChanged(nextFreeCountText);
-    state.lastFreeCountText = nextFreeCountText;
-    els.statusLine.textContent = `${state.useLiveTime ? "Live · " : ""}${day} at ${formatTime(state.selectedTime)} · ${busy.length} in class`;
-
     els.peopleList.replaceChildren();
 
     if (peopleCount === 0) {
@@ -3749,10 +3940,6 @@
     if (state.showGroups) {
       const grouped = renderGroupedPeople(visible, day, minute);
       displayed = grouped.visible;
-      const shownFree = free.filter(name => grouped.shown.has(name)).length;
-      const text = `${shownFree} of ${grouped.shown.size} free`;
-      els.freeCount.textContent = text;
-      els.statusLine.textContent = `${state.useLiveTime ? "Live · " : ""}${day} at ${formatTime(state.selectedTime)} · ${grouped.shown.size - shownFree} in class · Expanded groups`;
     } else visible.forEach(name => els.peopleList.append(renderPersonCard(name, day, minute)));
     for (const section of els.peopleList.querySelectorAll(".people-group")) {
       if (openMenus.includes(section.dataset.groupId)) section.querySelector(".group-options").open = true;
@@ -3761,7 +3948,7 @@
 
     if (state.selectedPerson && !displayed.includes(state.selectedPerson)) {
       state.selectedPerson = null;
-      els.peopleList.querySelectorAll(".person-card.selected").forEach(card => { card.classList.remove("selected"); card.setAttribute("aria-pressed", "false"); });
+      els.peopleList.querySelectorAll(".person-card.selected").forEach(card => { card.classList.remove("selected"); card.querySelector(".person-select-button")?.setAttribute("aria-pressed", "false"); });
     }
 
     const peopleSignature = [
@@ -3930,6 +4117,16 @@
     els.closeGroupWeekModal.addEventListener("click", closeGroupWeek);
     els.closePersonWeekModal.addEventListener("click", closePersonWeek);
     els.personWeekModal.addEventListener("click", event => { if (event.target === els.personWeekModal) closePersonWeek(); });
+    els.closePersonQuickShare.addEventListener("click", closePersonQuickShare);
+    els.personQuickShareModal.addEventListener("click", event => { if (event.target === els.personQuickShareModal) closePersonQuickShare(); });
+    els.personQuickUrlButton.addEventListener("click", () => exportPersonQuickSchedule("url"));
+    els.personQuickQrButton.addEventListener("click", () => exportPersonQuickSchedule("qr"));
+    els.personQuickCodeButton.addEventListener("click", () => exportPersonQuickSchedule("code"));
+    els.copyPersonQuickCode.addEventListener("click", () => copyExportCode(els.personQuickCode, els.personQuickShareStatus));
+    els.closePersonGroup.addEventListener("click", closePersonGroup);
+    els.personGroupModal.addEventListener("click", event => { if (event.target === els.personGroupModal) closePersonGroup(); });
+    els.personGroupForm.addEventListener("submit", addPersonToGroup);
+    els.personGroupManage.addEventListener("click", () => { closePersonGroup(); openGroupsModal(); });
     els.exportPersonScheduleButton.addEventListener("click", exportPersonSchedule);
     els.copyPersonWeekCodeButton.addEventListener("click", () => copyExportCode(els.personWeekCode, els.personWeekExportStatus));
     els.groupsModal.addEventListener("click", event => { if (event.target === els.groupsModal) closeGroupsModal(); });
@@ -3974,8 +4171,8 @@
     els.generateCodeButton.addEventListener("click", () => generateShareCode("code"));
     els.exportQrButton.addEventListener("click", () => generateShareCode("qr"));
     els.copyExportLinkButton.addEventListener("click", () => generateShareCode("link"));
-    for (const options of [els.exportFieldOptions, els.personExportFieldOptions]) {
-      const changed = options === els.exportFieldOptions ? exportSelectionChanged : personExportFieldsChanged;
+    for (const options of [els.exportFieldOptions, els.personExportFieldOptions, els.personQuickExportFields]) {
+      const changed = options === els.exportFieldOptions ? exportSelectionChanged : options === els.personExportFieldOptions ? personExportFieldsChanged : personQuickFieldsChanged;
       options.addEventListener("change", changed);
       options.querySelector(".export-include-all").addEventListener("click", () => {
         options.querySelectorAll("input").forEach(input => { input.checked = true; });
@@ -4021,7 +4218,7 @@
         if (event.key === "Escape") event.preventDefault();
         return;
       }
-      const groupModal = !els.personWeekModal.hidden ? els.personWeekModal : !els.groupWeekModal.hidden ? els.groupWeekModal : !els.groupsModal.hidden ? els.groupsModal : !els.helpModal.hidden ? els.helpModal : !els.scheduleModal.hidden ? els.scheduleModal : null;
+      const groupModal = !els.personQuickShareModal.hidden ? els.personQuickShareModal : !els.personGroupModal.hidden ? els.personGroupModal : !els.personWeekModal.hidden ? els.personWeekModal : !els.groupWeekModal.hidden ? els.groupWeekModal : !els.groupsModal.hidden ? els.groupsModal : !els.helpModal.hidden ? els.helpModal : !els.settingsModal.hidden ? els.settingsModal : !els.scheduleModal.hidden ? els.scheduleModal : null;
       if (event.key === "Tab" && groupModal) {
         const focusable = [...groupModal.querySelectorAll('button, input, textarea, select, summary, [tabindex="0"]')].filter(item => {
           const closed = item.closest("details:not([open])");
@@ -4032,7 +4229,7 @@
         else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
       }
       if (event.key !== "Escape") return;
-      const exportMenu = [els.exportFieldOptions, els.personExportFieldOptions].find(menu => menu.open && !menu.closest("[hidden]"));
+      const exportMenu = [els.exportFieldOptions, els.personExportFieldOptions, els.personQuickExportFields].find(menu => menu.open && !menu.closest("[hidden]"));
       if (exportMenu) { event.preventDefault(); exportMenu.open = false; exportMenu.querySelector("summary").focus(); return; }
       if (state.codeConflict) { event.preventDefault(); finishCodeConflict("old"); return; }
       if (state.pendingPersonHold) {
@@ -4048,7 +4245,9 @@
         els.advancedScheduleOptions.querySelector("summary").focus({ preventScroll: true });
         return;
       }
-      if (!els.personWeekModal.hidden) closePersonWeek();
+      if (!els.personQuickShareModal.hidden) closePersonQuickShare();
+      else if (!els.personGroupModal.hidden) closePersonGroup();
+      else if (!els.personWeekModal.hidden) closePersonWeek();
       else if (!els.groupWeekModal.hidden) closeGroupWeek();
       else if (!els.groupsModal.hidden) closeGroupsModal();
       else if (!els.helpModal.hidden) closeHelp();
@@ -4093,7 +4292,7 @@
     if (!("serviceWorker" in navigator)) return;
     if (location.protocol !== "https:" && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") return;
 
-    navigator.serviceWorker.register("./service-worker.js?v=73", { updateViaCache: "none" })
+    navigator.serviceWorker.register("./service-worker.js?v=74", { updateViaCache: "none" })
       .then(registration => registration.update())
       .catch(() => {
         // The app works normally even if PWA caching isn't available.

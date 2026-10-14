@@ -9,8 +9,8 @@
   <meta name="description" content="See who's free now and compare Omnivox schedules. Schedule data stays on your device.">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Who's Free?">
-  <title>Who's Free?</title>
+  <meta name="apple-mobile-web-app-title" content="UFree">
+  <title>UFree</title>
 
   <!-- Google tag (gtag.js) -->
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-1L4Z6JCNVV"></script>
@@ -25,7 +25,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" type="image/png" href="assets/favicon.png">
   <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
-  <link rel="stylesheet" href="styles.css?v=73">
+  <link rel="stylesheet" href="styles.css?v=74">
 </head>
 <body>
   <div class="app-shell">
@@ -33,7 +33,7 @@
       <div class="brand-copy">
         <div class="brand-row">
           <span class="brand-dot" aria-hidden="true"></span>
-          <h1>Who's Free?</h1>
+          <h1>UFree</h1>
         </div>
         <p>Find who's free now, or check any time during the week. Optimized for the Omnivox system.</p>
       </div>
@@ -80,11 +80,6 @@
               <button id="manageGroupsButton" class="secondary-button" type="button" aria-label="Manage groups" title="Manage groups" hidden>Manage</button>
             </span>
           </div>
-        </div>
-
-        <div class="availability-summary" aria-live="polite">
-          <p id="statusLine" class="status-line">Checking this device for schedule data…</p>
-          <span id="freeCount" class="count-badge">0 of 0 free</span>
         </div>
 
         <p id="personOrderHelp" class="visually-hidden">Drag a person to change their order. On touch screens, hold the card briefly before moving; ordinary scrolling does not reorder it. With a person focused, press Alt and Up or Down arrow to move them. Pinned people stay above unpinned people; reorder within either section. Orders are saved separately for the main list and each group. Undo reverses your last order change.</p>
@@ -226,14 +221,13 @@
         </div>
       </section>
 
-      <section class="schedule-action-section people-manager-section" aria-labelledby="peopleManagerTitle">
-        <div class="section-kicker">People</div>
-        <div class="people-manager-heading">
-          <h3 id="peopleManagerTitle">Stored on this device</h3>
+      <details id="storedPeopleSection" class="schedule-action-section people-manager-section" aria-labelledby="peopleManagerTitle">
+        <summary class="people-manager-heading">
+          <span id="peopleManagerTitle">Stored on this device</span>
           <span id="peopleManagerCount" class="count-badge">0</span>
-        </div>
+        </summary>
         <div id="peopleManagerList" class="people-manager-list"></div>
-      </section>
+      </details>
 
       <details id="advancedScheduleOptions" class="schedule-advanced-options">
         <summary class="secondary-button advanced-options-toggle" aria-label="Advanced schedule options" title="Advanced schedule options" aria-controls="advancedSchedulePanel">
@@ -351,7 +345,8 @@
         </div>
       </details>
       <footer class="creator-credit settings-credit" aria-label="App credits">
-        <p>Original app by Xander Vatch<br>Fork improvements by Hui En Qian</p>
+        <p>App by David Dajbog and Hui En Quan.</p>
+        <p>Inspiration from Xander Vatch.</p>
       </footer>
     </section>
   </div>
@@ -437,8 +432,59 @@
         <article><h3>Find a free moment</h3><p>Choose a day and time, or use the current time. Switch between Free and All to change who appears.</p></article>
         <article><h3>Groups</h3><p>Turn on GROUP to see your groups. Manage lets you create and edit them.</p></article>
         <article><h3>Share</h3><p>The export icon opens quick sharing for everyone. Expand People to share to choose fewer people, then export a code, show a QR or copy a link. Use … to include more class details.</p></article>
-        <article><h3>Individual schedules</h3><p>Select a person, then Full schedule to view or share their weekly timetable. Your saved schedules stay on this device.</p></article>
+        <article><h3>Individual schedules</h3><p>Use the share icon beside a person's name to send only their schedule as a URL, QR code or text code. Select the person to view their full schedule, add them to an existing group with +, or delete their local schedule with the red trash icon. Deletion requires confirmation and can be undone.</p></article>
       </div>
+      <footer class="creator-credit settings-credit" aria-label="App credits">
+        <p>App by David Dajbog and Hui En Quan.</p>
+        <p>Inspiration from Xander Vatch.</p>
+      </footer>
+    </section>
+  </div>
+
+  <div id="personQuickShareModal" class="modal-backdrop" hidden>
+    <section class="schedule-modal person-quick-share-modal panel" role="dialog" aria-modal="true" aria-labelledby="personQuickShareTitle">
+      <div class="modal-header"><div><h2 id="personQuickShareTitle">Share schedule</h2><p>Only this person's schedule will be exported.</p></div><button id="closePersonQuickShare" class="modal-close" type="button" aria-label="Close person sharing">×</button></div>
+      <div class="export-generation-actions">
+        <div class="export-action-buttons">
+          <button id="personQuickUrlButton" class="secondary-button action-icon-button" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-4-8 4-4 4 4M5 13v7h14v-7"/></svg><span>URL</span></button>
+          <button id="personQuickQrButton" class="secondary-button action-icon-button" type="button" aria-expanded="false" aria-controls="personQuickQr"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-4-8 4-4 4 4M5 13v7h14v-7"/></svg><span>QR Code</span></button>
+          <button id="personQuickCodeButton" class="secondary-button action-icon-button" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-4-8 4-4 4 4M5 13v7h14v-7"/></svg><span>Text Code</span></button>
+        </div>
+        <details id="personQuickExportFields" class="export-field-options">
+          <summary aria-label="Choose export details" title="Export details">…</summary>
+          <div class="export-options-menu" role="group" aria-label="Additional export details">
+            <label class="share-selection"><input type="checkbox" data-export-field="instructor"><span>Teacher’s full name</span></label>
+            <label class="share-selection"><input type="checkbox" data-export-field="course_code"><span>Course code</span></label>
+            <label class="share-selection"><input type="checkbox" data-export-field="section"><span>Section</span></label>
+            <label class="share-selection"><input type="checkbox" data-export-field="semester"><span>Semester</span></label>
+            <label class="share-selection"><input type="checkbox" data-export-field="extras"><span>Other saved schedule details</span></label>
+            <button class="secondary-button export-include-all" type="button">Include all</button>
+            <p class="share-code-note">More details make larger codes and QRs.</p>
+          </div>
+        </details>
+      </div>
+      <p class="share-code-note">Names, times, classes and rooms by default. Anyone with the URL, QR or code can read this schedule.</p>
+      <div id="personQuickCodeField" class="share-code-panel" hidden>
+        <label class="field-group share-code-field"><span>Text code</span><textarea id="personQuickCode" rows="4" readonly spellcheck="false" autocapitalize="off"></textarea></label>
+        <button id="copyPersonQuickCode" class="secondary-button" type="button" disabled>Copy text code</button>
+      </div>
+      <div id="personQuickSharePanel" class="schedule-share-link" hidden>
+        <label class="field-group share-link-field"><span>URL</span><textarea class="share-link-output" rows="2" readonly spellcheck="false" aria-label="Schedule URL"></textarea></label>
+        <div id="personQuickQr" class="share-qr" hidden></div>
+        <p class="share-link-status parser-status" role="status" aria-live="polite"></p>
+      </div>
+      <p id="personQuickShareStatus" class="parser-status" role="status" aria-live="polite"></p>
+    </section>
+  </div>
+
+  <div id="personGroupModal" class="modal-backdrop" hidden>
+    <section class="schedule-modal person-group-modal panel" role="dialog" aria-modal="true" aria-labelledby="personGroupTitle">
+      <div class="modal-header"><h2 id="personGroupTitle">Add to group</h2><button id="closePersonGroup" class="modal-close" type="button" aria-label="Close add to group">×</button></div>
+      <form id="personGroupForm">
+        <label id="personGroupField" class="field-group"><span>Existing group</span><select id="personGroupSelect" required></select></label>
+        <p id="personGroupEmpty" class="settings-description" hidden></p>
+        <div class="modal-actions"><button id="savePersonGroup" class="primary-button" type="submit">Add to group</button><button id="personGroupManage" class="secondary-button" type="button">Manage groups</button></div>
+      </form>
     </section>
   </div>
 
@@ -484,13 +530,13 @@
     }
   </script>
   <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js" defer></script>
-  <script src="schedule-parser.js?v=73" defer></script>
-  <script src="schedule-image-parser.js?v=73" defer></script>
-  <script src="schedule-availability.js?v=73" defer></script>
-  <script src="schedule-share-code.js?v=73" defer></script>
-  <script src="assets/qr/qrcodegen.js?v=73" defer></script>
-  <script src="schedule-groups.js?v=73" defer></script>
-  <script src="app.js?v=73" defer></script>
+  <script src="schedule-parser.js?v=74" defer></script>
+  <script src="schedule-image-parser.js?v=74" defer></script>
+  <script src="schedule-availability.js?v=74" defer></script>
+  <script src="schedule-share-code.js?v=74" defer></script>
+  <script src="assets/qr/qrcodegen.js?v=74" defer></script>
+  <script src="schedule-groups.js?v=74" defer></script>
+  <script src="app.js?v=74" defer></script>
 </body>
 </html>
 
