@@ -388,6 +388,8 @@ test("leaving search closes and clears it, while using its clear button keeps it
     assert.equal(input.value, ""); assert.equal(a.el("peopleSearchButton").getAttribute("aria-expanded"), "false");
     assert.equal(a.window.document.activeElement, a.el("scheduleDataButton")); assert.ok(a.card("Alice")); assert.ok(a.card("Bob"));
     a.el("peopleSearchButton").click(); assert.equal(panel.hidden, false); assert.equal(a.window.document.activeElement, input);
+    a.el("peopleSearchButton").focus(); await a.wait(() => panel.hidden);
+    a.el("peopleSearchButton").click(); assert.equal(panel.hidden, false);
     query("Alice"); a.card("Alice").querySelector(".person-select-button").focus(); await a.wait(() => panel.hidden);
     assert.equal(a.window.document.activeElement.closest(".person-card").dataset.person, "Alice"); assert.ok(a.card("Bob"));
   } finally { await a.window.happyDOM.abort(); }

@@ -1848,7 +1848,7 @@
       peopleSearchOutsideClick = false;
       // Wait for a pointer click to finish before hiding or rebuilding its target.
       if (peopleSearchPointerDown || els.peopleSearchPanel.hidden) return;
-      if (clickedOutside || !withinPeopleSearch(document.activeElement)) closePeopleSearch();
+      if (clickedOutside || !els.peopleSearchPanel.contains(document.activeElement)) closePeopleSearch();
     });
   }
 

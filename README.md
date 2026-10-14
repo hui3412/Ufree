@@ -2,6 +2,12 @@
 
 link: [www.youfree.ca](https://www.youfree.ca)
 
+### Version 81 — Keyboard search exit
+
+October 14, 2026
+
+- Also collapse search when keyboard focus returns to its icon. Press the icon again to reopen the field.
+
 ### Version 80 — Search closes when you leave
 
 October 14, 2026
