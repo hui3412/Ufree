@@ -273,3 +273,98 @@ test("Help opens with the bottom iOS guide collapsed, restores focus and allows 
     assert.equal(a.stored(), before);
   } finally { await a.window.happyDOM.abort(); }
 });
+
+test("search opens below the controls, matches canonical names and nicknames, and clears without changing data", async () => {
+  const a = await app();
+  try {
+    const before = a.stored();
+    const input = a.el("peopleSearchInput"), button = a.el("peopleSearchButton");
+    assert.equal(a.el("showGroupsToggle").nextElementSibling, button);
+    assert.equal(a.el("peopleSearchPanel").hidden, true);
+    button.click();
+    assert.equal(button.getAttribute("aria-expanded"), "true"); assert.equal(a.window.document.activeElement, input);
+    input.value = "  ALI  "; input.dispatchEvent(new a.window.Event("input", { bubbles: true }));
+    assert.ok(a.card("Alice")); assert.equal(a.card("Bob"), undefined);
+    assert.match(a.el("peopleSearchStatus").textContent, /^1 matching person/);
+    input.value = "Alice"; input.dispatchEvent(new a.window.Event("input", { bubbles: true })); assert.ok(a.card("Alice"));
+    input.value = "<nothing>"; input.dispatchEvent(new a.window.Event("input", { bubbles: true }));
+    assert.match(a.el("peopleList").textContent, /No matching people/);
+    a.el("clearPeopleSearchButton").click(); assert.ok(a.card("Alice")); assert.ok(a.card("Bob"));
+    input.value = "Bob"; input.dispatchEvent(new a.window.Event("input", { bubbles: true }));
+    input.dispatchEvent(new a.window.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    assert.equal(a.el("peopleSearchPanel").hidden, true); assert.equal(input.value, "");
+    assert.equal(a.window.document.activeElement, button); assert.ok(a.card("Alice"));
+    assert.equal(a.stored(), before);
+  } finally { await a.window.happyDOM.abort(); }
+});
+
+test("search respects free filters, group membership and accented multiword names without removing stored people", async () => {
+  const initial = plain(data); initial.people["Éloïse Chen"] = { classes: [] };
+  const a = await app(initial, [{id:"team",name:"Team",members:["Alice","Bob","Éloïse Chen"],hidden:false}]);
+  try {
+    const input = a.el("peopleSearchInput"); a.el("peopleSearchButton").click();
+    const query = value => { input.value = value; input.dispatchEvent(new a.window.Event("input", { bubbles: true })); };
+    query("chen eloise"); assert.ok(a.card("Éloïse Chen")); assert.equal(a.el("peopleList").querySelectorAll(".person-card").length, 1);
+    a.el("showGroupsToggle").click(); assert.ok(a.card("Éloïse Chen"));
+    assert.equal(a.el("peopleList").querySelectorAll(".people-group").length, 1);
+    query("nonexistent"); assert.match(a.el("peopleList").textContent, /No matching people/);
+    query("Alice"); a.el("liveToggle").checked = false; a.el("liveToggle").dispatchEvent(new a.window.Event("change", { bubbles: true }));
+    a.el("daySelect").value = "Monday"; a.el("daySelect").dispatchEvent(new a.window.Event("change", { bubbles: true }));
+    a.el("timeInput").value = "08:30"; a.el("timeInput").dispatchEvent(new a.window.Event("change", { bubbles: true }));
+    a.el("viewToggleButton").click(); assert.equal(a.card("Alice"), undefined);
+    a.el("viewToggleButton").click(); assert.ok(a.card("Alice"));
+    assert.deepEqual(JSON.parse(a.window.localStorage.getItem("whos-free-groups-v1")).groups[0].members, ["Alice","Bob","Éloïse Chen"]);
+  } finally { await a.window.happyDOM.abort(); }
+});
+
+test("Edit Group from the options menu stages renaming and individual removals, then saves only that group", async () => {
+  const groups = [{ id:"team",name:"Team",members:["Alice","Bob"],hidden:false },{ id:"other",name:"Other",members:["Bob"],hidden:false }];
+  const a = await app(data, groups);
+  try {
+    const before = a.stored(); a.el("showGroupsToggle").click();
+    const section = a.el("peopleList").querySelector('[data-group-id="team"]');
+    section.querySelector("details").open = true;
+    const edit = [...section.querySelectorAll("button")].find(button => button.textContent === "Edit Group");
+    assert.ok(edit); edit.click();
+    assert.equal(a.el("groupsModal").hidden, false); assert.equal(a.el("groupNameInput").value, "Team");
+    assert.equal(a.el("groupMembersList").querySelectorAll(".group-member-row").length, 2);
+    const remove = a.el("groupMembersList").querySelector('[data-person="Bob"] button');
+    assert.equal(remove.textContent.trim(), ""); assert.ok(remove.querySelector("svg")); assert.ok(remove.classList.contains("person-delete-button"));
+    remove.click();
+    assert.equal(a.el("groupMembersList").querySelectorAll(".group-member-row").length, 1);
+    assert.deepEqual(JSON.parse(a.window.localStorage.getItem("whos-free-groups-v1")).groups[0].members, ["Alice","Bob"]);
+    a.el("groupNameInput").value = "Study team";
+    a.el("groupForm").dispatchEvent(new a.window.Event("submit", { bubbles: true, cancelable: true }));
+    const saved = JSON.parse(a.window.localStorage.getItem("whos-free-groups-v1")).groups;
+    assert.deepEqual(saved[0],{ id:"team",name:"Study team",members:["Alice"],hidden:false });
+    assert.deepEqual(saved[1],groups[1]); assert.equal(a.stored(), before);
+    a.el("closeGroupsModal").click();
+    assert.equal(a.window.document.activeElement.getAttribute("aria-label"), "Options for group Study team");
+    const restored = await app(data, saved);
+    try { restored.el("showGroupsToggle").click(); const row=restored.el("peopleList").querySelector('[data-group-id="team"]'); assert.equal(row.querySelectorAll(".person-card").length,1); }
+    finally { await restored.window.happyDOM.abort(); }
+  } finally { await a.window.happyDOM.abort(); }
+});
+
+test("cancel and close discard group drafts, duplicate names are rejected, and empty groups can add people again", async () => {
+  const groups = [{id:"team",name:"Team",members:["Alice"],hidden:false},{id:"other",name:"Other",members:["Bob"],hidden:false}];
+  const a=await app(data,groups);
+  try {
+    a.el("showGroupsToggle").click();
+    const edit=()=>{a.el("peopleList").querySelector('[data-group-id="team"] .group-options').open=true; a.el("peopleList").querySelector('[aria-label="Edit Group Team"]').click();};
+    edit(); a.el("groupMembersList").querySelector(".group-remove-member").click(); a.el("groupNameInput").value="Other";
+    a.el("groupForm").dispatchEvent(new a.window.Event("submit",{bubbles:true,cancelable:true})); assert.match(a.el("groupFormError").textContent,/already uses/);
+    a.el("cancelGroupButton").click(); a.el("closeGroupsModal").click(); edit(); assert.equal(a.el("groupMembersList").querySelectorAll(".group-member-row").length,1);
+    a.el("groupMembersList").querySelector(".group-remove-member").click(); a.el("closeGroupsModal").click(); edit(); assert.equal(a.el("groupMembersList").querySelectorAll(".group-member-row").length,1);
+    a.el("groupMembersList").querySelector(".group-remove-member").click(); a.el("groupForm").dispatchEvent(new a.window.Event("submit",{bubbles:true,cancelable:true}));
+    assert.deepEqual(JSON.parse(a.window.localStorage.getItem("whos-free-groups-v1")).groups[0].members,[]);
+    a.el("closeGroupsModal").click(); edit();
+    const additions=a.el("groupMembersList").querySelector("details"); additions.open=true;
+    const add=additions.querySelector('input[data-person="Bob"]'); add.checked=true; add.dispatchEvent(new a.window.Event("change",{bubbles:true}));
+    a.el("groupForm").dispatchEvent(new a.window.Event("submit",{bubbles:true,cancelable:true}));
+    assert.deepEqual(JSON.parse(a.window.localStorage.getItem("whos-free-groups-v1")).groups[0].members,["Bob"]);
+    a.el("newGroupButton").click(); a.el("groupNameInput").value="New"; const select=a.el("groupMembersList").querySelector('input[data-person="Alice"]'); select.checked=true;
+    a.el("groupForm").dispatchEvent(new a.window.Event("submit",{bubbles:true,cancelable:true}));
+    assert.deepEqual(JSON.parse(a.window.localStorage.getItem("whos-free-groups-v1")).groups.find(group=>group.name==="New").members,["Alice"]);
+  } finally { await a.window.happyDOM.abort(); }
+});

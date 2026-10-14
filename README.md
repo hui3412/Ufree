@@ -2,6 +2,14 @@
 
 link: [www.youfree.ca](https://www.youfree.ca)
 
+### Version 78 — Search and group editing
+
+October 14, 2026
+
+- Open the compact magnifying glass beside GROUP to search names and nicknames in the current All/Free or Groups view. The input opens below the row; clearing or closing it restores that view.
+- Choose Edit Group from a group's … menu to rename it or remove members with red icon buttons. Save applies changes and Cancel discards them; schedules and other memberships are preserved. Add people remains available in a disclosure.
+- Fit the expanded controls at narrow widths with adaptive labels and retain normal page scrolling.
+
 ### Version 77 — Help, privacy and page scrolling
 
 October 14, 2026
