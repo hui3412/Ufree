@@ -30,6 +30,8 @@
     codeMode: null,
     quickExport: false,
     quickExportReturnFocus: null,
+    qrBatchRequest: 0,
+    qrBatchBusy: false,
     sharedImport: null,
     deviceReady: false,
     sharedLinkStartup: false,
@@ -149,6 +151,8 @@
     sharedImportPreview: document.getElementById("sharedImportPreview"),
     sharedImportPeople: document.getElementById("sharedImportPeople"),
     exportSharePanel: document.getElementById("exportSharePanel"),
+    multipleQrButton: document.getElementById("multipleQrButton"),
+    multipleQrCodes: document.getElementById("multipleQrCodes"),
     exportFieldOptions: document.getElementById("exportFieldOptions"),
     codeConflictPrompt: document.getElementById("codeConflictPrompt"),
     codeConflictMessage: document.getElementById("codeConflictMessage"),
@@ -2956,10 +2960,16 @@
     } catch (error) {
       els.exportCodeOutput.value = "";
       codeStatus(els.exportCodeStatus, error.message || "The code could not be created.", "error");
+      if (action === "qr" && /too large|too much|export fewer/i.test(error.message || "")) {
+        els.exportSharePanel.hidden = false;
+        codeStatus(els.exportSharePanel.querySelector(".share-link-status"), "Too much data for one QR. Try multiple QR codes, or copy a code or link.", "error");
+        offerMultipleQr();
+      }
     } finally { state.isParsing = false; updateScheduleModal(); }
   }
 
   function resetShareLink(panel) {
+    if (panel === els.exportSharePanel) resetMultipleQr();
     panel.hidden = true;
     panel.querySelector("textarea").value = "";
     const qr = panel.querySelector(".share-qr");
@@ -2992,6 +3002,111 @@
     }
   }
 
+  function resetMultipleQr() {
+    state.qrBatchRequest++;
+    state.qrBatchBusy = false;
+    if (els.multipleQrButton) {
+      els.multipleQrButton.hidden = true; els.multipleQrButton.disabled = false;
+      els.multipleQrButton.setAttribute("aria-expanded", "false");
+    }
+    if (els.multipleQrCodes) {
+      els.multipleQrCodes.hidden = true;
+      els.multipleQrCodes.removeAttribute("aria-busy");
+      els.multipleQrCodes.replaceChildren();
+    }
+  }
+
+  function offerMultipleQr() {
+    if (els.multipleQrButton && els.exportPeopleList.querySelectorAll("input:checked").length > 1) {
+      els.multipleQrButton.hidden = false;
+      els.multipleQrButton.disabled = false;
+    }
+  }
+
+  function scheduleQrSvg(link, label = "Scan to review and add these schedules in UFree") {
+    if (new TextEncoder().encode(link).length > 2331) throw new RangeError("QR selection too large");
+    const generator = window.qrcodegen;
+    if (!generator) throw new Error("QR generator unavailable");
+    const code = generator.QrCode.encodeText(link, generator.QrCode.Ecc.MEDIUM);
+    const ns = "http://www.w3.org/2000/svg", svg = document.createElementNS(ns, "svg");
+    const size = code.size + 8;
+    svg.setAttribute("viewBox", `0 0 ${size} ${size}`);
+    svg.setAttribute("role", "img"); svg.setAttribute("aria-label", label);
+    svg.setAttribute("shape-rendering", "crispEdges");
+    const background = document.createElementNS(ns, "rect");
+    background.setAttribute("width", String(size)); background.setAttribute("height", String(size)); background.setAttribute("fill", "#fff");
+    const path = document.createElementNS(ns, "path"), cells = [];
+    for (let y = 0; y < code.size; y++) for (let x = 0; x < code.size; x++) if (code.getModule(x, y)) cells.push(`M${x + 4},${y + 4}h1v1h-1z`);
+    path.setAttribute("d", cells.join("")); path.setAttribute("fill", "#000");
+    svg.append(background, path);
+    return { svg, version: code.version };
+  }
+
+  async function generateMultipleQr() {
+    if (state.isParsing || state.qrBatchBusy || state.codeMode !== "export") return;
+    const names = [...els.exportPeopleList.querySelectorAll("input:checked")].map(input => input.dataset.person);
+    if (names.length < 2) return;
+    const request = ++state.qrBatchRequest;
+    const current = () => request === state.qrBatchRequest && state.codeMode === "export" && !els.scheduleModal.hidden;
+    const status = els.exportSharePanel.querySelector(".share-link-status");
+    const people = Object.fromEntries(names.map(name => [name, peopleMap()[name]]));
+    const fields = [...els.exportFieldOptions.querySelectorAll("input:checked")].map(input => input.dataset.exportField);
+    state.qrBatchBusy = true;
+    els.multipleQrButton.disabled = true;
+    els.multipleQrButton.setAttribute("aria-expanded", "false");
+    els.multipleQrCodes.hidden = true;
+    els.multipleQrCodes.replaceChildren();
+    els.multipleQrCodes.setAttribute("aria-busy", "true");
+    codeStatus(status, `Preparing QR codes for ${names.length} people… You can close this view to cancel.`);
+    try {
+      if (!window.WhosFreeQrBatches?.pack) throw new Error("The QR tools did not load. Refresh the app and try again.");
+      const result = await window.WhosFreeQrBatches.pack(names, async members => {
+        try {
+          const code = await window.WhosFreeShareCode.encode({ people: Object.fromEntries(members.map(name => [name, people[name]])) }, { fields });
+          return window.WhosFreeShareCode.createLink(code, APP_URL);
+        } catch (error) {
+          if (/too large|too much|export fewer/i.test(error.message || "")) return null;
+          throw error;
+        }
+      }, { fullLink: els.exportSharePanel.querySelector("textarea").value, isCancelled: () => !current() });
+      if (!current()) return;
+      const fragment = document.createDocumentFragment();
+      const instructions = document.createElement("p");
+      instructions.textContent = "Scan each QR and add its listed people before scanning the next. Each QR works independently, and you can scan them in any order.";
+      fragment.append(instructions);
+      for (let i = 0; i < result.groups.length; i++) {
+        if (!current()) return;
+        const group = result.groups[i], card = document.createElement("section");
+        card.className = "qr-batch-card";
+        const heading = document.createElement("h4");
+        heading.textContent = `QR ${i + 1} of ${result.groups.length} · ${group.names.length} ${group.names.length === 1 ? "person" : "people"}`;
+        const list = document.createElement("p"); list.textContent = group.names.map(displayName).join(", ");
+        const qr = document.createElement("div"); qr.className = "share-qr";
+        qr.append(scheduleQrSvg(group.link, `${heading.textContent}: ${list.textContent}`).svg);
+        card.append(heading, list, qr); fragment.append(card);
+        await new Promise(resolve => setTimeout(resolve, 0));
+      }
+      if (!current()) return;
+      const covered = names.length - result.oversized.length;
+      const message = result.oversized.length
+        ? `${result.groups.length} QR ${result.groups.length === 1 ? "code covers" : "codes cover"} ${covered} of ${names.length} people. ${result.oversized.map(displayName).join(", ")} cannot fit in a QR individually with these details. Share those people by code or link, or choose fewer extra details.`
+        : `${result.groups.length} independent QR ${result.groups.length === 1 ? "code covers" : "codes cover"} all ${names.length} people. Scroll down to scan each one.`;
+      els.multipleQrCodes.replaceChildren(fragment);
+      els.multipleQrCodes.hidden = result.groups.length === 0;
+      els.multipleQrButton.setAttribute("aria-expanded", String(result.groups.length > 0));
+      codeStatus(status, message, result.oversized.length ? "warning" : "success");
+      if (result.groups.length) revealSection(els.multipleQrCodes, els.multipleQrCodes);
+    } catch (error) {
+      if (current()) codeStatus(status, error.message || "The QR codes could not be created. Try again, or copy a code or link.", "error");
+    } finally {
+      if (current()) {
+        state.qrBatchBusy = false;
+        els.multipleQrButton.disabled = false;
+        els.multipleQrCodes.removeAttribute("aria-busy");
+      }
+    }
+  }
+
   function toggleScheduleQr(panel) {
     const qr = panel.querySelector(".share-qr"), button = shareQrButton(panel);
     const staticLabel = [els.exportSharePanel, els.personQuickSharePanel].includes(panel);
@@ -3002,27 +3117,17 @@
     const link = panel.querySelector("textarea").value;
     if (!link) return;
     try {
-      if (link.length > 2331) throw new RangeError("QR selection too large");
-      const generator = window.qrcodegen;
-      if (!generator) throw new Error("QR generator unavailable");
-      const code = generator.QrCode.encodeText(link, generator.QrCode.Ecc.MEDIUM);
-      const ns = "http://www.w3.org/2000/svg", svg = document.createElementNS(ns, "svg");
-      const size = code.size + 8;
-      svg.setAttribute("viewBox", `0 0 ${size} ${size}`);
-      svg.setAttribute("role", "img");
-      svg.setAttribute("aria-label", "Scan to review and add these schedules in UFree");
-      svg.setAttribute("shape-rendering", "crispEdges");
-      const background = document.createElementNS(ns, "rect");
-      background.setAttribute("width", String(size)); background.setAttribute("height", String(size)); background.setAttribute("fill", "#fff");
-      const path = document.createElementNS(ns, "path"), cells = [];
-      for (let y = 0; y < code.size; y++) for (let x = 0; x < code.size; x++) if (code.getModule(x, y)) cells.push(`M${x + 4},${y + 4}h1v1h-1z`);
-      path.setAttribute("d", cells.join("")); path.setAttribute("fill", "#000");
-      svg.append(background, path); qr.replaceChildren(svg); qr.hidden = false;
+      const { svg, version } = scheduleQrSvg(link);
+      qr.replaceChildren(svg); qr.hidden = false;
       if (!staticLabel) button.textContent = "Hide QR"; button.setAttribute("aria-expanded", "true");
-      codeStatus(status, code.version > 25 ? "Scan with your phone camera. This QR is dense; select fewer people if scanning is difficult." : "Scan with your phone camera, then open the link. Anyone with the QR or link can read these schedules.");
+      codeStatus(status, version > 25 ? "Scan with your phone camera. This QR is dense; select fewer people if scanning is difficult." : "Scan with your phone camera, then open the link. Anyone with the QR or link can read these schedules.");
       revealSection(qr);
     } catch (error) {
       codeStatus(status, error instanceof RangeError ? "Too much data for one QR. Select fewer schedules, or copy the code or link." : "QR could not be created. Refresh the app, or copy the link.", "error");
+      if (error instanceof RangeError && panel === els.exportSharePanel) {
+        offerMultipleQr();
+        revealSection(status, els.multipleQrButton && !els.multipleQrButton.hidden ? els.multipleQrButton : null);
+      }
     }
   }
 
@@ -4385,6 +4490,7 @@
     });
     els.generateCodeButton.addEventListener("click", () => generateShareCode("code"));
     els.exportQrButton.addEventListener("click", () => generateShareCode("qr"));
+    els.multipleQrButton?.addEventListener("click", generateMultipleQr);
     els.copyExportLinkButton.addEventListener("click", () => generateShareCode("link"));
     for (const options of [els.exportFieldOptions, els.personQuickExportFields]) {
       const changed = options === els.exportFieldOptions ? exportSelectionChanged : personQuickFieldsChanged;
@@ -4511,7 +4617,7 @@
     if (!("serviceWorker" in navigator)) return;
     if (location.protocol !== "https:" && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") return;
 
-    navigator.serviceWorker.register("./service-worker.js?v=96", { updateViaCache: "none" })
+    navigator.serviceWorker.register("./service-worker.js?v=97", { updateViaCache: "none" })
       .then(registration => registration.update())
       .catch(() => {
         // The app works normally even if PWA caching isn't available.

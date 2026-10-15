@@ -24,6 +24,7 @@ test("OCR assets are cached locally and missing assets never receive HTML", asyn
   const version = require("../package.json").version.split(".")[0];
   assert.ok(shell.includes(`./schedule-share-code.js?v=${version}`), "share-code support must be cached for offline use");
   assert.ok(shell.includes(`./assets/qr/qrcodegen.js?v=${version}`), "QR generation must work offline");
+  assert.ok(shell.some(asset => asset.startsWith("./schedule-qr-batches.js?v=")), "independent QR batching must work offline");
   assert.ok(shell.includes(`./schedule-groups.js?v=${version}`), "group availability must work offline");
   for (const asset of ["assets/UFreeLogo_SVG.svg", "assets/UFreeLogo_PNG.png", "assets/favicon.svg", "favicon.ico", "assets/apple-touch-icon.png", "assets/icon-maskable-512.png"]) {
     assert.ok(shell.includes(`./${asset}?v=${version}`), `${asset} must be available offline`);
@@ -41,5 +42,6 @@ test("OCR assets are cached locally and missing assets never receive HTML", asyn
   assert.equal((await request("https://example.test/Whos-Free/missing.js")).type, "error");
   assert.equal(request("https://other.test/worker.min.js"), undefined);
 });
+
 
 

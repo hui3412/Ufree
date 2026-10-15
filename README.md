@@ -1,5 +1,12 @@
 # UFree
 
+### Multiple independent QR codes
+
+- When a collection is too large for one QR, **Multiple QR codes** packs the selected people into scrollable QR cards. Each card lists its people and uses a complete existing WF6 share link on the current deployment's domain and path.
+- Every QR imports independently through the normal preview and confirmation flow, in any order. Export field choices are preserved, and schedules are never split into pieces that require reassembly.
+- Packing measures real compressed link byte sizes, starts with large schedules, and tries redistribution and merges to reduce the QR count. The search is bounded for responsiveness; it does not guarantee the mathematically smallest number for every selection.
+- Individually oversized schedules are named explicitly with guidance to use a code/link or fewer optional details. Changing people/details, switching export actions, or closing the dialog discards old results and cancels pending work.
+
 ### Reader 53 — Variable-height semester rows
 
 - Keep the existing image reader first. When it rejects a time axis, an additional fallback can read semester timetables with stretched half-hour rows.
