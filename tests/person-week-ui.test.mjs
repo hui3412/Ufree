@@ -39,7 +39,7 @@ async function app() {
   return { window, el, tick, wait, open, copied: () => copied };
 }
 
-test("full week includes exact times and weekends; direct export uses the canonical name and only that person", async () => {
+test("full week includes exact times and weekends without redundant export controls", async () => {
   const a = await app(); const { window, el, wait, open, tick } = a;
   try {
     const before = window.localStorage.getItem("whos-free-local-schedules");
@@ -55,85 +55,28 @@ test("full week includes exact times and weekends; direct export uses the canoni
     assert.equal(blocks[0].style.height, "66px");
     assert.match(el("personWeekGrid").textContent, /23:00/);
     assert.equal(el("personWeekGrid").querySelectorAll("button, input").length, 0, "viewing is read-only");
-    el("exportPersonScheduleButton").click();
-    await wait(() => !el("exportPersonScheduleButton").disabled);
-    const code = el("personWeekCode").value;
-    assert.ok(code.startsWith("WF"));
-    const decoded = await window.WhosFreeShareCode.decode(code);
-    assert.deepEqual(Object.keys(decoded.people), ["Alice"]);
-    assert.equal(decoded.people.Alice.classes[0].start, "07:07");
-    assert.equal(decoded.people.Alice.classes[0].instructor, null);
-    assert.equal(decoded.people.Alice.classes[0].course_code, null);
-    assert.equal(decoded.people.Alice.classes.length, 3);
-    assert.match(el("personWeekExportStatus").textContent, /Code ready for 1 schedule/);
-    assert.equal(el("scheduleModal").hidden, true, "direct export remains in the full schedule view");
-    el("copyPersonWeekCodeButton").click(); await tick();
-    assert.equal(a.copied(), code);
+    assert.equal(el("exportPersonScheduleButton"), null);
+    assert.equal(el("personExportFieldOptions"), null);
     assert.equal(window.localStorage.getItem("whos-free-local-schedules"), before);
     window.document.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
     assert.equal(el("personWeekModal").hidden, true);
     assert.equal(window.document.body.style.overflow, "");
     assert.equal(window.document.activeElement, el("fullScheduleButton"));
     open("Bob");
-    assert.equal(el("personWeekCode").value, "");
-    assert.equal(el("personWeekExport").hidden, true);
     assert.equal(el("personWeekGrid").querySelectorAll(".person-week-block").length, 1);
   } finally { await window.happyDOM.abort(); }
 });
 
-test("empty schedules export correctly, focus stays in the dialog, and backdrop closes it", async () => {
+test("empty schedules remain viewable, focus stays in the dialog, and backdrop closes it", async () => {
   const { window, el, open, wait } = await app();
   try {
     open("Empty");
     assert.equal(el("personWeekEmpty").hidden, false);
     assert.equal(window.document.activeElement, el("closePersonWeekModal"));
     window.document.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Tab", shiftKey: true, bubbles: true, cancelable: true }));
-    assert.equal(window.document.activeElement, el("personExportFieldOptions").querySelector("summary"));
-    el("exportPersonScheduleButton").click();
-    await wait(() => !el("exportPersonScheduleButton").disabled);
-    const decoded = await window.WhosFreeShareCode.decode(el("personWeekCode").value);
-    assert.deepEqual(Object.keys(decoded.people), ["Empty"]);
-    assert.equal(decoded.people.Empty.classes.length, 0);
+    assert.equal(window.document.activeElement, el("closePersonWeekModal"));
     el("personWeekModal").click();
     assert.equal(el("personWeekModal").hidden, true);
-  } finally { await window.happyDOM.abort(); }
-});
-
-test("export errors allow retry and clipboard failure selects the full code for manual copy", async () => {
-  const { window, el, open, wait, tick } = await app();
-  try {
-    open("Bob");
-    const encode = window.WhosFreeShareCode.encode;
-    window.WhosFreeShareCode.encode = async () => { throw Error("Compression unavailable"); };
-    el("exportPersonScheduleButton").click();
-    await wait(() => !el("exportPersonScheduleButton").disabled);
-    assert.equal(el("personWeekExportStatus").dataset.tone, "error");
-    assert.equal(el("copyPersonWeekCodeButton").disabled, true);
-    assert.equal(el("personWeekCode").value, "");
-    window.WhosFreeShareCode.encode = encode;
-    el("exportPersonScheduleButton").click();
-    await wait(() => !el("exportPersonScheduleButton").disabled);
-    window.navigator.clipboard.writeText = async () => { throw Error("Permission denied"); };
-    el("copyPersonWeekCodeButton").click(); await tick();
-    assert.equal(window.document.activeElement, el("personWeekCode"));
-    assert.equal(el("personWeekCode").selectionEnd, el("personWeekCode").value.length);
-    assert.match(el("personWeekExportStatus").textContent, /Select and copy/);
-  } finally { await window.happyDOM.abort(); }
-});
-
-test("a finished export cannot leak into a different person's newly opened schedule", async () => {
-  const { window, el, open, tick } = await app();
-  try {
-    let finish;
-    window.WhosFreeShareCode.encode = () => new Promise(resolve => { finish = resolve; });
-    open("Alice"); el("exportPersonScheduleButton").click();
-    assert.equal(el("exportPersonScheduleButton").disabled, true);
-    el("closePersonWeekModal").click(); open("Bob");
-    finish("old person's code"); await tick();
-    assert.equal(el("personWeekTitle").textContent, "Bob");
-    assert.equal(el("personWeekCode").value, "");
-    assert.equal(el("personWeekExport").hidden, true);
-    assert.equal(el("exportPersonScheduleButton").disabled, false);
   } finally { await window.happyDOM.abort(); }
 });
 

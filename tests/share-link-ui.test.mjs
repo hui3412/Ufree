@@ -109,10 +109,9 @@ for (const url of [
     await checkLink(a.el("personQuickSharePanel"), ["Alice"]);
     a.el("closePersonQuickShare").click();
 
-    a.el("fullScheduleButton").click(); a.el("exportPersonScheduleButton").click();
-    await a.wait(() => !a.el("exportPersonScheduleButton").disabled);
-    a.el("personSharePanel").querySelector(".toggle-share-qr").click();
-    await checkLink(a.el("personSharePanel"), ["Alice"]);
+    a.el("fullScheduleButton").click();
+    assert.equal(a.el("personWeekModal").hidden, false);
+    assert.equal(a.el("exportPersonScheduleButton"), null);
     assert.equal(a.stored(), before, "sharing preserves saved schedules");
   } finally { a.window.happyDOM.abort(); }
 });
@@ -191,11 +190,11 @@ test("oversized QR retains the complete link and code, and one-person export con
     assert.equal(output.value.length > 2331, true); assert.equal(a.el("exportCodeOutput").value, code);
     a.window.WhosFreeShareCode.createLink = createLink;
     a.el("closeScheduleModal").click(); a.el("viewToggleButton").click();
-    a.el("peopleList").querySelector('[data-person="Alice"]').click(); a.el("fullScheduleButton").click();
-    a.el("exportPersonScheduleButton").click(); await a.wait(() => !a.el("exportPersonScheduleButton").disabled);
-    const personal = a.el("personSharePanel"); assert.equal(personal.hidden, false);
+    a.el("peopleList").querySelector('[data-person="Alice"]').click(); a.el("sharePersonScheduleButton").click();
+    a.el("personQuickQrButton").click(); await a.wait(() => !a.el("personQuickQrButton").disabled);
+    const personal = a.el("personQuickSharePanel"); assert.equal(personal.hidden, false);
     assert.deepEqual(Object.keys((await a.window.WhosFreeShareCode.decode(personal.querySelector("textarea").value)).people), ["Alice"]);
-    personal.querySelector(".toggle-share-qr").click(); assert.ok(personal.querySelector("svg"));
+    assert.ok(personal.querySelector("svg"));
   } finally { a.window.happyDOM.abort(); }
 });
 
@@ -246,19 +245,19 @@ test("single-person three-dot choices preserve full teacher names and course det
   const rich = { people: { ...data.people, Alice: { ...person("Physics"), classes: [{ ...person("Physics").classes[0], course_code: "203-SN1-RE", section: "00002" }] } } };
   const a = await app(rich);
   try {
-    a.el("viewToggleButton").click(); a.el("peopleList").querySelector('[data-person="Alice"]').click(); a.el("fullScheduleButton").click();
-    const options = a.el("personExportFieldOptions"); assert.equal(options.querySelectorAll("input:checked").length, 0);
-    options.querySelector(".export-include-all").click(); a.el("exportPersonScheduleButton").click();
-    await a.wait(() => !a.el("exportPersonScheduleButton").disabled);
-    const imported = await a.window.WhosFreeShareCode.decode(a.el("personSharePanel").querySelector("textarea").value);
+    a.el("viewToggleButton").click(); a.el("peopleList").querySelector('[data-person="Alice"]').click(); a.el("sharePersonScheduleButton").click();
+    const options = a.el("personQuickExportFields"); assert.equal(options.querySelectorAll("input:checked").length, 0);
+    options.querySelector(".export-include-all").click(); a.el("personQuickUrlButton").click();
+    await a.wait(() => !a.el("personQuickUrlButton").disabled);
+    const imported = await a.window.WhosFreeShareCode.decode(a.el("personQuickSharePanel").querySelector("textarea").value);
     assert.deepEqual(Object.keys(imported.people), ["Alice"]);
     assert.equal(imported.people.Alice.classes[0].instructor, "Anna de la Cruz");
     assert.equal(imported.people.Alice.classes[0].course_code, "203-SN1-RE"); assert.equal(imported.people.Alice.classes[0].section, "00002");
     options.querySelector('[data-export-field="instructor"]').click();
-    assert.equal(a.el("personWeekCode").value, ""); assert.equal(a.el("personSharePanel").hidden, true);
+    assert.equal(a.el("personQuickCode").value, ""); assert.equal(a.el("personQuickSharePanel").hidden, true);
     options.open = true;
     a.window.document.dispatchEvent(new a.window.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
-    assert.equal(options.open, false); assert.equal(a.el("personWeekModal").hidden, false);
+    assert.equal(options.open, false); assert.equal(a.el("personQuickShareModal").hidden, false);
   } finally { a.window.happyDOM.abort(); }
 });
 

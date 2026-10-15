@@ -414,34 +414,6 @@
       </div>
       <p id="personWeekEmpty" class="settings-description" hidden>No classes scheduled.</p>
       <div class="review-grid-scroll" tabindex="0" aria-label="Full weekly schedule. Scroll horizontally for more days."><div id="personWeekGrid" class="review-grid person-week-grid"></div></div>
-      <details class="export-encoding-note"><summary>Why does the text code use Chinese characters?</summary><p>Chinese (CJK) characters, plus some Korean symbols, encode the packed timetable in fewer characters than ordinary letters and numbers. Compression can shorten it further. These are data symbols, not translated text or encryption. Copy the whole code unchanged. Links and QR codes use a URL-safe encoding instead.</p></details>
-      <div class="export-generation-actions">
-        <button id="exportPersonScheduleButton" class="primary-button" type="button">Export this schedule</button>
-        <details id="personExportFieldOptions" class="export-field-options">
-          <summary aria-label="Choose export details" title="Export details">…</summary>
-          <div class="export-options-menu" role="group" aria-label="Additional export details">
-            <label class="share-selection"><input type="checkbox" data-export-field="instructor"><span>Teacher’s full name</span></label>
-            <label class="share-selection"><input type="checkbox" data-export-field="course_code"><span>Course code</span></label>
-            <label class="share-selection"><input type="checkbox" data-export-field="section"><span>Section</span></label>
-            <label class="share-selection"><input type="checkbox" data-export-field="semester"><span>Semester</span></label>
-            <label class="share-selection"><input type="checkbox" data-export-field="extras"><span>Other saved schedule details</span></label>
-            <button class="secondary-button export-include-all" type="button">Include all</button>
-            <p class="share-code-note">More details make larger codes and QRs.</p>
-          </div>
-        </details>
-      </div>
-      <div id="personWeekExport" class="share-code-panel" hidden>
-        <label class="field-group share-code-field"><span>Export code</span><textarea id="personWeekCode" rows="5" readonly spellcheck="false" autocapitalize="off" aria-describedby="personWeekExportStatus"></textarea></label>
-        <p class="share-code-note">Names, times, classes and rooms by default. Your saved schedule keeps all details.</p>
-        <button id="copyPersonWeekCodeButton" class="secondary-button" type="button" disabled>Copy code</button>
-        <div id="personSharePanel" class="schedule-share-link" hidden>
-          <label class="field-group"><span>Share link</span><textarea class="share-link-output" rows="2" readonly spellcheck="false" aria-label="Share link"></textarea></label>
-          <div class="modal-actions"><button class="secondary-button copy-share-link" type="button">Copy link</button><button class="secondary-button toggle-share-qr" type="button" aria-expanded="false" aria-controls="personQr">Show QR</button></div>
-          <div id="personQr" class="share-qr" hidden></div>
-          <p class="share-link-status parser-status" role="status" aria-live="polite"></p>
-        </div>
-      </div>
-      <p id="personWeekExportStatus" class="parser-status" role="status" aria-live="polite"></p>
     </section>
   </div>
 
@@ -581,7 +553,7 @@
   <script src="schedule-share-code.js?v=90" defer></script>
   <script src="assets/qr/qrcodegen.js?v=90" defer></script>
   <script src="schedule-groups.js?v=90" defer></script>
-  <script src="app.js?v=93" defer></script>
+  <script src="app.js?v=94" defer></script>
 </body>
 </html>
 
