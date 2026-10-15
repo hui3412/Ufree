@@ -87,6 +87,7 @@
     helpModal: document.getElementById("helpModal"),
     closeHelpModal: document.getElementById("closeHelpModal"),
     homeExportButton: document.getElementById("homeExportButton"),
+    homeImportButton: document.getElementById("homeImportButton"),
     undoChangesButton: document.getElementById("undoChangesButton"),
     undoScheduleChangesButton: document.getElementById("undoScheduleChangesButton"),
     undoChangesStatus: document.getElementById("undoChangesStatus"),
@@ -2865,12 +2866,12 @@
     }
   }
 
-  function openQuickExport(event) {
-    if (state.isParsing || state.pendingImage || state.codeMode || !Object.keys(peopleMap()).length) return;
+  function openQuickCodePanel(mode, event) {
+    if (state.isParsing || state.pendingImage || state.codeMode || (mode === "export" && !Object.keys(peopleMap()).length)) return;
     if (!els.helpModal.hidden) closeHelp();
-    state.quickExportReturnFocus = usesMobileNavigation() ? mobileMenuButton : event?.currentTarget || els.homeExportButton;
+    state.quickExportReturnFocus = usesMobileNavigation() ? mobileMenuButton : event?.currentTarget || (mode === "import" ? els.homeImportButton : els.homeExportButton);
     openScheduleModal();
-    openCodePanel("export", true);
+    openCodePanel(mode, true);
   }
 
   function openHelp() {
@@ -3440,6 +3441,7 @@
     const importBusy = state.isParsing || Boolean(state.pendingImage) || Boolean(state.codeMode);
     els.exportSchedulesButton.disabled = importBusy || peopleCount === 0;
     els.homeExportButton.disabled = importBusy || peopleCount === 0;
+    if (els.homeImportButton) els.homeImportButton.disabled = importBusy;
     els.importCodeButton.disabled = importBusy;
     els.generateCodeButton.disabled = state.isParsing;
     els.exportQrButton.disabled = state.isParsing;
@@ -4363,7 +4365,8 @@
       applyAccentTheme(button.dataset.colorTheme, true);
     });
     els.scheduleDataButton.addEventListener("click", openScheduleModal);
-    els.homeExportButton.addEventListener("click", openQuickExport);
+    els.homeExportButton.addEventListener("click", event => openQuickCodePanel("export", event));
+    els.homeImportButton?.addEventListener("click", event => openQuickCodePanel("import", event));
     els.helpButton.addEventListener("click", openHelp);
     els.closeHelpModal.addEventListener("click", closeHelp);
     els.helpModal.addEventListener("click", event => { if (event.target === els.helpModal) closeHelp(); });
@@ -4584,7 +4587,7 @@
     if (!("serviceWorker" in navigator)) return;
     if (location.protocol !== "https:" && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") return;
 
-    navigator.serviceWorker.register("./service-worker.js?v=92", { updateViaCache: "none" })
+    navigator.serviceWorker.register("./service-worker.js?v=93", { updateViaCache: "none" })
       .then(registration => registration.update())
       .catch(() => {
         // The app works normally even if PWA caching isn't available.
