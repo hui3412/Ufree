@@ -2075,7 +2075,7 @@
     els.finishImportPictureName.textContent = "Done entering name";
     els.importPictureNameHelp.textContent = "Your name will carry over. If you're typing when loading finishes, we'll wait for you.";
     overlay.querySelector(".import-progress-spinner").hidden = false;
-    overlay.querySelector(".import-progress-note").textContent = title === "Opening shared schedules" ? "Nothing is added until you confirm." : "Please wait until the import finishes.";
+    overlay.querySelector(".import-progress-note").textContent = title === "Opening shared schedules" ? "Please wait while the shared schedules are opened." : "Please wait until the import finishes.";
     overlay.setAttribute("aria-busy", "true");
     overlay.hidden = false;
     document.documentElement.classList.remove("shared-link-starting");
@@ -2995,7 +2995,7 @@
     if (!output.value) return;
     try {
       await navigator.clipboard.writeText(output.value);
-      codeStatus(status, "Link copied. Your friend can open it to review and add schedules.", "success");
+      codeStatus(status, "Link copied. Your friend can open it to add schedules automatically.", "success");
     } catch {
       output.focus(); output.select();
       codeStatus(status, "Select and copy the link above.");
@@ -3023,7 +3023,7 @@
     }
   }
 
-  function scheduleQrSvg(link, label = "Scan to review and add these schedules in UFree") {
+  function scheduleQrSvg(link, label = "Scan to add these schedules in UFree") {
     if (new TextEncoder().encode(link).length > 2331) throw new RangeError("QR selection too large");
     const generator = window.qrcodegen;
     if (!generator) throw new Error("QR generator unavailable");
@@ -3072,7 +3072,7 @@
       if (!current()) return;
       const fragment = document.createDocumentFragment();
       const instructions = document.createElement("p");
-      instructions.textContent = "Scan each QR and add its listed people before scanning the next. Each QR works independently, and you can scan them in any order.";
+      instructions.textContent = "Scan each QR separately. Its listed people are added automatically. You can scan them in any order.";
       fragment.append(instructions);
       for (let i = 0; i < result.groups.length; i++) {
         if (!current()) return;
@@ -3189,8 +3189,8 @@
       showToast("Finish the current import or export, then open the shared link again."); return;
     }
     const input = location.href;
-    // Consume the fragment before opening dialogs, so refresh cannot import it again.
-    try { history.replaceState(null, "", location.pathname + location.search); } catch { /* Read-only browser histories still show the preview. */ }
+    // Consume the fragment once so refresh cannot import it again.
+    try { history.replaceState(null, "", location.pathname + location.search); } catch { /* Read-only browser histories can still import the link. */ }
     if (!els.personQuickShareModal.hidden) closePersonQuickShare();
     if (!els.personGroupModal.hidden) closePersonGroup();
     if (!els.personWeekModal.hidden) closePersonWeek();
@@ -3201,7 +3201,7 @@
     openScheduleModal();
     openCodePanel("import");
     els.importCodeInput.value = input;
-    await previewSharedImport(input);
+    await importShareCode({ automatic: true });
   }
 
   async function copyExportCode(output, status, isCurrent = () => true) {
@@ -3238,21 +3238,25 @@
     resolve(choice);
   }
 
-  async function importShareCode() {
+  async function importShareCode({ automatic = false } = {}) {
     if (state.isParsing || state.codeMode !== "import") return;
-    if (!state.sharedImport && /^(?:https?:\/\/|WFL[56])/i.test(els.importCodeInput.value.trim())) { await previewSharedImport(els.importCodeInput.value); return; }
+    if (!automatic && !state.sharedImport && /^(?:https?:\/\/|WFL[56])/i.test(els.importCodeInput.value.trim())) { await previewSharedImport(els.importCodeInput.value); return; }
     const selected = state.sharedImport ? [...els.sharedImportPeople.querySelectorAll("input:checked")].map(input => input.dataset.person) : null;
     if (selected && !selected.length) return;
     if (!els.importCodeInput.value.trim()) { codeStatus(els.importCodeStatus, "Paste a code to import.", "error"); els.importCodeInput.focus(); return; }
     state.isParsing = true;
     updateScheduleModal();
     codeStatus(els.importCodeStatus, "Opening the code on this device…");
-    startImportProgress("Opening the code on this device…");
+    startImportProgress(automatic ? "Adding the shared schedules on this device…" : "Opening the code on this device…");
+    let automaticMessage = null;
     try {
+      if (automatic && state.loadError) throw new Error("Your saved schedules could not be loaded. Nothing was imported. Resolve the storage error before opening this link again.");
+      // Let the loading popup paint before decoding a potentially large QR link.
+      if (automatic) await new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 0)));
       const imported = state.sharedImport ? { ...state.sharedImport, people: Object.fromEntries(selected.map(name => [name, state.sharedImport.people[name]])) } : await window.WhosFreeShareCode.decode(els.importCodeInput.value);
       validateData(imported);
       applyAutomaticSemester(imported);
-      const result = await window.WhosFreeShareCode.merge(state.hasData ? state.data : null, imported, resolveCodeConflict);
+      const result = await window.WhosFreeShareCode.merge(state.hasData ? state.data : null, imported, automatic ? () => "old" : resolveCodeConflict);
       validateData(result.data);
       const before = captureScheduleChange();
       let warning = null;
@@ -3264,11 +3268,18 @@
       const renameNote = result.renamed.length ? ` Imported different schedules as ${result.renamed.map(item => item.to).join(", ")}. You can edit their names in the people list.` : "";
       const choicesNote = result.replaced || result.kept ? ` Replaced ${result.replaced || 0}. Kept ${result.kept || 0} old schedules.` : "";
       codeStatus(els.importCodeStatus, warning || `Imported ${result.added} schedule${result.added === 1 ? "" : "s"}. Skipped ${result.skipped} identical schedules.${choicesNote}${renameNote}`, warning ? "error" : "success");
-      showToast(warning || scheduleImportToast(before));
+      if (automatic) {
+        automaticMessage = `Added ${result.added} ${result.added === 1 ? "person" : "people"} · Skipped ${result.skipped + result.kept}${warning ? `. ${warning}` : ""}`;
+      } else showToast(warning || scheduleImportToast(before));
       if (state.sharedImport) { resetSharedImport(); els.importCodeInput.value = ""; }
     } catch (error) {
       codeStatus(els.importCodeStatus, error.message || "The code could not be imported.", "error");
-    } finally { finishCodeConflict(null); state.isParsing = false; updateScheduleModal(); endImportProgress(els.decodeCodeButton); els.decodeCodeButton.focus({ preventScroll: true }); }
+    } finally {
+      finishCodeConflict(null); state.isParsing = false; updateScheduleModal();
+      endImportProgress(els.decodeCodeButton);
+      if (automaticMessage !== null) { closeScheduleModal(); showToast(automaticMessage); }
+      else els.decodeCodeButton.focus({ preventScroll: true });
+    }
   }
 
   async function handleLocalScheduleFile(event) {
@@ -4617,7 +4628,7 @@
     if (!("serviceWorker" in navigator)) return;
     if (location.protocol !== "https:" && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") return;
 
-    navigator.serviceWorker.register("./service-worker.js?v=97", { updateViaCache: "none" })
+    navigator.serviceWorker.register("./service-worker.js?v=98", { updateViaCache: "none" })
       .then(registration => registration.update())
       .catch(() => {
         // The app works normally even if PWA caching isn't available.

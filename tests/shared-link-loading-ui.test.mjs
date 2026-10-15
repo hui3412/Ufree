@@ -45,7 +45,7 @@ test("initial shared-link loading popup appears before any deferred app scripts 
   } finally { a.window.happyDOM.abort(); normal.window.happyDOM.abort(); }
 });
 
-test("spinner covers slow local storage and decoding, then yields to confirmation without saving", async () => {
+test("spinner covers slow local storage and decoding, then saves automatically", async () => {
   const a = shell(base + "#import=WFL5Rpending"), storage = {};
   let resolveDecode, called = false;
   const pending = new Promise(resolve => { resolveDecode = resolve; });
@@ -56,19 +56,20 @@ test("spinner covers slow local storage and decoding, then yields to confirmatio
     assert.equal(called, false);
     assert.equal(a.window.document.documentElement.classList.contains("shared-link-starting"), false);
     storage.onerror();
+    Object.defineProperty(a.window, "indexedDB", { configurable: true, value: undefined });
     await wait(() => called);
     assert.equal(a.el("importProgressOverlay").hidden, false);
-    assert.match(a.el("importProgressMessage").textContent, /Reading the shared schedules/);
+    assert.match(a.el("importProgressMessage").textContent, /Adding the shared schedules/);
     assert.equal(a.el("sharedImportPreview").hidden, true);
     assert.equal(a.el("decodeCodeButton").disabled, true);
     assert.equal(a.window.localStorage.getItem("whos-free-local-schedules"), null);
     resolveDecode(shared);
-    await wait(() => !a.el("sharedImportPreview").hidden && a.el("importProgressOverlay").hidden);
-    assert.equal(a.el("decodeCodeButton").textContent, "Add schedules");
+    await wait(() => a.el("scheduleModal").hidden && a.el("importProgressOverlay").hidden);
+    assert.match(a.el("toast").textContent, /Added 1 person · Skipped 0/);
+    assert.equal(a.el("sharedImportPreview").hidden, true);
     assert.equal(a.el("importProgressOverlay").hasAttribute("aria-busy"), false);
     assert.equal(a.el("scheduleModal").hasAttribute("inert"), false);
-    assert.equal(a.window.localStorage.getItem("whos-free-local-schedules"), null);
-    a.el("closeScheduleModal").click();
+    assert.ok(JSON.parse(a.window.localStorage.getItem("whos-free-local-schedules")).data.people.Alice);
     assert.equal(a.window.document.body.style.overflow, "");
   } finally { a.window.happyDOM.abort(); }
 });
@@ -107,3 +108,4 @@ test("pasted links show the same spinner and ordinary page loads do not open it"
     assert.equal(a.el("sharedImportPreview").hidden, false);
   } finally { a.window.happyDOM.abort(); }
 });
+

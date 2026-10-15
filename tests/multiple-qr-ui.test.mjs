@@ -73,10 +73,10 @@ for (const base of ["https://hui3412.github.io/Ufree/", "https://youfree.ca/"]) 
     for (const link of [...a.links].reverse()) {
       receiver.window.location.hash = new URL(link).hash;
       receiver.window.dispatchEvent(new receiver.window.HashChangeEvent("hashchange"));
-      await receiver.wait(() => !receiver.el("sharedImportPreview").hidden && !receiver.el("decodeCodeButton").disabled);
-      receiver.el("decodeCodeButton").click();
-      await receiver.wait(() => receiver.el("sharedImportPreview").hidden && !receiver.el("decodeCodeButton").disabled);
-      receiver.el("closeImportButton").click();
+      await receiver.wait(() => receiver.el("scheduleModal").hidden && !receiver.el("decodeCodeButton").disabled);
+      const count = Object.keys((await a.window.WhosFreeShareCode.decode(link)).people).length;
+      assert.match(receiver.el("toast").textContent, new RegExp(`Added ${count} people? · Skipped 0`));
+      assert.equal(receiver.el("sharedImportPreview").hidden, true);
     }
     assert.deepEqual(JSON.parse(receiver.stored()).data.people, data.people);
     a.el("exportFieldOptions").querySelector('[data-export-field="instructor"]').click();

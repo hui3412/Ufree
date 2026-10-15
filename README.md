@@ -3,7 +3,7 @@
 ### Multiple independent QR codes
 
 - When a collection is too large for one QR, **Multiple QR codes** packs the selected people into scrollable QR cards. Each card lists its people and uses a complete existing WF6 share link on the current deployment's domain and path.
-- Every QR imports independently through the normal preview and confirmation flow, in any order. Export field choices are preserved, and schedules are never split into pieces that require reassembly.
+- Opening a QR/share link adds its people automatically and shows the added/skipped counts. Identical people and different schedules with an existing name are skipped, preserving local data; additions support Undo. Pasted links in the manual importer keep their selection preview and conflict choices. Every QR works independently, in any order. Export field choices are preserved, and schedules are never split into pieces that require reassembly.
 - Packing measures real compressed link byte sizes, starts with large schedules, and tries redistribution and merges to reduce the QR count. The search is bounded for responsiveness; it does not guarantee the mathematically smallest number for every selection.
 - Individually oversized schedules are named explicitly with guidance to use a code/link or fewer optional details. Changing people/details, switching export actions, or closing the dialog discards old results and cancels pending work.
 

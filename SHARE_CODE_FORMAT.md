@@ -55,11 +55,12 @@ The importer accepts complete share links, bare WFL5 values and old WF1–WF5
 message codes. Old codes may also appear in an `import` fragment.
 
 The fragment is processed on-device after the saved database loads, then removed
-from the current address. Links open a person-selection preview with Add schedules
-and Cancel. No schedules are saved until confirmation. The existing atomic merge,
-duplicate skipping, richer-local-detail preservation, conflict choices and Undo
-apply. Pasting a link also opens this preview. Anyone holding a link or QR can
-read its schedules; the format is not encrypted.
+from the current address. Opened links/QRs add schedules automatically and show
+added/skipped counts. Identical schedules and differing schedules with an existing
+name are skipped without prompting, preserving local details. Actual additions
+support Undo. Unreadable saved data blocks automatic import. Pasting a link in the
+manual importer still opens a selection preview and offers conflict choices.
+Anyone holding a link or QR can read its schedules; the format is not encrypted.
 
 QR generation uses a locally bundled MIT-licensed Project Nayuki encoder with
 medium error correction and a four-module quiet zone. A complete ASCII URL over
@@ -255,4 +256,5 @@ compatibility fixtures were generated using the original WF1 and WF2 encoders.
 WF1/WF2/WF3 shared fields remain name, optional semester, weekday, exact start/end times,
 course, course code, section, room, instructor and kind. Local nicknames, groups,
 Undo history, source paths and OCR review markers are not shared.
+
 

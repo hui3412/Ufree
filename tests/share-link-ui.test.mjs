@@ -116,35 +116,79 @@ for (const url of [
   } finally { a.window.happyDOM.abort(); }
 });
 
-test("opening a shared link previews people without saving; only selected schedules are added", async () => {
+test("opening a shared link adds all people automatically and supports Undo", async () => {
   const sender = await app();
   const link = sender.window.WhosFreeShareCode.createLink(await sender.window.WhosFreeShareCode.encode(data), base);
   const receiver = await app(null, link);
   try {
-    assert.equal(receiver.el("scheduleModal").hidden, false);
-    assert.equal(receiver.el("sharedImportPreview").hidden, false);
-    assert.equal(receiver.stored(), null);
+    assert.equal(receiver.el("scheduleModal").hidden, true);
+    assert.equal(receiver.el("sharedImportPreview").hidden, true);
     assert.equal(receiver.window.location.hash, "");
-    assert.equal(receiver.el("decodeCodeButton").textContent, "Add schedules");
-    const bob = receiver.el("sharedImportPeople").querySelector('[data-person="Bob"]');
-    bob.click(); receiver.el("decodeCodeButton").click();
-    await receiver.wait(() => !receiver.el("decodeCodeButton").disabled);
     const saved = JSON.parse(receiver.stored()).data;
-    assert.deepEqual(Object.keys(saved.people), ["Alice"]);
+    assert.deepEqual(Object.keys(saved.people), ["Alice", "Bob"]);
     assert.equal(saved.people.Alice.classes[0].start, "08:17");
     assert.equal(saved.people.Alice.classes[0].day, "Sunday");
     assert.equal(saved.people.Alice.classes[0].instructor, "de la Cruz");
-    assert.match(receiver.el("importCodeStatus").textContent, /Imported 1 schedule/);
-    assert.equal(receiver.el("sharedImportPreview").hidden, true);
+    assert.match(receiver.el("toast").textContent, /Added 2 people · Skipped 0/);
+    assert.equal(receiver.window.document.body.style.overflow, "");
+    receiver.el("undoChangesButton").click();
+    await receiver.wait(() => receiver.stored() === null);
   } finally { sender.window.happyDOM.abort(); receiver.window.happyDOM.abort(); }
+});
+
+for (const domain of [base, "https://youfree.ca/"]) test(`automatic imports preserve conflicting and identical local schedules on ${domain}`, async () => {
+  const original = { people: { Alice: person("Local course"), Bob: person("Physics") } };
+  const sender = await app();
+  const incoming = { people: { Alice: person("Different course"), Bob: person("Physics"), Charlie: person("New course") } };
+  const link = sender.window.WhosFreeShareCode.createLink(await sender.window.WhosFreeShareCode.encode(incoming), domain);
+  const receiver = await app(original, link);
+  try {
+    const saved = JSON.parse(receiver.stored()).data.people;
+    assert.deepEqual(saved.Alice, original.people.Alice);
+    assert.deepEqual(saved.Bob, original.people.Bob);
+    assert.ok(saved.Charlie);
+    assert.match(receiver.el("toast").textContent, /Added 1 person · Skipped 2/);
+    assert.equal(receiver.el("codeConflictPrompt").hidden, true);
+    assert.equal(receiver.el("scheduleModal").hidden, true);
+    const before = receiver.stored();
+    receiver.window.location.hash = new URL(link).hash;
+    receiver.window.dispatchEvent(new receiver.window.HashChangeEvent("hashchange"));
+    await receiver.wait(() => !receiver.el("decodeCodeButton").disabled);
+    assert.match(receiver.el("toast").textContent, /Added 0 people · Skipped 3/);
+    assert.equal(receiver.stored(), before, "repeat scans do not rewrite saved data");
+    receiver.el("undoChangesButton").click();
+    await receiver.wait(() => !JSON.parse(receiver.stored()).data.people.Charlie);
+    assert.deepEqual(JSON.parse(receiver.stored()).data.people, original.people);
+  } finally { sender.window.happyDOM.abort(); receiver.window.happyDOM.abort(); }
+});
+
+test("invalid opened links and unreadable local schedules never overwrite saved data", async () => {
+  const sender = await app();
+  const link = sender.window.WhosFreeShareCode.createLink(await sender.window.WhosFreeShareCode.encode(data), base);
+  for (const [initial, url, error] of [
+    [{ people: { Local: person("History") } }, base + "#import=WFL5Rbroken!", /incomplete|invalid|changed/],
+    [{ people: { Broken: { classes: "invalid" } } }, link, /saved schedules could not be loaded/],
+  ]) {
+    const receiver = await app(initial, url);
+    try {
+      assert.deepEqual(JSON.parse(receiver.stored()).data, initial);
+      assert.equal(receiver.el("scheduleModal").hidden, false);
+      assert.equal(receiver.el("importCodeStatus").dataset.tone, "error");
+      assert.match(receiver.el("importCodeStatus").textContent, error);
+      assert.equal(receiver.el("importProgressOverlay").hidden, true);
+    } finally { receiver.window.happyDOM.abort(); }
+  }
+  sender.window.happyDOM.abort();
 });
 
 test("cancelling and malformed links leave local schedules unchanged; empty selection cannot import", async () => {
   const sender = await app();
   const link = sender.window.WhosFreeShareCode.createLink(await sender.window.WhosFreeShareCode.encode(data), base);
-  const receiver = await app({ people: { Local: person("History") } }, link);
+  const receiver = await app({ people: { Local: person("History") } });
   try {
     const before = receiver.stored();
+    receiver.el("importCodeButton").click(); receiver.el("importCodeInput").value = link;
+    receiver.el("decodeCodeButton").click(); await receiver.wait(() => !receiver.el("decodeCodeButton").disabled);
     for (const checkbox of receiver.el("sharedImportPeople").querySelectorAll("input")) checkbox.click();
     assert.equal(receiver.el("decodeCodeButton").disabled, true);
     receiver.el("closeImportButton").click();
@@ -198,18 +242,17 @@ test("oversized QR retains the complete link and code, and one-person export con
   } finally { a.window.happyDOM.abort(); }
 });
 
-test("a fragment opened in an existing tab previews older codes after local schedules have loaded", async () => {
+test("a fragment opened in an existing tab automatically adds older codes after local data loads", async () => {
   const a = await app(data);
   try {
-    const before = a.stored();
     const frozen = JSON.parse(fs.readFileSync(new URL("fixtures/share-code-wf4.json", import.meta.url), "utf8"));
     a.window.location.hash = "import=" + encodeURIComponent(frozen.codes.J);
     a.window.dispatchEvent(new a.window.HashChangeEvent("hashchange"));
-    await a.wait(() => !a.el("sharedImportPreview").hidden);
+    await a.wait(() => !a.el("decodeCodeButton").disabled);
     assert.equal(a.window.location.hash, "");
-    assert.equal(a.stored(), before);
-    assert.equal(a.el("sharedImportPeople").querySelectorAll("input").length, 3);
-    a.el("closeImportButton").click(); assert.equal(a.stored(), before);
+    assert.equal(a.el("scheduleModal").hidden, true);
+    assert.match(a.el("toast").textContent, /Added 3 people · Skipped 0/);
+    assert.deepEqual(Object.keys(JSON.parse(a.stored()).data.people).sort(), ["Alice", "Bob", "Élodie", "Missing", "Null"].sort());
   } finally { a.window.happyDOM.abort(); }
 });
 
