@@ -68,6 +68,55 @@ test("export offers a copyable Ufree link and a locally generated QR; changing s
   } finally { a.window.happyDOM.abort(); }
 });
 
+for (const url of [
+  "https://hui3412.github.io/Ufree/?source=sharing#old",
+  "https://youfree.ca/?source=sharing#old",
+  "https://youfree.ca/index.html?source=sharing#old",
+]) test(`all sharing panels and QR codes use the current deployment: ${url}`, async () => {
+  const a = await app(data, url);
+  try {
+    const before = a.stored(), expected = new URL(url);
+    const qrInputs = [], generator = a.window.qrcodegen.QrCode;
+    const encodeText = generator.encodeText;
+    generator.encodeText = (text, level) => {
+      qrInputs.push(text);
+      return encodeText.call(generator, text, level);
+    };
+    const checkLink = async (panel, names) => {
+      const link = panel.querySelector("textarea").value, actual = new URL(link);
+      assert.equal(actual.origin, expected.origin);
+      assert.equal(actual.pathname, expected.pathname);
+      assert.equal(actual.search, "");
+      assert.match(actual.hash, /^#import=WFL6/);
+      assert.deepEqual(Object.keys((await a.window.WhosFreeShareCode.decode(link)).people), names);
+      assert.equal(qrInputs.at(-1), link, "QR encodes the same deployment-specific URL");
+      assert.ok(panel.querySelector("svg"));
+    };
+
+    a.el("exportSchedulesButton").click(); a.el("selectAllSchedules").click();
+    a.el("exportQrButton").click();
+    await a.wait(() => !a.el("generateCodeButton").disabled);
+    await checkLink(a.el("exportSharePanel"), ["Alice", "Bob"]);
+    a.el("copyExportLinkButton").click();
+    await a.wait(() => !a.el("generateCodeButton").disabled);
+    assert.equal(a.copied(), a.el("exportSharePanel").querySelector("textarea").value);
+    a.el("closeScheduleModal").click();
+
+    a.el("viewToggleButton").click();
+    a.el("peopleList").querySelector('[data-person="Alice"]').click();
+    a.el("sharePersonScheduleButton").click(); a.el("personQuickQrButton").click();
+    await a.wait(() => !a.el("personQuickQrButton").disabled);
+    await checkLink(a.el("personQuickSharePanel"), ["Alice"]);
+    a.el("closePersonQuickShare").click();
+
+    a.el("fullScheduleButton").click(); a.el("exportPersonScheduleButton").click();
+    await a.wait(() => !a.el("exportPersonScheduleButton").disabled);
+    a.el("personSharePanel").querySelector(".toggle-share-qr").click();
+    await checkLink(a.el("personSharePanel"), ["Alice"]);
+    assert.equal(a.stored(), before, "sharing preserves saved schedules");
+  } finally { a.window.happyDOM.abort(); }
+});
+
 test("opening a shared link previews people without saving; only selected schedules are added", async () => {
   const sender = await app();
   const link = sender.window.WhosFreeShareCode.createLink(await sender.window.WhosFreeShareCode.encode(data), base);
@@ -302,4 +351,5 @@ test("quick Copy Link exposes a selectable link when the clipboard is unavailabl
     a.el("closeScheduleModal").click(); assert.equal(a.el("scheduleModal").hidden, true);
   } finally { a.window.happyDOM.abort(); }
 });
+
 

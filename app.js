@@ -73,7 +73,8 @@
   const ACCENT_THEME_KEY = "whos-free-accent-theme-v1";
   const ACCENT_THEMES = new Set(["blue", "violet", "rose", "mint", "orange"]);
   const BREAK_THRESHOLD_MINUTES = window.WhosFreeAvailability.PASSING_MINUTES;
-  const APP_URL = "https://hui3412.github.io/Ufree/";
+  // Share back to this deployment, keeping its path but no query or import fragment.
+  const APP_URL = `${location.origin}${location.pathname}`;
 
   const els = {
     root: document.documentElement,
@@ -4583,7 +4584,7 @@
     if (!("serviceWorker" in navigator)) return;
     if (location.protocol !== "https:" && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") return;
 
-    navigator.serviceWorker.register("./service-worker.js?v=90", { updateViaCache: "none" })
+    navigator.serviceWorker.register("./service-worker.js?v=91", { updateViaCache: "none" })
       .then(registration => registration.update())
       .catch(() => {
         // The app works normally even if PWA caching isn't available.
@@ -4646,5 +4647,6 @@
 
   init();
 })();
+
 
 
