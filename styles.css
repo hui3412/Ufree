@@ -2291,6 +2291,7 @@ input[type="time"],
 .group-name-field input { width: 100%; min-width: 0; box-sizing: border-box; border: 1px solid var(--border); background: var(--input); color: var(--text); border-radius: 8px; padding: 11px; font: inherit; font-size: 16px; }
 .group-members-list { max-height: 300px; overflow-y: auto; margin: 10px 0; }
 .group-week-modal { width: min(1120px, 100%); max-width: 1120px; }
+.group-week-modal .review-grid-scroll { overscroll-behavior: auto; touch-action: pan-x pinch-zoom; -webkit-overflow-scrolling: touch; }
 .groups-modal .modal-header > div, .group-week-modal .modal-header > div { min-width: 0; overflow-wrap: anywhere; }
 .group-week-modal .modal-header p { max-width: none; }
 .group-week-note { color: var(--muted); line-height: 1.5; font-size: 0.85rem; }

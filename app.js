@@ -553,8 +553,8 @@
 
     await showSystemNotification(title, {
       body,
-      icon: "./assets/icon-192.png?v=88",
-      badge: "./assets/icon-192.png?v=88",
+      icon: "./assets/icon-192.png?v=89",
+      badge: "./assets/icon-192.png?v=89",
       tag: `whos-free-break-${dateKey()}-${breaks[0].start}`,
       data: { url: "./" },
     });
@@ -641,8 +641,8 @@
     }
     const ok = await showSystemNotification("UFree notifications work", {
       body: "You'll get grouped alerts when friends start breaks longer than 10 minutes.",
-      icon: "./assets/icon-192.png?v=88",
-      badge: "./assets/icon-192.png?v=88",
+      icon: "./assets/icon-192.png?v=89",
+      badge: "./assets/icon-192.png?v=89",
       tag: "whos-free-test",
       data: { url: "./" },
     });
@@ -4295,6 +4295,7 @@
   function bindEvents() {
     bindTimetableScrolling(els.reviewGrid);
     bindTimetableScrolling(els.personWeekGrid);
+    bindTimetableScrolling(els.groupWeekGrid);
     document.addEventListener("click", event => {
       if (state.importProgress && !els.importProgressOverlay.contains(event.target)) {
         event.preventDefault();
@@ -4557,7 +4558,7 @@
     if (!("serviceWorker" in navigator)) return;
     if (location.protocol !== "https:" && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") return;
 
-    navigator.serviceWorker.register("./service-worker.js?v=88", { updateViaCache: "none" })
+    navigator.serviceWorker.register("./service-worker.js?v=89", { updateViaCache: "none" })
       .then(registration => registration.update())
       .catch(() => {
         // The app works normally even if PWA caching isn't available.
