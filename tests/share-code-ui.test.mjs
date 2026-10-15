@@ -46,9 +46,9 @@ test("Export includes only chosen people; Import adds new people and leaves dupl
     const code = sender.el("exportCodeOutput").value;
     assert.ok(code.length);
     assert.deepEqual(Object.keys((await sender.window.WhosFreeShareCode.decode(code)).people), ["Alice", "Bob"]);
-    sender.el("copyCodeButton").click();
-    await sender.wait();
     assert.equal(sender.copied(), code);
+    assert.match(sender.el("exportCodeStatus").textContent, /Code copied/);
+    assert.equal(sender.el("copyCodeButton"), null);
     receiver.el("importCodeButton").click();
     receiver.el("importCodeInput").value = code;
     receiver.el("decodeCodeButton").click();
@@ -73,7 +73,7 @@ test("Export includes only chosen people; Import adds new people and leaves dupl
     sender.el("selectAllSchedules").checked = true;
     sender.el("selectAllSchedules").dispatchEvent(new sender.window.Event("change"));
     assert.equal(sender.el("exportCodeOutput").value, "");
-    assert.equal(sender.el("copyCodeButton").disabled, true);
+    assert.equal(sender.el("exportCodeField").hidden, true);
     sender.el("closeScheduleModal").click();
     sender.el("scheduleDataButton").click();
     assert.equal(sender.el("codeExportPanel").hidden, true);
@@ -131,8 +131,27 @@ test("message-size advice covers exactly 1000 and larger codes without truncatin
       sender.el("generateCodeButton").click(); await sender.wait();
       assert.equal(sender.el("exportCodeOutput").value.length, length);
       assert.match(sender.el("exportCodeStatus").textContent, length === 1000 ? /Fits a 1,000-character message/ : /Over 1,000 characters. Select fewer schedules/);
-      assert.equal(sender.el("copyCodeButton").disabled, false);
+      assert.equal(sender.copied(), sender.el("exportCodeOutput").value);
     }
+  } finally { await sender.window.happyDOM.abort(); }
+});
+
+for (const clipboard of ["denied", "unavailable"]) test(`Code keeps a selectable export when the clipboard is ${clipboard}`, async () => {
+  const sender = await app({ people: { Friend: { classes: [] } } });
+  try {
+    const before = JSON.stringify(sender.stored());
+    if (clipboard === "unavailable") Object.defineProperty(sender.window.navigator, "clipboard", { value: undefined, configurable: true });
+    else sender.window.navigator.clipboard.writeText = async () => { throw Error("Denied"); };
+    sender.el("exportSchedulesButton").click(); sender.el("selectAllSchedules").click();
+    sender.el("generateCodeButton").click(); await sender.wait();
+    const output = sender.el("exportCodeOutput");
+    assert.equal(sender.el("exportCodeField").hidden, false);
+    assert.ok(output.value);
+    assert.equal(sender.window.document.activeElement, output);
+    assert.equal(output.selectionEnd, output.value.length);
+    assert.match(sender.el("exportCodeStatus").textContent, /Select and copy/);
+    assert.equal(sender.el("generateCodeButton").disabled, false);
+    assert.equal(JSON.stringify(sender.stored()), before);
   } finally { await sender.window.happyDOM.abort(); }
 });
 
@@ -240,5 +259,6 @@ test("PDF and JSON tools are closed behind a bottom menu without moving the earl
     assert.equal(menu.open, false, "advanced tools start hidden on each new visit");
   } finally { await receiver.window.happyDOM.abort(); }
 });
+
 
 

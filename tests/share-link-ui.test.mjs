@@ -284,7 +284,8 @@ test("home export defaults to Everyone in a collapsed selection and supports eac
     assert.ok(a.el("exportQr").querySelector("svg")); assert.equal(a.el("exportQr").hidden, false);
     assert.equal(a.el("exportQrButton").textContent, "Export QR");
     a.el("generateCodeButton").click(); await a.wait(() => !a.el("generateCodeButton").disabled);
-    assert.equal(a.el("exportCodeField").hidden, false); assert.equal(a.el("copyCodeButton").hidden, false);
+    assert.equal(a.el("exportCodeField").hidden, false); assert.equal(a.el("copyCodeButton"), null);
+    assert.equal(a.copied(), a.el("exportCodeOutput").value);
     assert.deepEqual(Object.keys((await a.window.WhosFreeShareCode.decode(a.el("exportCodeOutput").value)).people), ["Alice","Bob"]);
     a.el("exportSelection").open = true;
     a.el("exportPeopleList").querySelector('[data-person="Bob"]').click();

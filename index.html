@@ -187,7 +187,7 @@
           <details class="export-encoding-note"><summary>Why does the text code use Chinese characters?</summary><p>Chinese (CJK) characters, plus some Korean symbols, encode the packed timetable in fewer characters than ordinary letters and numbers. Compression can shorten it further. These are data symbols, not translated text or encryption. Copy the whole code unchanged. Links and QR codes use a URL-safe encoding instead.</p></details>
           <div class="export-generation-actions">
             <div class="export-action-buttons">
-              <button id="generateCodeButton" class="secondary-button action-icon-button" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 7-5 5 5 5m8-10 5 5-5 5m-3-14-2 18"/></svg><span>Export Code</span></button>
+              <button id="generateCodeButton" class="secondary-button action-icon-button" type="button" title="Generate and copy export code"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 7-5 5 5 5m8-10 5 5-5 5m-3-14-2 18"/></svg><span>Export Code</span></button>
               <button id="exportQrButton" class="secondary-button action-icon-button toggle-share-qr" type="button" aria-expanded="false" aria-controls="exportQr"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="6" height="6" rx=".5"/><rect x="15" y="3" width="6" height="6" rx=".5"/><rect x="3" y="15" width="6" height="6" rx=".5"/><path d="M15 15h3v3h3v3h-6v-3m6-6v3M12 3v3m0 6h-3m3 3v6"/></svg><span data-action-label>Export QR</span></button>
               <button id="copyExportLinkButton" class="secondary-button action-icon-button copy-share-link" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m10 13 4-4m-6 6-1 1a4 4 0 0 1-6-6l4-4a4 4 0 0 1 6 0m2 2 1-1a4 4 0 0 1 6 6l-4 4a4 4 0 0 1-6 0"/></svg><span>Copy Link</span></button>
             </div>
@@ -213,7 +213,6 @@
             <p class="share-link-status parser-status" role="status" aria-live="polite"></p>
           </div>
           <div class="modal-actions">
-            <button id="copyCodeButton" class="secondary-button" type="button" disabled hidden>Copy code</button>
           </div>
         </div>
         <div id="codeImportPanel" class="share-code-panel" hidden>
@@ -465,7 +464,7 @@
         <div class="export-action-buttons">
           <button id="personQuickUrlButton" class="secondary-button action-icon-button" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-4-8 4-4 4 4M5 13v7h14v-7"/></svg><span>URL</span></button>
           <button id="personQuickQrButton" class="secondary-button action-icon-button" type="button" aria-expanded="false" aria-controls="personQuickQr"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-4-8 4-4 4 4M5 13v7h14v-7"/></svg><span>QR Code</span></button>
-          <button id="personQuickCodeButton" class="secondary-button action-icon-button" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-4-8 4-4 4 4M5 13v7h14v-7"/></svg><span>Text Code</span></button>
+          <button id="personQuickCodeButton" class="secondary-button action-icon-button" type="button" title="Generate and copy text code"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-4-8 4-4 4 4M5 13v7h14v-7"/></svg><span>Text Code</span></button>
         </div>
         <details id="personQuickExportFields" class="export-field-options">
           <summary aria-label="Choose export details" title="Export details">…</summary>
@@ -483,7 +482,6 @@
       <p class="share-code-note">Names, times, classes and rooms by default. Anyone with the URL, QR or code can read this schedule.</p>
       <div id="personQuickCodeField" class="share-code-panel" hidden>
         <label class="field-group share-code-field"><span>Text code</span><textarea id="personQuickCode" rows="4" readonly spellcheck="false" autocapitalize="off"></textarea></label>
-        <button id="copyPersonQuickCode" class="secondary-button" type="button" disabled>Copy text code</button>
       </div>
       <div id="personQuickSharePanel" class="schedule-share-link" hidden>
         <label class="field-group share-link-field"><span>URL</span><textarea class="share-link-output" rows="2" readonly spellcheck="false" aria-label="Schedule URL"></textarea></label>
@@ -553,7 +551,7 @@
   <script src="schedule-share-code.js?v=90" defer></script>
   <script src="assets/qr/qrcodegen.js?v=90" defer></script>
   <script src="schedule-groups.js?v=90" defer></script>
-  <script src="app.js?v=94" defer></script>
+  <script src="app.js?v=95" defer></script>
 </body>
 </html>
 

@@ -139,7 +139,6 @@
     exportSelection: document.getElementById("exportSelection"),
     exportSelectionSummary: document.getElementById("exportSelectionSummary"),
     exportCodeOutput: document.getElementById("exportCodeOutput"),
-    copyCodeButton: document.getElementById("copyCodeButton"),
     exportCodeStatus: document.getElementById("exportCodeStatus"),
     codeImportPanel: document.getElementById("codeImportPanel"),
     importCodeInput: document.getElementById("importCodeInput"),
@@ -214,7 +213,6 @@
     personQuickExportFields: document.getElementById("personQuickExportFields"),
     personQuickCodeField: document.getElementById("personQuickCodeField"),
     personQuickCode: document.getElementById("personQuickCode"),
-    copyPersonQuickCode: document.getElementById("copyPersonQuickCode"),
     personQuickSharePanel: document.getElementById("personQuickSharePanel"),
     personQuickShareStatus: document.getElementById("personQuickShareStatus"),
     personGroupModal: document.getElementById("personGroupModal"),
@@ -2831,9 +2829,7 @@
     els.exportSelectionSummary.textContent = selected === inputs.length && selected > 0 ? `Everyone · ${selected}` : `${selected} of ${inputs.length} selected`;
     els.exportCodeOutput.value = "";
     els.exportCodeField.hidden = true;
-    els.copyCodeButton.hidden = true;
     resetShareLink(els.exportSharePanel);
-    els.copyCodeButton.disabled = true;
     codeStatus(els.exportCodeStatus, `${selected} schedule${selected === 1 ? "" : "s"} selected.`);
   }
 
@@ -2944,7 +2940,6 @@
       els.exportCodeOutput.value = code;
       populateShareLink(code, els.exportSharePanel);
       els.exportCodeField.hidden = action !== "code";
-      els.copyCodeButton.hidden = action !== "code";
       codeStatus(els.exportCodeStatus, shareCodeReadyMessage(names.length, code), "success");
       if (action === "qr") {
         if (!els.exportSharePanel.querySelector("textarea").value) throw new Error("This code cannot make a QR. Use Export Code instead.");
@@ -2956,16 +2951,12 @@
       } else {
         els.exportSharePanel.hidden = true;
         revealSection(els.exportCodeField);
+        await copyExportCode(els.exportCodeOutput, els.exportCodeStatus);
       }
     } catch (error) {
       els.exportCodeOutput.value = "";
       codeStatus(els.exportCodeStatus, error.message || "The code could not be created.", "error");
     } finally { state.isParsing = false; updateScheduleModal(); }
-  }
-
-  async function copyShareCode() {
-    if (!els.exportCodeOutput.value || state.isParsing) return;
-    await copyExportCode(els.exportCodeOutput, els.exportCodeStatus);
   }
 
   function resetShareLink(panel) {
@@ -3108,15 +3099,18 @@
     await previewSharedImport(input);
   }
 
-  async function copyExportCode(output, status) {
+  async function copyExportCode(output, status, isCurrent = () => true) {
     if (!output.value) return;
+    const details = status.textContent;
     try {
       await navigator.clipboard.writeText(output.value);
-      codeStatus(status, "Code copied. Paste it into your message.", "success");
+      if (!isCurrent()) return;
+      codeStatus(status, `Code copied. Paste it into your message. ${details}`, "success");
     } catch {
+      if (!isCurrent()) return;
       output.focus();
       output.select();
-      codeStatus(status, "Select and copy the code above, then paste it into your message.");
+      codeStatus(status, `Select and copy the code above, then paste it into your message. ${details}`);
     }
   }
 
@@ -3428,7 +3422,6 @@
     els.generateCodeButton.disabled = state.isParsing;
     els.exportQrButton.disabled = state.isParsing;
     els.copyExportLinkButton.disabled = state.isParsing;
-    els.copyCodeButton.disabled = state.isParsing || !els.exportCodeOutput.value;
     els.decodeCodeButton.disabled = state.isParsing || Boolean(state.sharedImport && !els.sharedImportPeople.querySelector("input:checked"));
     els.closeImportButton.disabled = state.isParsing;
     els.importCodeInput.disabled = state.isParsing;
@@ -3557,7 +3550,6 @@
   function resetPersonQuickOutputs() {
     els.personQuickCode.value = "";
     els.personQuickCodeField.hidden = true;
-    els.copyPersonQuickCode.disabled = true;
     resetShareLink(els.personQuickSharePanel);
     codeStatus(els.personQuickShareStatus, "");
   }
@@ -3614,11 +3606,12 @@
       if (request !== state.personShareRequest) return;
       els.personQuickCode.value = code;
       populateShareLink(code, els.personQuickSharePanel);
+      codeStatus(els.personQuickShareStatus, shareCodeReadyMessage(1, code), "success");
       if (action === "code") {
         els.personQuickSharePanel.hidden = true;
         els.personQuickCodeField.hidden = false;
-        els.copyPersonQuickCode.disabled = false;
         revealSection(els.personQuickCodeField);
+        await copyExportCode(els.personQuickCode, els.personQuickShareStatus, () => request === state.personShareRequest);
       } else {
         if (!els.personQuickSharePanel.querySelector("textarea").value) throw new Error("Use Text Code for this schedule instead.");
         if (action === "qr") toggleScheduleQr(els.personQuickSharePanel);
@@ -3628,7 +3621,6 @@
           if (request !== state.personShareRequest) return;
         }
       }
-      codeStatus(els.personQuickShareStatus, shareCodeReadyMessage(1, code), "success");
     } catch (error) {
       if (request === state.personShareRequest) {
         resetPersonQuickOutputs();
@@ -4348,7 +4340,6 @@
     els.personQuickUrlButton.addEventListener("click", () => exportPersonQuickSchedule("url"));
     els.personQuickQrButton.addEventListener("click", () => exportPersonQuickSchedule("qr"));
     els.personQuickCodeButton.addEventListener("click", () => exportPersonQuickSchedule("code"));
-    els.copyPersonQuickCode.addEventListener("click", () => copyExportCode(els.personQuickCode, els.personQuickShareStatus));
     els.closePersonGroup.addEventListener("click", closePersonGroup);
     els.personGroupModal.addEventListener("click", event => { if (event.target === els.personGroupModal) closePersonGroup(); });
     els.personGroupForm.addEventListener("submit", addPersonToGroup);
@@ -4403,7 +4394,6 @@
         changed();
       });
     }
-    els.copyCodeButton.addEventListener("click", copyShareCode);
     els.decodeCodeButton.addEventListener("click", importShareCode);
     els.codeConflictPrompt.addEventListener("click", event => {
       const button = event.target.closest("[data-code-conflict-action]");
@@ -4521,7 +4511,7 @@
     if (!("serviceWorker" in navigator)) return;
     if (location.protocol !== "https:" && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") return;
 
-    navigator.serviceWorker.register("./service-worker.js?v=94", { updateViaCache: "none" })
+    navigator.serviceWorker.register("./service-worker.js?v=95", { updateViaCache: "none" })
       .then(registration => registration.update())
       .catch(() => {
         // The app works normally even if PWA caching isn't available.

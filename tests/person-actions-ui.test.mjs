@@ -88,7 +88,9 @@ test("sharing appears only in the expanded four-button row and all three methods
     const code = a.el("personQuickCode").value;
     assert.deepEqual(Object.keys((await a.window.WhosFreeShareCode.decode(code)).people), ["Alice"]);
     assert.equal(a.el("personQuickCodeField").hidden, false);
-    a.el("copyPersonQuickCode").click(); await tick(); assert.equal(a.copied(), code);
+    assert.equal(a.copied(), code);
+    assert.match(a.el("personQuickShareStatus").textContent, /Code copied/);
+    assert.equal(a.el("copyPersonQuickCode"), null);
     a.el("personQuickUrlButton").click(); await a.wait(() => !a.el("personQuickUrlButton").disabled);
     const url = a.el("personQuickSharePanel").querySelector("textarea").value;
     assert.equal(a.copied(), url);
@@ -118,6 +120,31 @@ test("single-person field selection and clipboard fallback preserve the full can
     assert.equal(decoded.people.Alice.classes[0].instructor, "Anna de la Cruz");
     assert.equal(decoded.people.Alice.classes[0].course_code, "201-NYA");
     assert.equal(decoded.people.Alice.semester, "Fall 2026");
+    a.el("personQuickCodeButton").click(); await a.wait(() => !a.el("personQuickCodeButton").disabled);
+    const code = a.el("personQuickCode");
+    assert.equal(a.el("personQuickCodeField").hidden, false);
+    assert.equal(a.window.document.activeElement, code);
+    assert.equal(code.selectionEnd, code.value.length);
+    assert.match(a.el("personQuickShareStatus").textContent, /Select and copy/);
+    const codeData = await a.window.WhosFreeShareCode.decode(code.value);
+    assert.equal(codeData.people.Alice.classes[0].instructor, "Anna de la Cruz");
+  } finally { await a.window.happyDOM.abort(); }
+});
+
+test("a delayed clipboard failure does not steal focus or leak status into a different person's share", async () => {
+  const a = await app();
+  try {
+    let failCopy;
+    a.window.navigator.clipboard.writeText = () => new Promise((_, reject) => { failCopy = reject; });
+    a.share("Alice"); a.el("personQuickCodeButton").click();
+    await a.wait(() => Boolean(failCopy));
+    a.el("closePersonQuickShare").click(); a.share("Bob");
+    failCopy(Error("Denied")); await tick();
+    assert.equal(a.el("personQuickShareTitle").textContent, "Share Bob");
+    assert.equal(a.el("personQuickCode").value, "");
+    assert.equal(a.el("personQuickShareStatus").textContent, "");
+    assert.equal(a.window.document.activeElement, a.el("closePersonQuickShare"));
+    assert.equal(a.el("personQuickCodeButton").disabled, false);
   } finally { await a.window.happyDOM.abort(); }
 });
 
@@ -452,7 +479,7 @@ test("mobile menu isolates the background, traps focus and restores page scrolli
     assert.equal(a.window.document.activeElement.id, "closeMobileMenuButton");
     const sendKey = (key, shiftKey = false) => a.window.document.activeElement.dispatchEvent(new a.window.KeyboardEvent("keydown", { key, shiftKey, bubbles: true, cancelable: true }));
     sendKey("Tab", true);
-    assert.equal(a.window.document.activeElement.id, "homeExportButton", "disabled Undo is skipped");
+    assert.equal(a.window.document.activeElement.id, "homeImportButton", "disabled Undo is skipped");
     sendKey("Tab");
     assert.equal(a.window.document.activeElement.id, "closeMobileMenuButton");
     sendKey("Escape");
@@ -468,17 +495,17 @@ test("mobile menu isolates the background, traps focus and restores page scrolli
   } finally { await a.window.happyDOM.abort(); }
 });
 
-test("mobile navigation reuses exactly five existing actions, closes before opening their dialogs and returns focus to the toggle", async () => {
+test("mobile navigation reuses exactly six existing actions, closes before opening their dialogs and returns focus to the toggle", async () => {
   const a = await app(data, [], true);
   try {
-    const ids = ["scheduleDataButton", "helpButton", "settingsButton", "homeExportButton", "undoChangesButton"];
+    const ids = ["scheduleDataButton", "helpButton", "settingsButton", "homeExportButton", "homeImportButton", "undoChangesButton"];
     assert.deepEqual([...a.el("homeNavigation").querySelector("nav").children].map(e => e.id), ids);
     for (const id of ids) {
       assert.equal(a.window.document.querySelectorAll(`#${id}`).length, 1);
       assert.ok(a.el(id).querySelector("svg"));
       assert.ok(a.el(id).querySelector("span").textContent.trim());
     }
-    for (const [action, dialog, close] of [["scheduleDataButton","scheduleModal","closeScheduleModal"],["helpButton","helpModal","closeHelpModal"],["settingsButton","settingsModal","closeSettingsModal"],["homeExportButton","scheduleModal","closeScheduleModal"]]) {
+    for (const [action, dialog, close] of [["scheduleDataButton","scheduleModal","closeScheduleModal"],["helpButton","helpModal","closeHelpModal"],["settingsButton","settingsModal","closeSettingsModal"],["homeExportButton","scheduleModal","closeScheduleModal"],["homeImportButton","scheduleModal","closeScheduleModal"]]) {
       a.el("mobileMenuButton").click(); a.el(action).click();
       await a.wait(() => !a.el(dialog).hidden);
       assert.equal(a.el("mobileMenuButton").getAttribute("aria-expanded"), "false");
@@ -574,12 +601,17 @@ test('published shell keeps the header siblings and release asset versions consi
     assert.equal(doc.querySelector('.brand-copy > p').parentElement.className, 'brand-copy');
     assert.equal(a.el('mobileMenuButton').closest('.brand-top-row').querySelectorAll('.brand-row').length, 1);
     assert.equal(doc.querySelectorAll('#mobileMenuButton').length, 1);
-    assert.equal(doc.querySelectorAll('.header-actions > button').length, 5);
-    const version = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version.split('.')[0];
+    assert.equal(doc.querySelectorAll('.header-actions > button').length, 6);
+    const worker = fs.readFileSync(new URL('../service-worker.js', import.meta.url), 'utf8');
+    const cached = new Set([...worker.matchAll(/"\.\/([^"]+)"/g)].map(match => match[1]));
+    const version = new URL(doc.querySelector('script[src^="app.js"]').getAttribute('src'), base).searchParams.get('v');
+    assert.ok(worker.includes(`const CACHE_NAME = "whos-free-shell-v${version}"`));
+    assert.ok(fs.readFileSync(new URL('../app.js', import.meta.url), 'utf8').includes(`service-worker.js?v=${version}`));
     for (const element of doc.querySelectorAll('script[src], link[href], .brand-logo')) {
       const url = element.getAttribute('src') || element.getAttribute('href');
       if (!url || url.startsWith('https:')) continue;
-      assert.equal(new URL(url, base).searchParams.get('v'), version, url);
+      assert.ok(cached.has(url), `${url} must match its offline cache entry`);
     }
   } finally { await a.window.happyDOM.abort(); }
 });
+
