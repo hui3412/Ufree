@@ -1,5 +1,13 @@
 # UFree
 
+### Reader 53 — Variable-height semester rows
+
+- Keep the existing image reader first. When it rejects a time axis, an additional fallback can read semester timetables with stretched half-hour rows.
+- Match printed clocks to each visible time-column cell and use its actual borders for class times, rather than assuming equal pixel heights mean equal durations.
+- Reject incomplete axes, contradictory clocks and missing row borders. The existing review screen remains required before saving.
+- The supplied seven-day screenshot yields all eight displayed occupied blocks, including Saturday 08:30–09:00. Meeting dates in footer messages are not imported, and course wording may still need review.
+- Regression fixtures retain only weekday/clock coordinates, row borders and anonymous occupied spans. No uploaded screenshot or course/person text is added to the repository.
+
 link: [www.youfree.ca](https://www.youfree.ca)
 
 ### Version 82 — Compact group controls
@@ -445,3 +453,4 @@ App by David Dajbog and Hui En Quan. Inspiration from Xander Vatch.
 ## v83: Official UFree branding
 
 The supplied SVG replaces the text masthead, including the legacy entry point. The supplied PNG is referenced in Open Graph and Twitter metadata. Browser, iOS, installable-app and notification icons use the official logo; square and maskable variants preserve its proportions. Branding assets are included in the offline shell.
+

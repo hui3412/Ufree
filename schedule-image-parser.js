@@ -413,7 +413,66 @@
     return groups.map(group => (group[0] + group[group.length - 1]) / 2);
   }
 
+  function variableRowTimeGrid(items, headerBottom, canvas, firstColumn) {
+    // Some semester views stretch a half-hour row to fit its course text.
+    // Validate each physical gutter cell; pixel height no longer means time.
+    const labels = items.map(item => ({ ...item, time: normalizedTime(item.text) }))
+      .filter(item => item.time && item.y0 > headerBottom && item.x1 <= firstColumn.left + 3)
+      .map(item => ({ ...item, minute: Number(item.time.slice(0, 2)) * 60 + Number(item.time.slice(3)) }))
+      .sort((a, b) => a.cy - b.cy);
+    if (labels.length < 12 || labels.some(item => item.minute % 30)) throw new Error("Not enough half-hour clocks for variable rows.");
+    const x0 = median(labels.map(item => item.x0)), x1 = median(labels.map(item => item.x1));
+    const padding = Math.max(2, (x1 - x0) * .12);
+    const gutter = { left: Math.max(0, x0 - padding), right: Math.min(firstColumn.left, x1 + padding) };
+    gutter.width = gutter.right - gutter.left;
+    const detected = borderRows(canvas, gutter, headerBottom);
+    const last = detected.findIndex(y => y >= labels.at(-1).y1);
+    const boundaries = detected.slice(0, last + 1);
+    if (last < 6 || boundaries[0] > labels[0].y0) throw new Error("Variable rows need complete visible borders.");
+    const heights = boundaries.slice(1).map((y, i) => y - boundaries[i]);
+    const rowHeight = median(heights);
+    const continues = row => detected.slice(last + 1).some(y => Math.abs(y - boundaries.at(-1) - row * rowHeight) < Math.max(2, rowHeight * .12));
+    if (continues(1) && continues(2)) throw new Error("Only part of the variable time column was read.");
+    if (boundaries[0] - headerBottom > rowHeight * .5 ||
+        !heights.some(height => height > rowHeight * 1.5) ||
+        heights.some(height => height < rowHeight * .6 || height > rowHeight * 6)) {
+      throw new Error("This is not a validated variable-height timetable.");
+    }
+    const rows = heights.map((_, i) => labels.filter(item => item.y0 >= boundaries[i] && item.y1 <= boundaries[i + 1]));
+    const pairs = rows.flatMap((row, i) => {
+      const minutes = [...new Set(row.map(item => item.minute))];
+      return minutes.length === 2 && minutes[1] - minutes[0] === 30 ? [minutes[0] - i * 30] : [];
+    });
+    const origin = median(pairs);
+    if (pairs.length < 4 || pairs.some(value => value !== origin) || origin < 0 || origin + rows.length * 30 >= 1440 ||
+        rows.some((row, i) => !row.length || row.some(item => item.minute !== origin + i * 30 && item.minute !== origin + (i + 1) * 30)) ||
+        rows.flat().length !== labels.length || rows[0][0].minute !== origin || rows.at(-1).at(-1).minute !== origin + rows.length * 30) {
+      throw new Error("Clock labels do not agree with the individual timetable rows.");
+    }
+    const height = median(labels.map(item => item.height));
+    const clock = minute => `${String(Math.floor(minute / 60)).padStart(2, "0")}:${String(minute % 60).padStart(2, "0")}`;
+    const markers = heights.flatMap((_, i) => {
+      const top = boundaries[i], bottom = boundaries[i + 1];
+      return [
+        { text: clock(origin + i * 30), x0, x1, cx: (x0 + x1) / 2, y0: top, y1: top + height, cy: top + height / 2, height },
+        { text: clock(origin + (i + 1) * 30), x0, x1, cx: (x0 + x1) / 2, y0: bottom - height, y1: bottom, cy: bottom - height / 2, height },
+      ];
+    });
+    return { items: markers, rowHeight, top: boundaries[0], bottom: boundaries.at(-1), boundaries, mode: "variable-half-hour", boundaryValidated: true };
+  }
+
   function readTimeGrid(items, headerBottom, evidence) {
+    try { return readRegularTimeGrid(items, headerBottom, evidence); }
+    catch (error) {
+      if (evidence?.canvas?.getContext && evidence.column) {
+        try { return variableRowTimeGrid(items, headerBottom, evidence.canvas, evidence.column); }
+        catch { /* Preserve existing retries and errors when this layout is unproven. */ }
+      }
+      throw error;
+    }
+  }
+
+  function readRegularTimeGrid(items, headerBottom, evidence) {
     const grid = timeGrid(items, headerBottom, evidence);
     if (evidence?.canvas?.getContext) {
       // A consistent subset is not a complete timetable. Full-page sparse OCR
@@ -648,7 +707,7 @@
             try { grid = readTimeGrid(words.filter(item => item.x1 <= columns[0].left + 3), headerBottom, evidence); break; }
             catch { /* Continue to the next independent reading method. */ }
           }
-          if (!grid) throw new Error("Could not validate the full time column after several on-device reading methods. Include all the times and grid borders in a clear, upright screenshot. (Reader 52: time column)");
+          if (!grid) throw new Error("Could not validate the full time column after several on-device reading methods. Include all the times and grid borders in a clear, upright screenshot. (Reader 53: time column)");
         }
       }
       status("Isolating the timetable from the rest of the picture…");
@@ -712,7 +771,7 @@
       if (recognizedCells.length >= 4 && recognizedCells.filter(cell => !cell.words.some(word => /[a-z0-9]/i.test(word.text))).length > recognizedCells.length / 2) {
         throw new Error("Too much of the timetable is unreadable, even after text retries. Try a closer screenshot of the timetable, with all headings and times included.");
       }
-      const classes = classesFromCells(recognizedCells, starts, ends, grid.rowHeight);
+      const classes = classesFromCells(recognizedCells, starts, ends, grid.rowHeight, grid);
       if (!classes.length) throw new Error("No classes could be read. Use a sharper screenshot showing the entire timetable.");
       if (grid.boundaryValidated) for (const item of classes) {
         item.review_warning = [item.review_warning, "Time labels were recovered using visible grid borders. Check these times against the picture."].filter(Boolean).join(" ");
@@ -720,7 +779,7 @@
       const name = globalThis.WhosFreeParser.extractScheduleName(fullItems) || "";
       return { name, person: { source_file: filename, classes }, needsReview: true };
     } catch (error) {
-      throw new Error(`${error.message || "The picture could not be read."}${String(error.message).includes("Reader 52:") ? "" : ` (Reader 52: ${stage.toLowerCase()})`}`);
+      throw new Error(`${error.message || "The picture could not be read."}${String(error.message).includes("Reader 53:") ? "" : ` (Reader 53: ${stage.toLowerCase()})`}`);
     } finally {
       bootFailed = true;
       clearTimeout(bootTimer);
@@ -729,9 +788,25 @@
     }
   }
 
-  function classesFromCells(cells, starts, ends, rowHeight) {
+  function variableRowTimes(rect, grid) {
+    const nearest = y => grid.boundaries.reduce((best, value, i) => Math.abs(value - y) < Math.abs(grid.boundaries[best] - y) ? i : best, 0);
+    const first = nearest(rect.y0), last = nearest(rect.y1);
+    const tolerance = Math.max(2, grid.rowHeight * .18);
+    if (last <= first || Math.abs(grid.boundaries[first] - rect.y0) > tolerance || Math.abs(grid.boundaries[last] - rect.y1) > tolerance) {
+      throw new Error("A class does not align with the validated timetable rows. Check the picture's borders.");
+    }
+    return { start: grid.items[first * 2].text, end: grid.items[last * 2 - 1].text };
+  }
+
+  function classesFromCells(cells, starts, ends, rowHeight, grid = null) {
     const classes = [];
-    for (const { rect, lines, words } of cells) {
+    for (const { rect, lines: recognizedLines, words } of cells) {
+      // In narrow semester cells OCR can split a printed code as "602-UF 1-MQ".
+      // Join only the fixed code shape on the new path; do not infer characters.
+      const lines = grid?.mode === "variable-half-hour" ? recognizedLines.map(line => line.replace(
+        /\b([A-Z0-9]{3})\s*-\s*([A-Z0-9](?:\s*[A-Z0-9]){2})\s*-\s*([A-Z0-9]{2})\b/gi,
+        (_, prefix, middle, suffix) => `${prefix}-${middle.replace(/\s/g, "")}-${suffix}`
+      )) : recognizedLines;
       const codes = lines.join(" ").match(/\b[A-Z0-9]{3}-[A-Z0-9]{3}-[A-Z0-9]{2}\b/gi) || [];
       const warnings = [];
       if (codes.length > 1) warnings.push("Check this busy span: multiple courses were detected. Split it if needed.");
@@ -751,7 +826,9 @@
       const label = lines.join(" ").trim();
       const busy = /^(?:athletes?\s+(?:student|etudiant)|confli(?:ct|t)\s*\d*)$/i.test(label.normalize("NFD").replace(/[\u0300-\u036f]/g, ""));
       // Occupancy follows the cell geometry, never a known course name/code.
-      let times = (codes.length <= 1 && parsed.explicitTime) || globalThis.WhosFreeParser.scheduleTimesFromRectangle(rect, starts, ends, rowHeight);
+      let times = (codes.length <= 1 && parsed.explicitTime) || (grid?.mode === "variable-half-hour"
+        ? variableRowTimes(rect, grid)
+        : globalThis.WhosFreeParser.scheduleTimesFromRectangle(rect, starts, ends, rowHeight));
       delete parsed.explicitTime;
       if (busy || !parsed.course_code) parsed.course = label || "Busy block";
       if (times.end <= times.start) continue;
@@ -768,6 +845,7 @@
     finally { canvas.width = canvas.height = 1; }
   }
 
-  globalThis.WhosFreeImageParser = { parseScheduleImage, parseScheduleCanvas, __test: { wordsFromData, timeGrid, readTimeGrid, boundaryTimeGrid, recognitionPatch, patchWords, borderRows, headersFromItems, classesFromCells, classRegions, containsInk, isolateTimetable } };
+  globalThis.WhosFreeImageParser = { parseScheduleImage, parseScheduleCanvas, __test: { wordsFromData, timeGrid, readTimeGrid, boundaryTimeGrid, variableRowTimeGrid, recognitionPatch, patchWords, borderRows, headersFromItems, classesFromCells, classRegions, containsInk, isolateTimetable } };
 })();
+
 
