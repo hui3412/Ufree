@@ -363,7 +363,7 @@ test("navigation keeps six actions together, the export icon opens quick share, 
   } finally { a.window.happyDOM.abort(); }
 });
 
-for (const mobile of [false, true]) test(`menu code import shares the existing importer and restores focus on ${mobile ? "mobile" : "desktop"}`, async () => {
+for (const mobile of [false, true]) test(`menu Import shares the existing importer and restores focus on ${mobile ? "mobile" : "desktop"}`, async () => {
   const a = await app(null, base, mobile);
   try {
     const trigger = mobile ? "mobileMenuButton" : "homeImportButton";
@@ -379,9 +379,12 @@ for (const mobile of [false, true]) test(`menu code import shares the existing i
       assert.equal(a.el("scheduleModal").querySelector(".schedule-modal").dataset.scheduleFlow, "code-import");
     };
     assert.equal(a.el("homeImportButton").disabled, false, "import works on an empty device");
-    assert.equal(a.el("homeImportButton").getAttribute("aria-label"), "Import schedule code");
+    assert.equal(a.el("homeImportButton").getAttribute("aria-label"), "Import");
+    assert.equal(a.el("homeImportButton").querySelector(".nav-extra-label").textContent, "Import");
     assert.ok(a.el("homeImportButton").querySelector("svg"));
     open();
+    assert.equal(a.el("importScheduleImageButton").closest("[hidden]"), null);
+    assert.equal(a.el("codeImportPanel").firstElementChild, a.el("importScheduleImageButton"));
     a.el("closeImportButton").click();
     assert.equal(a.el("scheduleModal").hidden, true);
     assert.equal(a.window.document.activeElement.id, trigger);

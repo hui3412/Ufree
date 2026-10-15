@@ -1,5 +1,10 @@
 # UFree
 
+### Combined Import panel
+
+- The main menu's **Import** opens a single panel with **Import schedule image** above the code/link text box. Schedules keeps its original picture button and also uses this combined importer.
+- Both image buttons open the same chooser and use the existing local recognition, naming, review, duplicate handling and save flow. Canceling the chooser or returning from review preserves any typed code. Image errors and retry feedback stay visible in Import.
+
 ### Multiple independent QR codes
 
 - When a collection is too large for one QR, **Multiple QR codes** packs the selected people into scrollable QR cards. Each card lists its people and uses a complete existing WF6 share link on the current deployment's domain and path.

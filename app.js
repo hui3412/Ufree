@@ -131,6 +131,8 @@
     shareSchedulesButton: document.getElementById("shareSchedulesButton"),
     exportSchedulesButton: document.getElementById("exportSchedulesButton"),
     importCodeButton: document.getElementById("importCodeButton"),
+    importScheduleImageButton: document.getElementById("importScheduleImageButton"),
+    importImageStatus: document.getElementById("importImageStatus"),
     codeExportPanel: document.getElementById("codeExportPanel"),
     exportPeopleList: document.getElementById("exportPeopleList"),
     selectAllSchedules: document.getElementById("selectAllSchedules"),
@@ -2168,6 +2170,10 @@
   function setImageStatus(message, tone = "working") {
     els.imageParserStatus.textContent = message;
     els.imageParserStatus.dataset.tone = tone;
+    if (state.codeMode === "import") {
+      els.importImageStatus.textContent = message;
+      els.importImageStatus.dataset.tone = tone;
+    }
     updateImportProgress(message);
   }
 
@@ -2387,7 +2393,7 @@
       state.isParsing = false;
       event.target.value = "";
       updateScheduleModal();
-      endImportProgress(state.pendingImage ? document.getElementById("imageReviewTitle") : els.addScheduleImageButton);
+      endImportProgress(state.pendingImage ? document.getElementById("imageReviewTitle") : state.codeMode === "import" ? els.importScheduleImageButton : els.addScheduleImageButton);
     }
   }
 
@@ -2908,8 +2914,9 @@
       revealSection(els.codeExportPanel, quick ? els.generateCodeButton : els.exportSelection.querySelector("summary"));
     } else {
       els.importCodeInput.value = "";
+      els.importImageStatus.textContent = "";
       codeStatus(els.importCodeStatus, "");
-      revealSection(els.codeImportPanel, els.importCodeInput);
+      revealSection(els.codeImportPanel, els.importScheduleImageButton);
     }
     updateScheduleModal();
   }
@@ -3512,12 +3519,13 @@
     }
     els.codeImportPanel.hidden = state.codeMode !== "import";
     els.codeExportPanel.hidden = state.codeMode !== "export";
-    document.getElementById("scheduleModalTitle").textContent = flow === "review" ? "Review schedule" : flow === "code-import" ? "Import schedules" : flow === "code-export" ? state.quickExport ? "Quick share" : "Share schedules" : "Schedule data";
+    document.getElementById("scheduleModalTitle").textContent = flow === "review" ? "Review schedule" : flow === "code-import" ? "Import" : flow === "code-export" ? state.quickExport ? "Quick share" : "Share schedules" : "Schedule data";
     dialog.querySelector(".modal-header p").hidden = Boolean(flow);
     if (flow) dialog.dataset.scheduleFlow = flow;
     else delete dialog.dataset.scheduleFlow;
     if (previous !== flow) {
       dialog.scrollTop = 0;
+      if (previous === "review" && flow === "code-import") revealSection(els.codeImportPanel, els.importScheduleImageButton);
       if (!flow && !els.scheduleModal.hidden && !state.importProgress) {
         const target = previous === "review" ? els.addScheduleImageButton : previous === "code-export" ? els.exportSchedulesButton : els.importCodeButton;
         target.focus({ preventScroll: true });
@@ -3535,6 +3543,7 @@
     els.homeExportButton.disabled = importBusy || peopleCount === 0;
     if (els.homeImportButton) els.homeImportButton.disabled = importBusy;
     els.importCodeButton.disabled = importBusy;
+    els.importScheduleImageButton.disabled = state.isParsing || Boolean(state.pendingImage) || Boolean(state.sharedImport);
     els.generateCodeButton.disabled = state.isParsing;
     els.exportQrButton.disabled = state.isParsing;
     els.copyExportLinkButton.disabled = state.isParsing;
@@ -4471,6 +4480,7 @@
       if (els.advancedScheduleOptions.open && !els.scheduleModal.hidden) revealSection(els.advancedSchedulePanel);
     });
     els.addScheduleImageButton.addEventListener("click", chooseScheduleImage);
+    els.importScheduleImageButton.addEventListener("click", chooseScheduleImage);
     els.scheduleImageInput.addEventListener("change", handleScheduleImage);
     els.manualScheduleButton.addEventListener("click", () => openManualSchedule());
     els.addReviewClassButton.addEventListener("click", () => {
@@ -4628,7 +4638,7 @@
     if (!("serviceWorker" in navigator)) return;
     if (location.protocol !== "https:" && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") return;
 
-    navigator.serviceWorker.register("./service-worker.js?v=98", { updateViaCache: "none" })
+    navigator.serviceWorker.register("./service-worker.js?v=99", { updateViaCache: "none" })
       .then(registration => registration.update())
       .catch(() => {
         // The app works normally even if PWA caching isn't available.
