@@ -1,10 +1,10 @@
-const CACHE_NAME = "whos-free-shell-v95";
+const CACHE_NAME = "whos-free-shell-v96";
 const OCR_CACHE_NAME = "whos-free-ocr-v1";
 const APP_SHELL = [
   "./",
   "./index.html",
   "./styles.css?v=90",
-  "./app.js?v=95",
+  "./app.js?v=96",
   "./schedule-share-code.js?v=90",
   "./assets/qr/qrcodegen.js?v=90",
   "./schedule-availability.js?v=90",
@@ -20,7 +20,10 @@ const APP_SHELL = [
   "./assets/UFreeLogo_SVG.svg?v=90",
   "./assets/UFreeLogo_PNG.png?v=90",
   "./assets/favicon.svg?v=90",
-  "./favicon.ico?v=90"
+  "./favicon.ico?v=90",
+  "./assets/icon-192.png",
+  "./favicon.ico",
+  "./assets/apple-touch-icon.png"
 ];
 
 self.addEventListener("install", event => {
