@@ -10,9 +10,16 @@ async function timetable(view) {
   window.matchMedia = () => ({ matches: true, addEventListener() {} });
   window.URL.createObjectURL = () => "blob:test";
   window.URL.revokeObjectURL = () => {};
-  if (view === "full schedule") window.localStorage.setItem("whos-free-local-schedules", JSON.stringify({ data: { people: { "Test student": { classes: [{ day: "Monday", start: "08:15", end: "09:35" }] } } }, meta: {} }));
+  if (view !== "picture review") window.localStorage.setItem("whos-free-local-schedules", JSON.stringify({ data: { people: { "Test student": { classes: [{ day: "Monday", start: "08:15", end: "09:35" }] } } }, meta: {} }));
+  if (view === "group schedule") {
+    const record = JSON.parse(window.localStorage.getItem("whos-free-local-schedules"));
+    record.data.people["Second student"] = { classes: [{ day: "Tuesday", start: "10:00", end: "11:30" }] };
+    window.localStorage.setItem("whos-free-local-schedules", JSON.stringify(record));
+    window.localStorage.setItem("whos-free-groups-v1", JSON.stringify({ groups: [{ id: "team", name: "Team", members: ["Test student", "Second student"] }], showGroups: true }));
+  }
   window.WhosFreeImageParser = { parseScheduleImage: async () => ({ name: "Test student", person: { classes: [{ day: "Monday", start: "08:15", end: "09:35" }] } }) };
   window.eval(fs.readFileSync(new URL("../schedule-availability.js", import.meta.url), "utf8"));
+  window.eval(fs.readFileSync(new URL("../schedule-groups.js", import.meta.url), "utf8"));
   window.eval(fs.readFileSync(new URL("../app.js", import.meta.url), "utf8"));
   const tick = () => new Promise(resolve => setTimeout(resolve, 30));
   await tick();
@@ -20,17 +27,21 @@ async function timetable(view) {
     const input = window.document.getElementById("scheduleImageInput");
     Object.defineProperty(input, "files", { value: [{ name: "timetable.png" }] });
     input.dispatchEvent(new window.Event("change"));
+    await tick();
+    window.document.getElementById("importPictureNameForm").dispatchEvent(new window.Event("submit", { cancelable: true }));
+  } else if (view === "group schedule") {
+    window.document.querySelector('[aria-label="View weekly availability for Team"]').click();
   } else {
     window.document.getElementById("viewToggleButton").click();
     window.document.querySelector('.person-card[data-person="Test student"]').click();
     window.document.getElementById("fullScheduleButton").click();
   }
   await tick();
-  const grid = window.document.getElementById(view === "picture review" ? "reviewGrid" : "personWeekGrid").parentElement;
-  const container = window.document.getElementById(view === "picture review" ? "imageReview" : "personWeekModal");
-  const actionButton = window.document.getElementById(view === "picture review" ? "saveImageScheduleButton" : "exportPersonScheduleButton");
+  const grid = window.document.getElementById(view === "picture review" ? "reviewGrid" : view === "group schedule" ? "groupWeekGrid" : "personWeekGrid").parentElement;
+  const container = window.document.getElementById(view === "picture review" ? "imageReview" : view === "group schedule" ? "groupWeekModal" : "personWeekModal");
+  const actionButton = window.document.getElementById(view === "picture review" ? "saveImageScheduleButton" : view === "group schedule" ? "closeGroupWeekModal" : "exportPersonScheduleButton");
   const dialog = grid.closest(".schedule-modal");
-  Object.defineProperties(grid, { scrollHeight: { value: 700 }, clientHeight: { value: 300, configurable: true } });
+  Object.defineProperties(grid, { scrollHeight: { value: 700 }, clientHeight: { value: 300, configurable: true }, scrollWidth: { value: 1300 }, clientWidth: { value: 300 } });
   Object.defineProperties(dialog, { scrollHeight: { value: 2000 }, clientHeight: { value: 600 } });
   grid.scrollTop = 0;
   dialog.scrollTop = 100;
@@ -56,9 +67,73 @@ async function timetable(view) {
   return { window, grid, dialog, container, actionButton, touch, dispatch, advance, frame, frames };
 }
 
-for (const view of ["picture review", "full schedule"]) {
+for (const view of ["picture review", "full schedule", "group schedule"]) {
 const review = () => timetable(view);
 const test = (name, run) => nodeTest(`${view}: ${name}`, run);
+
+test("a vertical swipe immediately interrupts horizontal momentum", async () => {
+  const a = await review();
+  try {
+    a.dispatch("touchstart", [a.touch(200, 300)]);
+    a.advance(20); a.dispatch("touchmove", [a.touch(160, 300)]);
+    a.advance(20); a.dispatch("touchmove", [a.touch(120, 300)]);
+    a.dispatch("touchend", []);
+    const beforeCoast = a.grid.scrollLeft; a.frame();
+    assert.ok(a.grid.scrollLeft > beforeCoast);
+    const stoppedX = a.grid.scrollLeft;
+    a.dispatch("touchstart", [a.touch(100, 300)]);
+    assert.equal(a.frames.size, 0);
+    a.advance(20); a.dispatch("touchmove", [a.touch(100, 260)]);
+    assert.equal(a.grid.scrollLeft, stoppedX);
+    assert.equal(a.grid.scrollTop, 40);
+    a.dispatch("touchend", []); a.frame();
+    assert.equal(a.grid.scrollLeft, stoppedX);
+    assert.ok(a.grid.scrollTop > 40);
+  } finally { await a.window.happyDOM.abort(); }
+});
+
+test("diagonal swipes move both axes and momentum continues when only one hits an edge", async () => {
+  const a = await review();
+  try {
+    a.grid.scrollLeft = 990; a.grid.scrollTop = 390;
+    a.dispatch("touchstart", [a.touch(200, 300)]);
+    a.advance(20); a.dispatch("touchmove", [a.touch(170, 260)]);
+    assert.equal(a.grid.scrollLeft, 1000);
+    assert.equal(a.grid.scrollTop, 400);
+    assert.equal(a.dialog.scrollTop, 130);
+    a.dispatch("touchend", []); a.frame();
+    assert.equal(a.grid.scrollLeft, 1000); assert.ok(a.dialog.scrollTop > 130);
+    assert.equal(a.frames.size, 1, "horizontal edge does not end vertical coasting");
+    a.dispatch("touchstart", [a.touch(200, 300)]);
+    a.grid.scrollLeft = 100; a.dialog.scrollTop = 1400;
+    a.advance(20); a.dispatch("touchmove", [a.touch(170, 260)]);
+    a.dispatch("touchend", []); a.frame();
+    assert.ok(a.grid.scrollLeft > 130); assert.equal(a.dialog.scrollTop, 1400);
+    assert.equal(a.frames.size, 1, "vertical edge does not end horizontal coasting");
+  } finally { await a.window.happyDOM.abort(); }
+});
+
+test("trackpad diagonals, vertical movement after horizontal movement and browser zoom stay usable", async () => {
+  const a = await review();
+  try {
+    const wheel = options => {
+      const event = new a.window.WheelEvent("wheel", { bubbles: true, cancelable: true, ...options });
+      // happy-dom's WheelEvent omits modifier properties present in browsers.
+      Object.defineProperties(event, { ctrlKey: { value: Boolean(options.ctrlKey) }, shiftKey: { value: Boolean(options.shiftKey) } });
+      a.grid.dispatchEvent(event); return event;
+    };
+    assert.equal(wheel({ deltaX: 60, deltaY: 40 }).defaultPrevented, true);
+    assert.equal(a.grid.scrollLeft, 60); assert.equal(a.grid.scrollTop, 40);
+    a.grid.scrollLeft = 1000; a.grid.scrollTop = 400;
+    wheel({ deltaX: 30, deltaY: 50 });
+    assert.equal(a.grid.scrollLeft, 1000); assert.equal(a.dialog.scrollTop, 150);
+    wheel({ deltaY: 30 }); assert.equal(a.dialog.scrollTop, 180);
+    assert.equal(wheel({ deltaY: 50, ctrlKey: true }).defaultPrevented, false);
+    assert.equal(a.dialog.scrollTop, 180);
+    a.grid.scrollLeft = 100; wheel({ deltaY: 20, shiftKey: true });
+    assert.equal(a.grid.scrollLeft, 120); assert.equal(a.dialog.scrollTop, 180);
+  } finally { await a.window.happyDOM.abort(); }
+});
 
 test("picture review continues the same upward swipe into the dialog at the grid bottom", async () => {
   const a = await review();
@@ -106,17 +181,18 @@ test("an unbounded horizontal timetable sends vertical swipes directly to the di
   } finally { a.window.happyDOM.abort(); }
 });
 
-test("taps and horizontal swipes remain native even when the finger later drifts vertically", async () => {
+test("taps remain native and horizontal movement can turn into a diagonal swipe", async () => {
   const a = await review();
   try {
     a.dispatch("touchstart", [a.touch(100, 300)]);
     assert.equal(a.dispatch("touchmove", [a.touch(102, 298)]).defaultPrevented, false);
     a.dispatch("touchend", []);
     a.dispatch("touchstart", [a.touch(100, 300)]);
-    assert.equal(a.dispatch("touchmove", [a.touch(60, 298)]).defaultPrevented, false);
-    assert.equal(a.dispatch("touchmove", [a.touch(40, 240)]).defaultPrevented, false);
+    assert.equal(a.dispatch("touchmove", [a.touch(60, 298)]).defaultPrevented, true);
+    assert.equal(a.dispatch("touchmove", [a.touch(40, 240)]).defaultPrevented, true);
     assert.equal(a.dialog.scrollTop, 100);
-    assert.equal(a.grid.scrollTop, 0);
+    assert.equal(a.grid.scrollTop, 60);
+    assert.equal(a.grid.scrollLeft, 60);
   } finally { a.window.happyDOM.abort(); }
 });
 
@@ -195,20 +271,22 @@ test("a new touch anywhere or another input immediately stops momentum", async (
       a.dispatch("touchend", []); a.frame();
       assert.equal(a.frames.size, 1);
       const stopped = a.dialog.scrollTop;
+      if (type === "visibilitychange") Object.defineProperty(a.window.document, "hidden", { value: true, configurable: true });
       a.window.document.dispatchEvent(new a.window.Event(type, { bubbles: true }));
       assert.equal(a.frames.size, 0, `${type} cancels the pending coast frame`);
       a.frame(); assert.equal(a.dialog.scrollTop, stopped);
+      if (type === "visibilitychange") Object.defineProperty(a.window.document, "hidden", { value: false, configurable: true });
     }
   } finally { await a.window.happyDOM.abort(); }
 });
 
-test("a pause, cancellation, pinch, horizontal swipe or replaced touch cannot start momentum", async () => {
+test("a pause, cancellation, pinch or replaced touch cannot start momentum", async () => {
   const a = await review();
   try {
-    for (const interruption of ["pause", "cancel", "pinch", "horizontal", "replacement", "native"]) {
+    for (const interruption of ["pause", "cancel", "pinch", "replacement", "native"]) {
       a.dispatch("touchstart", [a.touch(100, 300)]);
       a.advance(20);
-      a.dispatch("touchmove", [a.touch(interruption === "horizontal" ? 30 : 100, 270)]);
+      a.dispatch("touchmove", [a.touch(100, 270)]);
       a.advance(20); a.dispatch("touchmove", [a.touch(100, 230)]);
       if (interruption === "pause") a.advance(120);
       if (interruption === "cancel") a.dispatch("touchcancel", []);
@@ -272,3 +350,4 @@ test("faster flicks travel farther and coast distance is consistent at 60Hz and 
   } finally { await a.window.happyDOM.abort(); }
 });
 }
+

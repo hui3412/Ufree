@@ -553,8 +553,8 @@
 
     await showSystemNotification(title, {
       body,
-      icon: "./assets/icon-192.png?v=89",
-      badge: "./assets/icon-192.png?v=89",
+      icon: "./assets/icon-192.png?v=90",
+      badge: "./assets/icon-192.png?v=90",
       tag: `whos-free-break-${dateKey()}-${breaks[0].start}`,
       data: { url: "./" },
     });
@@ -641,8 +641,8 @@
     }
     const ok = await showSystemNotification("UFree notifications work", {
       body: "You'll get grouped alerts when friends start breaks longer than 10 minutes.",
-      icon: "./assets/icon-192.png?v=89",
-      badge: "./assets/icon-192.png?v=89",
+      icon: "./assets/icon-192.png?v=90",
+      badge: "./assets/icon-192.png?v=90",
       tag: "whos-free-test",
       data: { url: "./" },
     });
@@ -4212,15 +4212,16 @@
       momentumFrame = null;
     };
 
-    const scrollVertically = (element, delta) => {
-      const limit = Math.max(0, element.scrollHeight - element.clientHeight);
-      const before = Math.max(0, Math.min(element.scrollTop, limit));
+    const scrollAxis = (element, delta, horizontal = false) => {
+      const position = horizontal ? "scrollLeft" : "scrollTop";
+      const limit = Math.max(0, horizontal ? element.scrollWidth - element.clientWidth : element.scrollHeight - element.clientHeight);
+      const before = Math.max(0, Math.min(element[position], limit));
       const after = Math.max(0, Math.min(before + delta, limit));
-      element.scrollTop = after;
+      element[position] = after;
       return delta - (after - before);
     };
-    const scroll = delta => scrollVertically(dialog, scrollVertically(grid, delta));
-    const startMomentum = velocity => {
+    const scroll = (x, y) => ({ x: scrollAxis(grid, x, true), y: scrollAxis(dialog, scrollAxis(grid, y)) });
+    const startMomentum = (x, y) => {
       let previous = performance.now();
       // Exponential slowing keeps the release smooth at any display refresh
       // rate. Integrate the distance rather than stepping a fixed pixel count.
@@ -4230,9 +4231,12 @@
         const elapsed = Math.min(48, Math.max(0, now - previous));
         previous = now;
         const decay = Math.exp(-elapsed / 325);
-        const remaining = scroll(velocity * 325 * (1 - decay));
-        velocity *= decay;
-        if (Math.abs(remaining) > .5 || Math.abs(velocity) < .03) return;
+        const remaining = scroll(x * 325 * (1 - decay), y * 325 * (1 - decay));
+        x *= decay; y *= decay;
+        // Hitting one edge must not stop motion along the other axis.
+        if (Math.abs(remaining.x) > .5 || Math.abs(x) < .03) x = 0;
+        if (Math.abs(remaining.y) > .5 || Math.abs(y) < .03) y = 0;
+        if (!x && !y) return;
         momentumFrame = requestAnimationFrame(frame);
       };
       momentumFrame = requestAnimationFrame(frame);
@@ -4246,50 +4250,71 @@
     grid.addEventListener("touchstart", event => {
       const touch = event.touches.length === 1 ? event.touches[0] : null;
       const now = performance.now();
-      gesture = touch ? { id: touch.identifier, x: touch.clientX, y: touch.clientY, lastY: touch.clientY, lastTime: now, samples: [{ y: touch.clientY, time: now }], direction: 0, axis: null } : null;
+      gesture = touch ? {
+        id: touch.identifier, x: touch.clientX, y: touch.clientY,
+        lastX: touch.clientX, lastY: touch.clientY, lastTime: now,
+        samples: { x: [{ value: touch.clientX, time: now }], y: [{ value: touch.clientY, time: now }] },
+        direction: { x: 0, y: 0 }, moving: false,
+      } : null;
     }, { passive: true });
     grid.addEventListener("touchmove", event => {
       if (!gesture || event.touches.length !== 1) { gesture = null; return; }
       const touch = event.touches[0];
       if (touch.identifier !== gesture.id) { gesture = null; return; }
-      if (!gesture.axis) {
+      if (!gesture.moving) {
         const x = Math.abs(touch.clientX - gesture.x), y = Math.abs(touch.clientY - gesture.y);
         if (Math.max(x, y) < 6) return;
-        gesture.axis = x > y ? "horizontal" : "vertical";
+        gesture.moving = true;
       }
-      if (gesture.axis !== "vertical") return;
       if (!event.cancelable) { gesture = null; return; }
-      // Route the whole vertical gesture so Safari cannot latch it to the
-      // horizontal scroller. Transfer unused motion to the surrounding dialog,
-      // including during the same swipe and when reversing at either edge.
+      // Own both axes so Safari's horizontal momentum cannot latch a new
+      // gesture. Diagonal motion stays diagonal; unused Y moves the dialog.
       event.preventDefault();
-      const delta = gesture.lastY - touch.clientY;
+      const x = gesture.lastX - touch.clientX, y = gesture.lastY - touch.clientY;
       const now = performance.now();
       // A reversal starts a fresh velocity estimate rather than carrying the
       // earlier direction into the release. A pause before lifting cancels it.
-      if (delta && gesture.direction && Math.sign(delta) !== gesture.direction) {
-        gesture.samples = [{ y: gesture.lastY, time: gesture.lastTime }];
+      for (const [axis, delta, value, last] of [["x", x, touch.clientX, gesture.lastX], ["y", y, touch.clientY, gesture.lastY]]) {
+        if (delta && gesture.direction[axis] && Math.sign(delta) !== gesture.direction[axis]) {
+          gesture.samples[axis] = [{ value: last, time: gesture.lastTime }];
+        }
+        if (delta) gesture.direction[axis] = Math.sign(delta);
+        const samples = gesture.samples[axis];
+        samples.push({ value, time: now });
+        while (samples.length > 2 && now - samples[0].time > 100) samples.shift();
       }
-      if (delta) gesture.direction = Math.sign(delta);
-      gesture.samples.push({ y: touch.clientY, time: now });
-      while (gesture.samples.length > 2 && now - gesture.samples[0].time > 100) gesture.samples.shift();
+      gesture.lastX = touch.clientX;
       gesture.lastY = touch.clientY;
       gesture.lastTime = now;
-      scroll(delta);
+      scroll(x, y);
     }, { passive: false });
     const reset = () => { gesture = null; };
     grid.addEventListener("touchend", event => {
       const released = gesture;
       reset();
-      if (!released || released.axis !== "vertical" || event.touches.length || performance.now() - released.lastTime >= 100) return;
+      if (!released || !released.moving || event.touches.length || performance.now() - released.lastTime >= 100) return;
       if (event.changedTouches?.length && !Array.from(event.changedTouches).some(touch => touch.identifier === released.id)) return;
-      const first = released.samples[0], last = released.samples.at(-1);
-      const duration = last.time - first.time;
-      if (duration <= 0) return;
-      const velocity = Math.max(-3.5, Math.min(3.5, (first.y - last.y) / duration)) * Math.exp(-(performance.now() - last.time) / 80);
-      if (Math.abs(velocity) >= .08) startMomentum(velocity);
+      const velocity = axis => {
+        const samples = released.samples[axis], first = samples[0], last = samples.at(-1);
+        const duration = last.time - first.time;
+        if (duration <= 0) return 0;
+        const speed = Math.max(-3.5, Math.min(3.5, (first.value - last.value) / duration)) * Math.exp(-(performance.now() - last.time) / 80);
+        return Math.abs(speed) >= .08 ? speed : 0;
+      };
+      const x = velocity("x"), y = velocity("y");
+      if (x || y) startMomentum(x, y);
     }, { passive: true });
     grid.addEventListener("touchcancel", () => { reset(); stopMomentum(); }, { passive: true });
+    grid.addEventListener("wheel", event => {
+      // Keep trackpad diagonals independent too; Ctrl+wheel remains browser zoom.
+      if (event.ctrlKey || !event.cancelable) return;
+      const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? grid.clientHeight : 1;
+      let x = event.deltaX * unit, y = event.deltaY * unit;
+      if (event.shiftKey && !x) { x = y; y = 0; }
+      if (!x && !y) return;
+      event.preventDefault();
+      scroll(x, y);
+    }, { passive: false });
   }
 
   function bindEvents() {
@@ -4558,7 +4583,7 @@
     if (!("serviceWorker" in navigator)) return;
     if (location.protocol !== "https:" && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") return;
 
-    navigator.serviceWorker.register("./service-worker.js?v=89", { updateViaCache: "none" })
+    navigator.serviceWorker.register("./service-worker.js?v=90", { updateViaCache: "none" })
       .then(registration => registration.update())
       .catch(() => {
         // The app works normally even if PWA caching isn't available.

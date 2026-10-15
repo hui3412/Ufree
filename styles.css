@@ -2224,9 +2224,9 @@ input[type="time"],
 
 /* Weekly review: one pixel per minute, with a horizontally scrollable week. */
 .review-grid-scroll { overflow-x: auto; margin: 16px 0; border: 1px solid var(--border); border-radius: 10px; }
-/* Keep native horizontal swipes and pinch zoom. Vertical touch movement is
-   shared by the review grid and its dialog, even after reaching an edge. */
-#imageReview .review-grid-scroll { touch-action: pan-x pinch-zoom; overscroll-behavior-y: auto; }
+/* The timetable controller handles both axes without direction locking.
+   Keep native pinch zoom while sharing vertical movement with the dialog. */
+#imageReview .review-grid-scroll { touch-action: pinch-zoom; overscroll-behavior-y: auto; }
 .review-grid { display: grid; grid-template-columns: 54px repeat(7, minmax(110px, 1fr)); min-width: 850px; }
 .review-time-axis { position: relative; }
 .review-time-axis span { position: absolute; left: 3px; font-size: 11px; color: var(--muted); transform: translateY(-50%); }
@@ -2291,7 +2291,7 @@ input[type="time"],
 .group-name-field input { width: 100%; min-width: 0; box-sizing: border-box; border: 1px solid var(--border); background: var(--input); color: var(--text); border-radius: 8px; padding: 11px; font: inherit; font-size: 16px; }
 .group-members-list { max-height: 300px; overflow-y: auto; margin: 10px 0; }
 .group-week-modal { width: min(1120px, 100%); max-width: 1120px; }
-.group-week-modal .review-grid-scroll { overscroll-behavior: auto; touch-action: pan-x pinch-zoom; -webkit-overflow-scrolling: touch; }
+.group-week-modal .review-grid-scroll { overscroll-behavior: auto; touch-action: pinch-zoom; }
 .groups-modal .modal-header > div, .group-week-modal .modal-header > div { min-width: 0; overflow-wrap: anywhere; }
 .group-week-modal .modal-header p { max-width: none; }
 .group-week-note { color: var(--muted); line-height: 1.5; font-size: 0.85rem; }
@@ -2714,7 +2714,7 @@ button:disabled { cursor: not-allowed; }
 .person-week-modal { width: min(1050px, 100%); }
 .person-week-grid { grid-template-columns: 54px repeat(7, minmax(140px, 1fr)); min-width: 1034px; }
 .person-week-block { cursor: default; white-space: pre-line; overflow-wrap: anywhere; line-height: 1.3; }
-.person-week-modal .review-grid-scroll { overscroll-behavior: auto; touch-action: pan-x pinch-zoom; -webkit-overflow-scrolling: touch; }
+.person-week-modal .review-grid-scroll { overscroll-behavior: auto; touch-action: pinch-zoom; }
 .person-week-modal .modal-header h2 { overflow-wrap: anywhere; }
 .person-week-modal .parser-status { margin-bottom: 0; }
 

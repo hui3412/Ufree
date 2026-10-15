@@ -1,26 +1,26 @@
-const CACHE_NAME = "whos-free-shell-v89";
+const CACHE_NAME = "whos-free-shell-v90";
 const OCR_CACHE_NAME = "whos-free-ocr-v1";
 const APP_SHELL = [
   "./",
   "./index.html",
-  "./styles.css?v=89",
-  "./app.js?v=89",
-  "./schedule-share-code.js?v=89",
-  "./assets/qr/qrcodegen.js?v=89",
-  "./schedule-availability.js?v=89",
-  "./schedule-groups.js?v=89",
-  "./schedule-parser.js?v=89",
-  "./schedule-image-parser.js?v=89",
-  "./manifest.webmanifest?v=89",
-  "./assets/favicon.png?v=89",
-  "./assets/apple-touch-icon.png?v=89",
-  "./assets/icon-192.png?v=89",
-  "./assets/icon-512.png?v=89",
-  "./assets/icon-maskable-512.png?v=89",
-  "./assets/UFreeLogo_SVG.svg?v=89",
-  "./assets/UFreeLogo_PNG.png?v=89",
-  "./assets/favicon.svg?v=89",
-  "./favicon.ico?v=89"
+  "./styles.css?v=90",
+  "./app.js?v=90",
+  "./schedule-share-code.js?v=90",
+  "./assets/qr/qrcodegen.js?v=90",
+  "./schedule-availability.js?v=90",
+  "./schedule-groups.js?v=90",
+  "./schedule-parser.js?v=90",
+  "./schedule-image-parser.js?v=90",
+  "./manifest.webmanifest?v=90",
+  "./assets/favicon.png?v=90",
+  "./assets/apple-touch-icon.png?v=90",
+  "./assets/icon-192.png?v=90",
+  "./assets/icon-512.png?v=90",
+  "./assets/icon-maskable-512.png?v=90",
+  "./assets/UFreeLogo_SVG.svg?v=90",
+  "./assets/UFreeLogo_PNG.png?v=90",
+  "./assets/favicon.svg?v=90",
+  "./favicon.ico?v=90"
 ];
 
 self.addEventListener("install", event => {

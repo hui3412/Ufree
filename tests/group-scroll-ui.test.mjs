@@ -19,7 +19,7 @@ async function groupSchedule() {
   assert.match(el("groupWeekSummary").textContent, /2 people/);
   const grid = el("groupWeekGrid").parentElement;
   const dialog = grid.closest(".schedule-modal");
-  Object.defineProperties(grid, { scrollHeight: { value: 700 }, clientHeight: { value: 300, configurable: true } });
+  Object.defineProperties(grid, { scrollHeight: { value: 700 }, clientHeight: { value: 300, configurable: true }, scrollWidth: { value: 1300 }, clientWidth: { value: 300 } });
   Object.defineProperties(dialog, { scrollHeight: { value: 2000 }, clientHeight: { value: 600 } });
   grid.scrollTop = 0; dialog.scrollTop = 100;
   let clock = 0, nextFrame = 1;
@@ -58,7 +58,7 @@ test("multi-person group grid hands vertical swipes to its dialog at both edges 
   } finally { await a.window.happyDOM.abort(); }
 });
 
-test("unbounded group grids scroll the dialog while horizontal swipes and pinch remain native", async () => {
+test("unbounded group grids scroll the dialog with independent horizontal motion and native pinch", async () => {
   const a = await groupSchedule();
   try {
     Object.defineProperty(a.grid, "clientHeight", { value: 700 });
@@ -66,11 +66,11 @@ test("unbounded group grids scroll the dialog while horizontal swipes and pinch 
     a.dispatch("touchmove", [a.touch(100, 250)]);
     assert.equal(a.grid.scrollTop, 0); assert.equal(a.dialog.scrollTop, 150);
     a.dispatch("touchstart", [a.touch(100, 300)]);
-    assert.equal(a.dispatch("touchmove", [a.touch(50, 298)]).defaultPrevented, false);
-    assert.equal(a.dialog.scrollTop, 150);
+    assert.equal(a.dispatch("touchmove", [a.touch(50, 298)]).defaultPrevented, true);
+    assert.equal(a.dialog.scrollTop, 152); assert.equal(a.grid.scrollLeft, 50);
     a.dispatch("touchstart", [a.touch(100, 300), a.touch(200, 300, 2)]);
     assert.equal(a.dispatch("touchmove", [a.touch(90, 270), a.touch(210, 270, 2)]).defaultPrevented, false);
-    assert.equal(a.dialog.scrollTop, 150);
+    assert.equal(a.dialog.scrollTop, 152);
   } finally { await a.window.happyDOM.abort(); }
 });
 
