@@ -188,7 +188,7 @@ test("three-dot export choices start basic and regenerate codes, links and QRs w
     assert.deepEqual(plain(exported.people), rich.people);
     a.el("exportQrButton").click(); await a.wait(() => !a.el("generateCodeButton").disabled); assert.ok(panel.querySelector("svg"));
     assert.equal(a.stored(), before);
-    a.el("closeExportButton").click(); a.el("exportSchedulesButton").click();
+    a.el("closeScheduleModal").click(); a.el("scheduleDataButton").click(); a.el("exportSchedulesButton").click();
     assert.equal(options.querySelectorAll("input:checked").length, 0);
   } finally { a.window.happyDOM.abort(); }
 });
@@ -244,7 +244,7 @@ test("home export defaults to Everyone in a collapsed selection and supports eac
     a.el("copyExportLinkButton").click(); await a.wait(() => !a.el("generateCodeButton").disabled);
     assert.deepEqual(Object.keys((await a.window.WhosFreeShareCode.decode(a.copied())).people), ["Alice"]);
     assert.equal(a.stored(), before);
-    a.el("closeExportButton").click(); assert.equal(a.el("scheduleModal").hidden, true);
+    a.el("closeScheduleModal").click(); assert.equal(a.el("scheduleModal").hidden, true);
     assert.equal(a.window.document.activeElement.id, "homeExportButton");
     assert.equal(a.window.document.body.style.overflow, "");
   } finally { a.window.happyDOM.abort(); }
@@ -280,10 +280,10 @@ test("empty devices disable the home export entry point and failed quick exports
     const encode = a.window.WhosFreeShareCode.encode;
     a.window.WhosFreeShareCode.encode = async () => { throw Error("Try exporting again"); };
     a.el("exportQrButton").click(); await a.wait(() => !a.el("generateCodeButton").disabled);
-    assert.equal(a.el("exportCodeStatus").dataset.tone, "error"); assert.equal(a.el("closeExportButton").disabled, false);
+    assert.equal(a.el("exportCodeStatus").dataset.tone, "error"); assert.equal(a.el("closeScheduleModal").disabled, false);
     a.window.WhosFreeShareCode.encode = encode;
     a.el("exportQrButton").click(); await a.wait(() => !a.el("generateCodeButton").disabled); assert.ok(a.el("exportQr").querySelector("svg"));
-    a.el("closeExportButton").click(); assert.equal(a.el("scheduleModal").hidden, true);
+    a.el("closeScheduleModal").click(); assert.equal(a.el("scheduleModal").hidden, true);
   } finally { empty.window.happyDOM.abort(); a.window.happyDOM.abort(); }
 });
 
@@ -299,7 +299,7 @@ test("quick Copy Link exposes a selectable link when the clipboard is unavailabl
     assert.equal(a.window.document.activeElement, output);
     assert.equal(output.selectionEnd, output.value.length);
     assert.deepEqual(Object.keys((await a.window.WhosFreeShareCode.decode(output.value)).people), ["Alice","Bob"]);
-    a.el("closeExportButton").click(); assert.equal(a.el("scheduleModal").hidden, true);
+    a.el("closeScheduleModal").click(); assert.equal(a.el("scheduleModal").hidden, true);
   } finally { a.window.happyDOM.abort(); }
 });
 

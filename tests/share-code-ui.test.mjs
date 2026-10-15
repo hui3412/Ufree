@@ -111,7 +111,7 @@ test("compact export preserves local details and reimport skips without a confli
     assert.equal(item.instructor, null); assert.equal(item.course, "Differential Calculus");
     assert.match(sender.el("exportCodeStatus").textContent, /Fits a 1,000-character message/);
     assert.equal(JSON.stringify(sender.stored()), before);
-    sender.el("closeExportButton").click(); sender.el("importCodeButton").click();
+    sender.el("closeScheduleModal").click(); sender.el("scheduleDataButton").click(); sender.el("importCodeButton").click();
     sender.el("importCodeInput").value = code; sender.el("decodeCodeButton").click(); await sender.wait();
     assert.match(sender.el("importCodeStatus").textContent, /Skipped 1 identical/);
     assert.equal(sender.el("codeConflictPrompt").hidden, true);
@@ -240,4 +240,5 @@ test("PDF and JSON tools are closed behind a bottom menu without moving the earl
     assert.equal(menu.open, false, "advanced tools start hidden on each new visit");
   } finally { await receiver.window.happyDOM.abort(); }
 });
+
 

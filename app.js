@@ -141,7 +141,6 @@
     exportCodeOutput: document.getElementById("exportCodeOutput"),
     copyCodeButton: document.getElementById("copyCodeButton"),
     exportCodeStatus: document.getElementById("exportCodeStatus"),
-    closeExportButton: document.getElementById("closeExportButton"),
     codeImportPanel: document.getElementById("codeImportPanel"),
     importCodeInput: document.getElementById("importCodeInput"),
     decodeCodeButton: document.getElementById("decodeCodeButton"),
@@ -554,8 +553,8 @@
 
     await showSystemNotification(title, {
       body,
-      icon: "./assets/icon-192.png?v=87",
-      badge: "./assets/icon-192.png?v=87",
+      icon: "./assets/icon-192.png?v=88",
+      badge: "./assets/icon-192.png?v=88",
       tag: `whos-free-break-${dateKey()}-${breaks[0].start}`,
       data: { url: "./" },
     });
@@ -642,8 +641,8 @@
     }
     const ok = await showSystemNotification("UFree notifications work", {
       body: "You'll get grouped alerts when friends start breaks longer than 10 minutes.",
-      icon: "./assets/icon-192.png?v=87",
-      badge: "./assets/icon-192.png?v=87",
+      icon: "./assets/icon-192.png?v=88",
+      badge: "./assets/icon-192.png?v=88",
       tag: "whos-free-test",
       data: { url: "./" },
     });
@@ -3446,7 +3445,6 @@
     els.copyExportLinkButton.disabled = state.isParsing;
     els.copyCodeButton.disabled = state.isParsing || !els.exportCodeOutput.value;
     els.decodeCodeButton.disabled = state.isParsing || Boolean(state.sharedImport && !els.sharedImportPeople.querySelector("input:checked"));
-    els.closeExportButton.disabled = state.isParsing;
     els.closeImportButton.disabled = state.isParsing;
     els.importCodeInput.disabled = state.isParsing;
     els.closeScheduleModal.disabled = Boolean(state.codeMode) && state.isParsing;
@@ -4447,7 +4445,6 @@
       const button = event.target.closest("[data-code-conflict-action]");
       if (button) finishCodeConflict(button.dataset.codeConflictAction);
     });
-    els.closeExportButton.addEventListener("click", closeCodePanels);
     els.closeImportButton.addEventListener("click", closeCodePanels);
     window.addEventListener("hashchange", openSharedLink);
     els.removeSchedulesButton.addEventListener("click", removeSchedules);
@@ -4560,7 +4557,7 @@
     if (!("serviceWorker" in navigator)) return;
     if (location.protocol !== "https:" && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") return;
 
-    navigator.serviceWorker.register("./service-worker.js?v=87", { updateViaCache: "none" })
+    navigator.serviceWorker.register("./service-worker.js?v=88", { updateViaCache: "none" })
       .then(registration => registration.update())
       .catch(() => {
         // The app works normally even if PWA caching isn't available.
