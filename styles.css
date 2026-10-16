@@ -2767,13 +2767,30 @@ button:disabled { cursor: not-allowed; }
 #showGroupsToggle.group-label-button { width: auto; padding: 0 10px; gap: 7px; }
 #showGroupsToggle.group-label-button.compact-label { width: 42px; min-width: 42px; padding: 0; gap: 0; }
 .group-toggle-label { font-size: .7rem; font-weight: 600; letter-spacing: .045em; }
-.export-selection { margin: 0 0 18px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 8px; }
-.export-selection summary { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; cursor: pointer; list-style: none; min-height: 24px; font-size: .88rem; }
+.export-selection { margin: 8px 0 0; padding: 12px 14px; border: 1px solid var(--border); border-radius: 8px; }
+.export-selection summary { display: grid; grid-template-columns: auto minmax(0, 1fr) 20px; align-items: center; gap: 8px; cursor: pointer; list-style: none; min-height: 24px; font-size: .88rem; }
 .export-selection summary::-webkit-details-marker { display: none; }
-.export-selection summary::after { content: "+"; color: var(--muted); }
-.export-selection[open] summary::after { content: "−"; }
-.export-selection-summary { margin-left: auto; color: var(--muted); font-size: .8rem; }
+.export-selection-chevron { width: 20px; height: 20px; flex: 0 0 auto; fill: none; stroke: currentColor; stroke-width: 2; transition: transform .15s; }
+.export-selection[open] .export-selection-chevron { transform: rotate(180deg); }
+.export-selection-summary { min-width: 0; color: var(--muted); font-size: .8rem; overflow-wrap: anywhere; text-align: right; }
 .export-selection[open] > .share-selection { margin-top: 16px; }
+.export-selection-controls { margin-bottom: 18px; }
+.export-selection-toolbar { display: flex; align-items: stretch; gap: 8px; }
+.export-person-search { display: flex; align-items: center; gap: 8px; flex: 1 1 auto; min-width: 0; padding: 0 12px; background: var(--input); border: 1px solid var(--border); border-radius: 8px; }
+.export-person-search svg, .export-group-button svg { width: 19px; height: 19px; flex: 0 0 auto; fill: none; stroke: currentColor; stroke-width: 1.8; }
+.export-person-search:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.export-person-search input { width: 100%; min-width: 0; min-height: 42px; padding: 8px 0; border: 0; background: transparent; color: var(--text); font: inherit; font-size: 16px; outline: none; }
+.export-group-button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 42px; flex: 0 0 auto; padding: 8px 12px; background: var(--input); color: var(--text); border: 1px solid var(--border); font-size: .85rem; }
+.export-group-button[aria-expanded="true"], .export-group-button.has-group { background: var(--button-hover); }
+.export-group-picker { display: grid; gap: 4px; max-height: 240px; overflow-y: auto; margin-top: 8px; padding: 6px; border: 1px solid var(--border); border-radius: 8px; background: var(--input); }
+.export-group-choice { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; min-height: 42px; padding: 8px 10px; color: var(--text); background: transparent; border: 0; border-radius: 5px; font: inherit; font-size: .86rem; text-align: left; cursor: pointer; }
+.export-group-choice > span:first-child { min-width: 0; overflow-wrap: anywhere; }
+.export-group-choice > span:last-child { flex: 0 0 auto; color: var(--muted); font-size: .8rem; }
+.export-group-choice:hover, .export-group-choice[aria-pressed="true"] { background: var(--button-hover); }
+.export-group-choice:disabled { opacity: .5; cursor: default; }
+.export-group-picker p { margin: 6px; }
+#exportPeopleEmpty { margin: 10px 0 0; }
+
 .export-action-buttons { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; flex: 1 1 auto; min-width: 0; }
 .export-action-buttons button { padding: 10px 8px; flex-direction: column; gap: 6px; line-height: 1.25; font-size: .8rem; background: var(--input); color: var(--text); border: 1px solid var(--border); }
 .export-action-buttons button:hover { background: var(--button-hover); }
@@ -2788,6 +2805,8 @@ button:disabled { cursor: not-allowed; }
 }
 
 @media (max-width: 350px) {
+  .export-group-button { width: 42px; min-width: 42px; padding: 0; }
+  .export-group-button > span { display: none; }
   .home-header-controls .header-actions { gap: 6px; }
   .home-header-controls .header-data-button { padding-left: 9px; padding-right: 9px; gap: 5px; font-size: .78rem; }
   .home-header-controls .nav-icon-button { width: 36px; min-width: 36px; padding: 0; }

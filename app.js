@@ -151,6 +151,12 @@
     exportCodeField: document.getElementById("exportCodeField"),
     exportSelection: document.getElementById("exportSelection"),
     exportSelectionSummary: document.getElementById("exportSelectionSummary"),
+    exportSelectionControls: document.getElementById("exportSelectionControls"),
+    exportPeopleSearch: document.getElementById("exportPeopleSearch"),
+    exportPeopleEmpty: document.getElementById("exportPeopleEmpty"),
+    exportSelectionToggleLabel: document.getElementById("exportSelectionToggleLabel"),
+    exportGroupButton: document.getElementById("exportGroupButton"),
+    exportGroupPicker: document.getElementById("exportGroupPicker"),
     exportCodeOutput: document.getElementById("exportCodeOutput"),
     exportCodeStatus: document.getElementById("exportCodeStatus"),
     codeImportPanel: document.getElementById("codeImportPanel"),
@@ -2860,12 +2866,90 @@
     if (element === els.importCodeStatus) updateImportProgress(message);
   }
 
+  function filterExportPeople() {
+    const terms = searchText(els.exportPeopleSearch.value.trim()).split(/\s+/).filter(Boolean);
+    const inputs = [...els.exportPeopleList.querySelectorAll("input")];
+    let visible = 0;
+    for (const input of inputs) {
+      const name = input.dataset.person;
+      const match = terms.every(term => searchText(`${name} ${displayName(name)}`).includes(term));
+      input.closest("label").hidden = !match;
+      if (match) visible++;
+    }
+    const selected = inputs.filter(input => input.checked).length;
+    els.exportPeopleEmpty.hidden = visible > 0;
+    els.exportSelectionSummary.textContent = terms.length ? `${visible} matching · ${selected} selected`
+      : state.exportGroup ? `${state.exportGroup.name} · ${selected} selected`
+      : selected === inputs.length && selected > 0 ? `Everyone · ${selected}` : `${selected} of ${inputs.length} selected`;
+    els.exportSelectionToggleLabel.textContent = els.exportSelection.open ? "Hide people" : "Show people";
+  }
+
+  function syncExportGroup() {
+    els.exportGroupButton.classList.toggle("has-group", Boolean(state.exportGroup));
+    els.exportGroupSummary.hidden = !state.exportGroup;
+    els.exportGroupSummary.textContent = state.exportGroup ? `Sharing ${state.exportGroup.name} as a group. The receiver can keep the group or add its members individually.` : "";
+    updateScheduleFlow();
+  }
+
+  function closeExportGroupPicker(restoreFocus = false) {
+    els.exportGroupPicker.hidden = true;
+    els.exportGroupButton.setAttribute("aria-expanded", "false");
+    if (restoreFocus) els.exportGroupButton.focus({ preventScroll: true });
+  }
+
+  function chooseExportGroup(group) {
+    if (state.isParsing) return;
+    const members = new Set(group ? groupMembers(group) : Object.keys(peopleMap()));
+    if (!members.size) return;
+    state.exportGroup = group ? { id: group.id, name: group.name } : null;
+    els.exportPeopleList.querySelectorAll("input").forEach(input => { input.checked = members.has(input.dataset.person); });
+    els.exportPeopleSearch.value = "";
+    els.exportSelection.open = false;
+    syncExportGroup();
+    exportSelectionChanged();
+    closeExportGroupPicker(true);
+  }
+
+  function toggleExportGroupPicker() {
+    if (state.isParsing) return;
+    if (!els.exportGroupPicker.hidden) { closeExportGroupPicker(true); return; }
+    els.exportGroupPicker.replaceChildren();
+    for (const group of [null, ...state.groups]) {
+      const members = group ? groupMembers(group) : Object.keys(peopleMap());
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "export-group-choice";
+      button.dataset.exportGroup = group?.id || "";
+      button.dataset.empty = String(!members.length);
+      button.disabled = !members.length;
+      const everyoneSelected = [...els.exportPeopleList.querySelectorAll("input")].every(input => input.checked);
+      button.setAttribute("aria-pressed", String(group ? state.exportGroup?.id === group.id : !state.exportGroup && everyoneSelected));
+      const name = document.createElement("span"), count = document.createElement("span");
+      name.textContent = group?.name || "Everyone individually";
+      count.textContent = `${members.length} ${members.length === 1 ? "person" : "people"}`;
+      button.append(name, count);
+      button.addEventListener("click", () => chooseExportGroup(group));
+      els.exportGroupPicker.append(button);
+    }
+    if (!state.groups.length) {
+      const empty = document.createElement("p");
+      empty.className = "share-code-note";
+      empty.textContent = "No saved groups. Create one using the group controls on the main page.";
+      els.exportGroupPicker.append(empty);
+    }
+    els.exportSelection.open = false;
+    els.exportGroupPicker.hidden = false;
+    els.exportGroupButton.setAttribute("aria-expanded", "true");
+    const active = els.exportGroupPicker.querySelector('button[aria-pressed="true"]:not(:disabled)') || els.exportGroupPicker.querySelector('button:not(:disabled)');
+    active?.focus({ preventScroll: true });
+  }
+
   function exportSelectionChanged() {
     const inputs = [...els.exportPeopleList.querySelectorAll("input")];
     const selected = inputs.filter(input => input.checked).length;
     els.selectAllSchedules.checked = selected > 0 && selected === inputs.length;
     els.selectAllSchedules.indeterminate = selected > 0 && selected < inputs.length;
-    els.exportSelectionSummary.textContent = selected === inputs.length && selected > 0 ? `Everyone · ${selected}` : `${selected} of ${inputs.length} selected`;
+    filterExportPeople();
     els.exportCodeOutput.value = "";
     els.exportCodeField.hidden = true;
     resetShareLink(els.exportSharePanel);
@@ -2885,6 +2969,7 @@
     state.quickExport = false;
     state.quickExportReturnFocus = null;
     state.exportGroup = null;
+    closeExportGroupPicker();
     resetSharedImport();
     resetShareLink(els.exportSharePanel);
     els.codeExportPanel.hidden = true;
@@ -2940,9 +3025,10 @@
     els.codeImportPanel.hidden = mode !== "import";
     if (mode === "export") {
       resetExportFields(els.exportFieldOptions);
+      els.exportSelectionControls.hidden = Boolean(group);
+      els.exportPeopleSearch.value = "";
+      closeExportGroupPicker();
       els.exportSelection.hidden = Boolean(group);
-      els.exportGroupSummary.hidden = !group;
-      els.exportGroupSummary.textContent = group ? `All ${groupMembers(group).length} members of ${group.name} will be shared. Choose Code, QR or Link below.` : "";
       els.exportPeopleList.replaceChildren();
       for (const name of (group ? groupMembers(group) : Object.keys(peopleMap())).sort(comparePeopleNames)) {
         const label = document.createElement("label");
@@ -2951,14 +3037,19 @@
         input.type = "checkbox";
         input.checked = quick;
         input.dataset.person = name;
-        input.addEventListener("change", exportSelectionChanged);
+        input.addEventListener("change", () => {
+          state.exportGroup = null;
+          syncExportGroup();
+          exportSelectionChanged();
+        });
         const caption = document.createElement("span");
         caption.textContent = displayName(name) === name ? name : `${displayName(name)} (${name})`;
         label.append(input, caption);
         els.exportPeopleList.append(label);
       }
-      exportSelectionChanged();
+      syncExportGroup();
       els.exportSelection.open = !quick;
+      exportSelectionChanged();
       revealSection(els.codeExportPanel, quick ? els.generateCodeButton : els.exportSelection.querySelector("summary"));
     } else {
       els.importCodeInput.value = "";
@@ -3681,6 +3772,9 @@
     els.addSharedPeopleButton.disabled = state.isParsing;
     els.closeScheduleModal.disabled = Boolean(state.codeMode) && state.isParsing;
     els.selectAllSchedules.disabled = state.isParsing;
+    els.exportPeopleSearch.disabled = state.isParsing;
+    els.exportGroupButton.disabled = state.isParsing;
+    els.exportGroupPicker.querySelectorAll("button").forEach(button => { button.disabled = state.isParsing || button.dataset.empty === "true"; });
     els.exportPeopleList.querySelectorAll("input").forEach(input => { input.disabled = state.isParsing; });
     els.exportFieldOptions.querySelectorAll("input, button").forEach(input => { input.disabled = state.isParsing; });
     els.sharedImportPeople.querySelectorAll("input").forEach(input => { input.disabled = state.isParsing; });
@@ -4636,7 +4730,23 @@
     els.shareSchedulesButton.addEventListener("click", shareSchedules);
     els.exportSchedulesButton.addEventListener("click", () => openCodePanel("export"));
     els.importCodeButton.addEventListener("click", () => openCodePanel("import"));
+    els.exportPeopleSearch.addEventListener("focus", () => {
+      closeExportGroupPicker();
+      els.exportSelection.open = true;
+      filterExportPeople();
+    });
+    els.exportPeopleSearch.addEventListener("input", () => {
+      els.exportSelection.open = true;
+      filterExportPeople();
+    });
+    els.exportSelection.addEventListener("toggle", filterExportPeople);
+    els.exportGroupButton.addEventListener("click", toggleExportGroupPicker);
+    document.addEventListener("click", event => {
+      if (!els.exportGroupPicker.hidden && !els.exportGroupPicker.contains(event.target) && !els.exportGroupButton.contains(event.target)) closeExportGroupPicker();
+    });
     els.selectAllSchedules.addEventListener("change", () => {
+      state.exportGroup = null;
+      syncExportGroup();
       els.exportPeopleList.querySelectorAll("input").forEach(input => { input.checked = els.selectAllSchedules.checked; });
       exportSelectionChanged();
     });
@@ -4709,6 +4819,7 @@
         else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
       }
       if (event.key !== "Escape") return;
+      if (!els.scheduleModal.hidden && !els.exportGroupPicker.hidden) { event.preventDefault(); closeExportGroupPicker(true); return; }
       const exportMenu = [els.exportFieldOptions, els.personQuickExportFields].find(menu => menu.open && !menu.closest("[hidden]"));
       if (exportMenu) { event.preventDefault(); exportMenu.open = false; exportMenu.querySelector("summary").focus(); return; }
       if (state.codeConflict) { event.preventDefault(); finishCodeConflict("old"); return; }
@@ -4772,7 +4883,7 @@
     if (!("serviceWorker" in navigator)) return;
     if (location.protocol !== "https:" && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") return;
 
-    navigator.serviceWorker.register("./service-worker.js?v=113", { updateViaCache: "none" })
+    navigator.serviceWorker.register("./service-worker.js?v=114", { updateViaCache: "none" })
       .then(registration => registration.update())
       .catch(() => {
         // The app works normally even if PWA caching isn't available.
