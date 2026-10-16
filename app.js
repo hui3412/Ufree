@@ -3141,6 +3141,7 @@
     if (!output.value) return;
     try {
       await navigator.clipboard.writeText(output.value);
+      showToast("Copied");
       codeStatus(status, panel === els.exportSharePanel && state.exportGroup ? "Link copied. Your friend can keep the group or add everybody individually." : "Link copied. Your friend can open it to add schedules automatically.", "success");
     } catch {
       output.focus(); output.select();
@@ -3404,6 +3405,7 @@
     try {
       await navigator.clipboard.writeText(output.value);
       if (!isCurrent()) return;
+      showToast("Copied");
       codeStatus(status, `Code copied. Paste it into your message. ${details}`, "success");
     } catch {
       if (!isCurrent()) return;
@@ -4883,7 +4885,7 @@
     if (!("serviceWorker" in navigator)) return;
     if (location.protocol !== "https:" && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") return;
 
-    navigator.serviceWorker.register("./service-worker.js?v=114", { updateViaCache: "none" })
+    navigator.serviceWorker.register("./service-worker.js?v=115", { updateViaCache: "none" })
       .then(registration => registration.update())
       .catch(() => {
         // The app works normally even if PWA caching isn't available.

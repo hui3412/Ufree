@@ -100,6 +100,8 @@ for (const url of [
     a.el("copyExportLinkButton").click();
     await a.wait(() => !a.el("generateCodeButton").disabled);
     assert.equal(a.copied(), a.el("exportSharePanel").querySelector("textarea").value);
+    assert.equal(a.el("toast").textContent, "Copied");
+    assert.equal(a.el("toast").hidden, false);
     a.el("closeScheduleModal").click();
 
     a.el("viewToggleButton").click();
@@ -431,6 +433,7 @@ test("quick Copy Link exposes a selectable link when the clipboard is unavailabl
     const panel = a.el("exportSharePanel"), output = panel.querySelector("textarea");
     assert.equal(panel.hidden, false); assert.equal(panel.querySelector(".share-link-field").hidden, false);
     assert.match(panel.querySelector(".share-link-status").textContent, /Select and copy/);
+    assert.notEqual(a.el("toast").textContent, "Copied");
     assert.equal(a.window.document.activeElement, output);
     assert.equal(output.selectionEnd, output.value.length);
     assert.deepEqual(Object.keys((await a.window.WhosFreeShareCode.decode(output.value)).people), ["Alice","Bob"]);
