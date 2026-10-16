@@ -64,7 +64,18 @@
   }
 
   function detectRows(canvas, headers, columns) {
-    const firstLeft = columns[0].left, gutterLeft = Math.max(0, Math.ceil(firstLeft - (columns[0].right - firstLeft) * .6));
+    const firstLeft = columns[0].left;
+    let gutterLeft = Math.max(0, Math.ceil(firstLeft - (columns[0].right - firstLeft) * .6));
+    // The clock gutter can be much narrower than a weekday column. Find its
+    // actual outer rule before measuring horizontal clock-row borders.
+    const counts = new Uint32Array(Math.floor(firstLeft) + 1); let samples = 0;
+    const context = canvas.getContext("2d", { willReadFrequently: true });
+    for (let y = Math.ceil(Math.max(...headers.map(header => header.y1))); y < canvas.height; y += Math.max(1, Math.floor(canvas.height / 150))) {
+      const { data } = context.getImageData(0, y, counts.length, 1); samples++;
+      for (let x = gutterLeft; x < firstLeft - 5; x++) if (shade(data, x * 4) < 230) counts[x]++;
+    }
+    const outerRules = mergeRules(Array.from(counts, (count, x) => count > samples * .82 ? x : -1).filter(x => x >= gutterLeft && x < firstLeft - 5));
+    if (outerRules.length) gutterLeft = Math.ceil(outerRules.at(-1));
     const left = gutterLeft + 4, width = Math.floor(firstLeft - left - 4);
     if (width < 20) throw unsupported("The dated timetable's full clock column is missing.");
     const top = Math.ceil(Math.max(...headers.map(header => header.y1)));
@@ -73,13 +84,13 @@
     const rules = [];
     for (let y = 0; y < height; y++) {
       let ink = 0;
-      for (let x = 0; x < width; x++) if (shade(data, (y * width + x) * 4) < 230) ink++;
+      for (let x = 0; x < width; x++) if (shade(data, (y * width + x) * 4) < 250) ink++;
       if (ink > width * .85) rules.push(top + y);
     }
     const boundaries = mergeRules(rules);
     if (boundaries.length < 9 || boundaries.length > 49) throw unsupported("The dated timetable needs complete clock-row borders.");
     const heights = boundaries.slice(1).map((y, i) => y - boundaries[i]), rowHeight = median(heights);
-    if (rowHeight < 12 || heights.some(value => Math.abs(value - rowHeight) > rowHeight * .15) || boundaries[0] - top > rowHeight * .6 || canvas.height - boundaries.at(-1) > rowHeight * .6) throw unsupported("The dated timetable's rows are cropped or inconsistent.");
+    if (rowHeight < 12 || heights.some(value => Math.abs(value - rowHeight) > rowHeight * .15) || boundaries[0] - top > rowHeight * .6 || canvas.height - boundaries.at(-1) > rowHeight * .8) throw unsupported("The dated timetable's rows are cropped or inconsistent.");
     return { boundaries, rowHeight, gutterLeft, gutterRight: firstLeft, headerBottom: top };
   }
 
@@ -106,13 +117,18 @@
     return rows;
   }
 
+  function borderInk(data, offset) {
+    const red = data[offset], green = data[offset + 1], blue = data[offset + 2];
+    return shade(data, offset) < 170 || (Math.max(red, green, blue) - Math.min(red, green, blue) > 70 && shade(data, offset) < 235);
+  }
+
   function horizontalBorder(canvas, column, y) {
     const left = Math.ceil(column.left + 3), width = Math.floor(column.right - column.left - 6);
     const top = Math.max(0, Math.floor(y - 2)), height = Math.min(5, canvas.height - top);
     const { data } = canvas.getContext("2d").getImageData(left, top, width, height);
     for (let row = 0; row < height; row++) {
       let ink = 0;
-      for (let x = 0; x < width; x++) if (shade(data, (row * width + x) * 4) < 170) ink++;
+      for (let x = 0; x < width; x++) if (borderInk(data, (row * width + x) * 4)) ink++;
       if (ink > width * .85) return true;
     }
     return false;
@@ -120,29 +136,45 @@
 
   function whiteRow(canvas, column, top, bottom) {
     const context = canvas.getContext("2d"); let white = 0, samples = 0;
-    for (const fraction of [.22, .48, .72]) {
+    for (const fraction of [.1, .2, .3, .4, .5, .6, .7, .8, .9]) {
       const y = Math.round(top + (bottom - top) * fraction), left = Math.ceil(column.left + (column.right - column.left) * .08);
       const width = Math.floor((column.right - column.left) * .84), { data } = context.getImageData(left, y, width, 1);
       for (let x = 0; x < width; x += 3) { samples++; if (shade(data, x * 4) >= 248) white++; }
     }
     // Dense course text can cover much of a sampled scanline. Empty cells are
-    // grey throughout; require a white majority, then validate full box borders.
-    return white / samples > .55;
+    // grey throughout; require substantial white space and complete box borders.
+    return white / samples > .4;
   }
 
   function classRegions(canvas, columns, grid, rows) {
     const regions = []; let grey = 0;
     for (const column of columns) {
+      // Include full-width coloured rules between clock rows. Athlete blocks
+      // may start halfway down a row; their printed time range is required.
+      const left = Math.ceil(column.left + 3), width = Math.floor(column.right - column.left - 6);
+      const top = Math.floor(grid.boundaries[0]), height = Math.ceil(grid.boundaries.at(-1)) - top + 1;
+      const { data } = canvas.getContext("2d").getImageData(left, top, width, height);
+      const rules = [];
+      for (let y = 0; y < height; y++) {
+        let ink = 0;
+        for (let x = 0; x < width; x++) if (borderInk(data, (y * width + x) * 4)) ink++;
+        if (ink > width * .85) rules.push(top + y);
+      }
+      const extra = mergeRules(rules).filter(y => !grid.boundaries.some(boundary => Math.abs(y - boundary) <= 3));
+      const boundaries = [...grid.boundaries, ...extra].sort((a, b) => a - b);
       let first = null;
-      for (let row = 0; row < rows.length; row++) {
-        const white = whiteRow(canvas, column, grid.boundaries[row], grid.boundaries[row + 1]);
+      for (let row = 0; row < boundaries.length - 1; row++) {
+        const white = whiteRow(canvas, column, boundaries[row], boundaries[row + 1]);
         if (!white) { grey++; if (first !== null) throw new Error("A dated class has an incomplete bottom border."); continue; }
         if (first === null) {
-          if (!horizontalBorder(canvas, column, grid.boundaries[row])) throw new Error("A dated class has an incomplete top border.");
+          if (!horizontalBorder(canvas, column, boundaries[row])) throw new Error("A dated class has an incomplete top border.");
           first = row;
         }
-        if (horizontalBorder(canvas, column, grid.boundaries[row + 1])) {
-          regions.push({ ...column, top: grid.boundaries[first], bottom: grid.boundaries[row + 1], start: clock(rows[first].start), end: clock(rows[row].end) });
+        if (horizontalBorder(canvas, column, boundaries[row + 1])) {
+          const firstRow = grid.boundaries.indexOf(boundaries[first]), lastRow = grid.boundaries.indexOf(boundaries[row + 1]);
+          regions.push({ ...column, top: boundaries[first], bottom: boundaries[row + 1],
+            start: firstRow >= 0 && firstRow < rows.length ? clock(rows[firstRow].start) : null,
+            end: lastRow > 0 ? clock(rows[lastRow - 1].end) : null });
           first = null;
         }
       }
@@ -166,13 +198,27 @@
         .replace(/^([A-Z])\s*-\s*(\d{2,4}[A-Z]?)$/i, "Classroom $1-$2"));
   }
 
+  const isBusyLabel = label => /^(?:athletes?\s+(?:student|etudiant)|confli(?:ct|t)\s*\d*)$/i.test(String(label || "").normalize("NFD").replace(/[\u0300-\u036f]/g, ""));
+  const footerHeight = region => Math.min((region.bottom - region.top) * .15, (region.right - region.left) * .1);
+
   function classFromWords(words, region) {
+    // The small Classroom link at the bottom right is not course/staff text,
+    // even when OCR misreads its border and spelling.
+    words = words.filter(word => !(word.cy > region.bottom - footerHeight(region) && word.cx > region.left + (region.right - region.left) * .6));
     const lines = classLines(words);
     if ((lines.join(" ").match(/\b[A-Z0-9]{3}-[A-Z0-9]{3}-[A-Z0-9]{2}\b/gi) || []).length > 1) throw new Error("Several courses share an unclear class border. Try a sharper picture so they can be separated.");
     const parsed = globalThis.WhosFreeParser.parseScheduleClassLines(lines);
-    delete parsed.explicitTime; // Clock borders, never text dates, define this weekly event.
+    const explicit = parsed.explicitTime;
+    delete parsed.explicitTime;
+    const label = lines.filter(line => !/\b\d{1,2}\s*[:h]\s*\d{2}\s*(?:to|à|a|au|[-–—])/i.test(line)).join(" ");
+    const busy = !parsed.course_code && isBusyLabel(label);
+    // Explicit hour ranges already take precedence in the older reader. Dates
+    // in the headings still never enter these recurring weekday records.
+    const times = explicit || { start: region.start, end: region.end };
+    if ((busy && !explicit) || !times.start || !times.end || times.end <= times.start) throw Object.assign(new Error("A dated block between clock rows needs a readable start and end time."), { code: "MISSING_DATED_TIMES" });
+    if (busy) parsed.course = label;
     const warnings = [];
-    if (!parsed.course_code) warnings.push("Course text is unclear. Check this class against the image.");
+    if (!parsed.course_code && !busy) warnings.push("Course text is unclear. Check this class against the image.");
     const ambiguousRoom = lines.findIndex(line => /^[1|]\s*-\s*\d{2,4}[A-Z]?$/i.test(line));
     if (ambiguousRoom >= 0) {
       parsed.room = lines[ambiguousRoom].replace(/\s/g, "");
@@ -182,8 +228,9 @@
     const scored = words.filter(word => Number.isFinite(word.confidence) && word.confidence >= 0);
     const confidence = scored.length ? scored.reduce((sum, word) => sum + word.confidence, 0) / scored.length : null;
     if (confidence === null || confidence < 75 || scored.some(word => word.confidence < 45)) warnings.push("Check the recognized wording against the picture.");
+    if (parsed.course_code && (!parsed.room || !parsed.section)) warnings.push("Check the class room and section against the picture.");
     if (!parsed.course) parsed.course = "Unclear class";
-    return { day: region.day, start: region.start, end: region.end, ...parsed, kind: parsed.course_code ? "class" : "busy_block",
+    return { day: region.day, ...times, ...parsed, kind: parsed.course_code ? "class" : "busy_block",
       ...(confidence === null ? {} : { recognition_confidence: Math.round(confidence * 10) / 10 }),
       ...(warnings.length ? { review_warning: warnings.join(" ") } : {}) };
   }
@@ -222,16 +269,21 @@
       for (let i = 0; i < regions.length; i++) {
         const region = regions[i]; status(`Reading dated weekly class ${i + 1} of ${regions.length}…`);
         const cellWords = words.filter(word => word.cx > region.left + 3 && word.cx < region.right - 3 && word.cy > region.top + 3 && word.cy < region.bottom - 3);
-        let item = classFromWords(cellWords, region);
-        if (!item.course_code || (item.recognition_confidence ?? 0) < 75) {
-          const rectangle = { left: Math.ceil(region.left + 3), top: Math.ceil(region.top + 3), width: Math.floor(region.right - region.left - 6), height: Math.floor(region.bottom - region.top - 6) };
+        let item;
+        try { item = classFromWords(cellWords, region); }
+        catch (error) { if (error.code !== "MISSING_DATED_TIMES") throw error; }
+        if (!item || (!item.course_code && !isBusyLabel(item.course)) || item.review_warning) {
+          const rectangle = { left: Math.ceil(region.left + 3), top: Math.ceil(region.top + 3), width: Math.floor(region.right - region.left - 6), height: Math.floor(region.bottom - region.top - footerHeight(region) - 3) };
           const retry = await recognize(canvas, rectangle, "6");
-          const alternative = classFromWords(retry, region);
-          if (alternative.course_code && (!item.course_code || (alternative.recognition_confidence ?? 0) > (item.recognition_confidence ?? 0))) item = alternative;
+          let alternative;
+          try { alternative = classFromWords(retry, region); }
+          catch (error) { if (!item || error.code !== "MISSING_DATED_TIMES") throw error; }
+          const quality = value => (value?.recognition_confidence ?? 0) + (value?.room ? 15 : 0) + (value?.section ? 10 : 0);
+          if (alternative && (!item || ((alternative.course_code || isBusyLabel(alternative.course)) && ((!item.course_code && !isBusyLabel(item.course)) || quality(alternative) > quality(item))))) item = alternative;
         }
         classes.push(item);
       }
-      if (classes.filter(item => item.course_code).length < Math.ceil(classes.length * .7)) throw new Error("Too much class text is unclear in this dated timetable. Try a sharper image.");
+      if (classes.filter(item => item.course_code || isBusyLabel(item.course)).length < Math.ceil(classes.length * .7)) throw new Error("Too much class text is unclear in this dated timetable. Try a sharper image.");
       return { name: "", person: { source_file: filename, classes }, needsReview: true, reader: "dated-weekly-fallback" };
     } finally {
       failed = true;
