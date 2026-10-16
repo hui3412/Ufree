@@ -32,7 +32,7 @@
   <link rel="icon" type="image/png" href="assets/icon-192.png" sizes="192x192">
   <link rel="icon" type="image/x-icon" href="favicon.ico" sizes="16x16 32x32 48x48">
   <link rel="apple-touch-icon" href="assets/apple-touch-icon.png" sizes="180x180">
-  <link rel="stylesheet" href="styles.css?v=100">
+  <link rel="stylesheet" href="styles.css?v=101">
 </head>
 <body>
   <div id="mobileNavBackdrop" class="mobile-nav-backdrop" aria-hidden="true" hidden></div>
@@ -211,14 +211,14 @@
             <label class="field-group share-link-field" hidden><span>Share link</span><textarea class="share-link-output" rows="2" readonly spellcheck="false" aria-label="Share link"></textarea></label>
             <div id="exportQr" class="share-qr" hidden></div>
             <p class="share-link-status parser-status" role="status" aria-live="polite"></p>
-            <button id="multipleQrButton" class="secondary-button" type="button" aria-controls="multipleQrCodes" aria-expanded="false" hidden>Multiple QR codes</button>
+            <button id="multipleQrButton" class="primary-button" type="button" aria-controls="multipleQrCodes" aria-expanded="false" hidden>Multiple QR codes</button>
             <div id="multipleQrCodes" class="multiple-qr-codes" tabindex="-1" aria-label="Independent schedule QR codes" hidden></div>
           </div>
           <div class="modal-actions">
           </div>
         </div>
         <div id="codeImportPanel" class="share-code-panel" hidden>
-          <button id="importScheduleImageButton" class="secondary-button action-icon-button wide-action" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8" cy="8" r="1.5"/><path d="m3 17 5-5 4 4 4-6 5 7"/></svg><span>Import schedule image</span></button>
+          <button id="importScheduleImageButton" class="primary-button action-icon-button wide-action" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8" cy="8" r="1.5"/><path d="m3 17 5-5 4 4 4-6 5 7"/></svg><span>Import schedule image</span></button>
           <div id="importImageStatus" class="parser-status" role="status" aria-live="polite"></div>
           <p id="importCodeHelp">Paste a code or share link. Duplicates are skipped; conflicting schedules need your choice.</p>
           <label id="importCodeField" class="field-group share-code-field"><span>Code or link from your friend</span><textarea id="importCodeInput" rows="5" maxlength="1800000" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></label>
@@ -555,7 +555,7 @@
   <script src="assets/qr/qrcodegen.js?v=90" defer></script>
   <script src="schedule-groups.js?v=90" defer></script>
   <script src="schedule-qr-batches.js?v=97" defer></script>
-  <script src="app.js?v=100" defer></script>
+  <script src="app.js?v=101" defer></script>
 </body>
 </html>
 

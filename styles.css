@@ -2773,8 +2773,6 @@ button:disabled { cursor: not-allowed; }
 .export-action-buttons { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; flex: 1 1 auto; min-width: 0; }
 .export-action-buttons button { padding: 10px 8px; flex-direction: column; gap: 6px; line-height: 1.25; font-size: .8rem; background: var(--input); color: var(--text); border: 1px solid var(--border); }
 .export-action-buttons button:hover { background: var(--button-hover); }
-#importScheduleImageButton, #multipleQrButton { background: var(--input); border: 1px solid var(--border); }
-#importScheduleImageButton:hover, #multipleQrButton:hover { background: var(--button-hover); }
 .export-action-buttons svg { width: 21px; height: 21px; }
 .help-topics { display: grid; gap: 18px; }
 .help-topics h3 { margin: 0 0 5px; font-size: .95rem; }
