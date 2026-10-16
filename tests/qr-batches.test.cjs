@@ -55,3 +55,34 @@ test("QR capacity counts UTF-8 bytes and cancellation discards pending work", as
   await assert.rejects(pack(["A", "B"], async () => { cancelled = true; return "large link"; }, { isCancelled: () => cancelled }), { name: "AbortError" });
   await assert.rejects(pack(["A"], async () => { throw Error("Encoding failed"); }), /Encoding failed/);
 });
+
+test("progress advances with real schedule/packing work and finishes only after groups are prepared", async () => {
+  const sizes = { A: 6, B: 5, C: 3, D: 2, E: 2, F: 2 }, updates = [];
+  const result = await pack(Object.keys(sizes), sized(sizes), { maxBytes: 10, onProgress: info => updates.push({ ...info }) });
+  assert.equal(result.groups.length, 2);
+  assert.equal(updates[0].progress, 0);
+  assert.equal(updates.at(-1).progress, 1);
+  assert.equal(updates.at(-1).phase, "complete");
+  for (let i = 1; i < updates.length; i++) {
+    assert.ok(updates[i].progress >= updates[i - 1].progress && updates[i].progress <= 1);
+    assert.ok(updates[i].checked >= updates[i - 1].checked);
+  }
+  assert.deepEqual([...new Set(updates.filter(info => info.phase === "checking").map(info => info.processed))], [0, 1, 2, 3, 4, 5, 6]);
+  assert.ok(updates.some(info => info.phase === "packing"));
+  assert.ok(updates.some(info => info.phase === "optimizing" && info.progress > .5));
+  assert.ok(updates.every(info => info.phase === "complete" || info.progress < 1));
+});
+
+test("empty/cached-fit QR selections complete progress, while failures and cancellation do not", async () => {
+  for (const names of [[], ["A", "B"]]) {
+    const updates = [];
+    await pack(names, async () => { throw Error("cached selection must not encode"); }, { fullLink: "one link", onProgress: info => updates.push(info) });
+    assert.equal(updates.at(-1).phase, "complete");
+    assert.equal(updates.at(-1).progress, 1);
+  }
+  const updates = []; let cancelled = false;
+  await assert.rejects(pack(["A", "B"], async () => { cancelled = true; return "large"; }, { isCancelled: () => cancelled, onProgress: info => updates.push(info) }), { name: "AbortError" });
+  assert.ok(updates.every(info => info.progress < 1));
+  await assert.rejects(pack(["A"], async () => { throw Error("Failed to encode"); }, { onProgress: info => updates.push(info) }), /Failed to encode/);
+  assert.ok(updates.every(info => info.phase !== "complete"));
+});

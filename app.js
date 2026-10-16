@@ -170,6 +170,7 @@
     exportSharePanel: document.getElementById("exportSharePanel"),
     multipleQrButton: document.getElementById("multipleQrButton"),
     multipleQrCodes: document.getElementById("multipleQrCodes"),
+    multipleQrProgress: document.getElementById("multipleQrProgress"),
     exportFieldOptions: document.getElementById("exportFieldOptions"),
     codeConflictPrompt: document.getElementById("codeConflictPrompt"),
     codeConflictMessage: document.getElementById("codeConflictMessage"),
@@ -3142,6 +3143,11 @@
   function resetMultipleQr() {
     state.qrBatchRequest++;
     state.qrBatchBusy = false;
+    if (els.multipleQrProgress) {
+      els.multipleQrProgress.hidden = true;
+      els.multipleQrProgress.value = 0;
+      els.multipleQrProgress.removeAttribute("aria-valuetext");
+    }
     if (els.multipleQrButton) {
       els.multipleQrButton.hidden = true; els.multipleQrButton.disabled = false;
       els.multipleQrButton.setAttribute("aria-expanded", "false");
@@ -3195,8 +3201,19 @@
     els.multipleQrCodes.hidden = true;
     els.multipleQrCodes.replaceChildren();
     els.multipleQrCodes.setAttribute("aria-busy", "true");
-    codeStatus(status, `Preparing QR codes for ${names.length} people… You can close this view to cancel.`);
+    const updateProgress = (value, message) => {
+      if (!current()) return;
+      els.multipleQrProgress.value = Math.max(els.multipleQrProgress.value, Math.min(100, value));
+      els.multipleQrProgress.setAttribute("aria-valuetext", message);
+      const note = `${message} You can close this view to cancel.`;
+      if (status.textContent !== note) codeStatus(status, note);
+    };
+    els.multipleQrProgress.value = 0;
+    els.multipleQrProgress.hidden = false;
+    updateProgress(0, `Preparing QR codes for ${names.length} people…`);
     try {
+      await new Promise(resolve => setTimeout(resolve, 0));
+      if (!current()) return;
       if (!window.WhosFreeQrBatches?.pack) throw new Error("The QR tools did not load. Refresh the app and try again.");
       const result = await window.WhosFreeQrBatches.pack(names, async members => {
         try {
@@ -3206,8 +3223,18 @@
           if (/too large|too much|export fewer/i.test(error.message || "")) return null;
           throw error;
         }
-      }, { fullLink: els.exportSharePanel.querySelector("textarea").value, isCancelled: () => !current() });
+      }, {
+        fullLink: els.exportSharePanel.querySelector("textarea").value,
+        isCancelled: () => !current(),
+        onProgress: info => {
+          const message = info.phase === "checking" ? `Checking schedules: ${info.processed} of ${names.length}…`
+            : info.phase === "packing" ? "Combining schedules into QR codes…"
+            : info.phase === "optimizing" ? "Finding a smaller set of QR codes…" : "Preparing QR images…";
+          updateProgress(info.progress * 85, message);
+        },
+      });
       if (!current()) return;
+      updateProgress(85, `Drawing QR codes: 0 of ${result.groups.length}…`);
       const fragment = document.createDocumentFragment();
       const instructions = document.createElement("p");
       instructions.textContent = sharedGroup ? "Scan each QR separately, in any order. Choose Add to group to collect its listed people in the same group, or add everybody individually." : "Scan each QR separately. Its listed people are added automatically. You can scan them in any order.";
@@ -3222,9 +3249,11 @@
         const qr = document.createElement("div"); qr.className = "share-qr";
         qr.append(scheduleQrSvg(group.link, `${heading.textContent}: ${list.textContent}`).svg);
         card.append(heading, list, qr); fragment.append(card);
+        updateProgress(85 + 15 * (i + 1) / result.groups.length, `Drawing QR codes: ${i + 1} of ${result.groups.length}…`);
         await new Promise(resolve => setTimeout(resolve, 0));
       }
       if (!current()) return;
+      updateProgress(100, "QR codes ready.");
       const covered = names.length - result.oversized.length;
       const message = result.oversized.length
         ? `${result.groups.length} QR ${result.groups.length === 1 ? "code covers" : "codes cover"} ${covered} of ${names.length} people. ${result.oversized.map(displayName).join(", ")} cannot fit in a QR individually with these details. Share those people by code or link, or choose fewer extra details.`
@@ -3239,6 +3268,7 @@
     } finally {
       if (current()) {
         state.qrBatchBusy = false;
+        els.multipleQrProgress.hidden = true;
         els.multipleQrButton.disabled = false;
         els.multipleQrCodes.removeAttribute("aria-busy");
       }
@@ -4875,7 +4905,7 @@
     if (!("serviceWorker" in navigator)) return;
     if (location.protocol !== "https:" && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") return;
 
-    navigator.serviceWorker.register("./service-worker.js?v=117", { updateViaCache: "none" })
+    navigator.serviceWorker.register("./service-worker.js?v=118", { updateViaCache: "none" })
       .then(registration => registration.update())
       .catch(() => {
         // The app works normally even if PWA caching isn't available.

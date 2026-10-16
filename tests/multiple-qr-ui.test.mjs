@@ -52,6 +52,8 @@ for (const base of ["https://hui3412.github.io/Ufree/", "https://youfree.ca/"]) 
     assert.ok(cards.length > 1 && cards.length < 6, "combine multiple people when they fit");
     assert.equal(a.links.length, cards.length);
     assert.equal(a.el("multipleQrButton").getAttribute("aria-expanded"), "true");
+    assert.equal(a.el("multipleQrProgress").hidden, true);
+    assert.equal(a.el("multipleQrProgress").value, 100);
     assert.equal(a.el("exportCodeOutput").value, fullCode);
     assert.equal(a.el("exportSharePanel").querySelector("textarea").value, fullLink);
     const exported = [];
@@ -95,13 +97,19 @@ test("selection changes and closing the export discard pending QR results", asyn
     let finish;
     a.window.WhosFreeQrBatches.pack = () => new Promise(resolve => { finish = resolve; });
     a.el("multipleQrButton").click();
+    await a.wait(() => Boolean(finish));
+    assert.equal(a.el("multipleQrProgress").hidden, false);
     a.el("exportPeopleList").querySelector("input").click();
+    assert.equal(a.el("multipleQrProgress").hidden, true);
+    assert.equal(a.el("multipleQrProgress").value, 0);
     finish({ groups: [], oversized: [] }); await tick();
     assert.equal(a.el("multipleQrCodes").hidden, true);
     assert.equal(a.el("multipleQrCodes").childElementCount, 0);
     a.el("selectAllSchedules").click(); a.el("exportQrButton").click();
     await a.wait(() => !a.el("generateCodeButton").disabled);
-    a.el("multipleQrButton").click(); a.el("closeScheduleModal").click();
+    finish = null;
+    a.el("multipleQrButton").click(); await a.wait(() => Boolean(finish)); a.el("closeScheduleModal").click();
+    assert.equal(a.el("multipleQrProgress").hidden, true);
     finish({ groups: [], oversized: [] }); await tick();
     assert.equal(a.el("scheduleModal").hidden, true);
     assert.equal(a.el("multipleQrCodes").childElementCount, 0);
@@ -119,5 +127,61 @@ test("an individually oversized person is identified instead of silently omitted
     assert.equal(status.dataset.tone, "warning");
     assert.match(status.textContent, /1 of 2 people/); assert.match(status.textContent, /Huge cannot fit/);
     assert.deepEqual(Object.keys((await a.window.WhosFreeShareCode.decode(a.links.at(-1))).people), ["Small"]);
+  } finally { await a.window.happyDOM.abort(); }
+});
+
+
+test("multiple QR loading bar reflects real callbacks and ignores progress from cancelled requests", async () => {
+  const a = await app({ people: { A: { classes: [] }, B: { classes: [] } } }, "https://youfree.ca/");
+  try {
+    a.window.WhosFreeShareCode.createLink = () => "https://youfree.ca/#import=" + "x".repeat(2400);
+    await a.overflow();
+    let report, finish;
+    a.window.WhosFreeQrBatches.pack = (names, makeLink, options) => {
+      report = options.onProgress;
+      return new Promise(resolve => { finish = resolve; });
+    };
+    a.el("multipleQrButton").click();
+    assert.equal(a.el("multipleQrProgress").hidden, false);
+    assert.equal(a.el("multipleQrProgress").value, 0);
+    const status = a.el("exportSharePanel").querySelector(".share-link-status");
+    assert.ok(status.compareDocumentPosition(a.el("multipleQrProgress")) & a.window.Node.DOCUMENT_POSITION_FOLLOWING);
+    await a.wait(() => Boolean(report));
+    report({ phase: "checking", processed: 1, progress: .125 });
+    const first = a.el("multipleQrProgress").value;
+    assert.ok(first > 0 && first < 100);
+    assert.match(a.el("multipleQrProgress").getAttribute("aria-valuetext"), /Checking schedules: 1 of 2/);
+    report({ phase: "optimizing", progress: .7 });
+    assert.ok(a.el("multipleQrProgress").value > first && a.el("multipleQrProgress").value < 100);
+    const progress = a.el("multipleQrProgress").value;
+    await tick();
+    assert.equal(a.el("multipleQrProgress").value, progress, "waiting alone does not advance the bar");
+    a.el("closeScheduleModal").click();
+    report({ phase: "complete", progress: 1 });
+    finish({ groups: [], oversized: [] }); await tick();
+    assert.equal(a.el("multipleQrProgress").hidden, true);
+    assert.equal(a.el("multipleQrProgress").value, 0);
+    a.el("homeExportButton").click();
+    assert.equal(a.el("multipleQrProgress").hidden, true);
+  } finally { await a.window.happyDOM.abort(); }
+});
+
+test("a failed QR generation hides the loading bar and a retry starts fresh", async () => {
+  const a = await app({ people: { A: { classes: [] }, B: { classes: [] } } }, "https://youfree.ca/");
+  try {
+    a.window.WhosFreeShareCode.createLink = () => "https://youfree.ca/#import=" + "x".repeat(2400);
+    await a.overflow();
+    a.window.WhosFreeQrBatches.pack = async () => { throw Error("Test failure"); };
+    a.el("multipleQrButton").click(); await a.wait(() => !a.el("multipleQrButton").disabled);
+    assert.equal(a.el("multipleQrProgress").hidden, true);
+    assert.match(a.el("exportSharePanel").querySelector(".share-link-status").textContent, /Test failure/);
+    let finish;
+    a.window.WhosFreeQrBatches.pack = () => new Promise(resolve => { finish = resolve; });
+    a.el("multipleQrButton").click(); await a.wait(() => Boolean(finish));
+    assert.equal(a.el("multipleQrProgress").hidden, false);
+    assert.equal(a.el("multipleQrProgress").value, 0);
+    finish({ groups: [], oversized: ["A", "B"] }); await a.wait(() => !a.el("multipleQrButton").disabled);
+    assert.equal(a.el("multipleQrProgress").hidden, true);
+    assert.equal(a.el("multipleQrProgress").value, 100);
   } finally { await a.window.happyDOM.abort(); }
 });

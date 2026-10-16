@@ -8,6 +8,16 @@
     const encoder = new TextEncoder(), cache = new Map();
     let extraChecks = 0, searchNodes = 0;
     const budget = options.maxExtraChecks ?? 160;
+    const maxSearchNodes = options.maxSearchNodes ?? 2500;
+    let phase = "checking", processed = 0, placementTotal = 0, progress = 0;
+    const report = () => {
+      // Real completed work within bounded phases; this is not a time estimate.
+      const next = phase === "complete" ? 1 : phase === "checking" ? .25 * processed / Math.max(1, unique.length)
+        : phase === "packing" ? .25 + .25 * processed / Math.max(1, placementTotal)
+        : .5 + .4 * Math.min(1, Math.max(extraChecks / Math.max(1, budget), searchNodes / Math.max(1, maxSearchNodes)));
+      progress = Math.max(progress, next);
+      options.onProgress?.({ checked: cache.size, people: unique.length, phase, processed, progress });
+    };
     const active = () => {
       if (options.isCancelled?.()) {
         const error = new Error("QR generation cancelled."); error.name = "AbortError"; throw error;
@@ -26,23 +36,26 @@
       // Do not retain large failed exports for every candidate combination.
       const result = { names: sorted, size, link: size <= maxBytes ? link : null };
       cache.set(key, result);
-      options.onProgress?.({ checked: cache.size, people: unique.length });
+      report();
       if (cache.size % 8 === 0) await new Promise(resolve => setTimeout(resolve, 0));
       return result;
     };
-    if (!unique.length) return { groups: [], oversized: [] };
+    report();
+    if (!unique.length) { phase = "complete"; report(); return { groups: [], oversized: [] }; }
     if (options.fullLink) {
       const size = encoder.encode(options.fullLink).length;
       cache.set(JSON.stringify(unique.map((_, i) => i)), { names: unique, size, link: size <= maxBytes ? options.fullLink : null });
     }
     const full = await measure(unique, true);
-    if (full.link) return { groups: [full], oversized: [] };
+    if (full.link) { phase = "complete"; report(); return { groups: [full], oversized: [] }; }
 
     const singles = [], oversized = [];
     for (const name of unique) {
       const single = await measure([name], true);
       if (single.link) singles.push(single); else oversized.push(name);
+      processed++; report();
     }
+    phase = "packing"; processed = 0; placementTotal = singles.length; report();
     singles.sort((a, b) => b.size - a.size || order.get(a.names[0]) - order.get(b.names[0]));
     // Best-fit decreasing using actual compression, not summed individual sizes.
     let best = [];
@@ -53,13 +66,15 @@
         if (combined?.link && (!placement || combined.size > placement.group.size)) placement = { index: i, group: combined };
       }
       if (placement) best[placement.index] = placement.group; else best.push(single);
+      processed++; report();
     }
+    phase = "optimizing"; report();
     // Seek fewer groups by redistributing large and small schedules. Bound
     // new encodings and cached search work instead of an unbounded exact search.
     const search = async (index, groups, target) => {
       active();
-      if (++searchNodes > (options.maxSearchNodes ?? 2500)) return null;
-      if (searchNodes % 64 === 0) await new Promise(resolve => setTimeout(resolve, 0));
+      if (++searchNodes > maxSearchNodes) return null;
+      if (searchNodes % 64 === 0) { report(); await new Promise(resolve => setTimeout(resolve, 0)); }
       if (index === singles.length) return groups;
       const single = singles[index], choices = [];
       for (let i = 0; i < groups.length; i++) {
@@ -86,6 +101,7 @@
       if (combined?.link) { best[i] = combined; best.splice(j, 1); i = -1; break; } else j++;
     }
     active();
+    phase = "complete"; report();
     return { groups: best, oversized };
   }
   globalThis.WhosFreeQrBatches = { pack };
