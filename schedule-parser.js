@@ -499,6 +499,30 @@
     return result;
   }
 
+  // Image-only detail fallback. Keep the existing class decoder first and
+  // leave PDF parsing, layout detection and all time calculations unchanged.
+  function parseImageClassLines(lines) {
+    const parsed = parseClassLines(lines);
+    const group = lines.join("\n").match(/\bgr\.\s*(\d+)\b/i);
+    if (!parsed.section && group) parsed.section = group[1];
+    for (const raw of lines) {
+      const match = String(raw).trim().match(/^(?:Classroom|Local|Classe|Salle(?:\s+de\s+(?:classe|cours))?)\s*[:#-]?\s*(\d[A-Z0-9]*(?:\s*\.\s*[A-Z0-9]+)?)(?:\s+L)?\s*$/i);
+      if (!match) continue;
+      const room = match[1].replace(/\s/g, "").toUpperCase();
+      if (/^\d{1,2}[A-Z]\.\d{1,3}$/.test(room)) {
+        // The old numeric-room regex may otherwise keep only a prefix.
+        if (!parsed.room || room.startsWith(parsed.room)) parsed.room = room;
+      } else if (/^\d{1,2}\.\d{1,3}$/.test(room) || /^\d{1,2}[A-Z]\d{1,3}$/.test(room)) {
+        // Preserve uncertain OCR literally. Do not guess a missing dot or B/8.
+        if (!parsed.room || room.startsWith(parsed.room)) parsed.room = room;
+        parsed.review_warning = "Check the room code against the picture; its punctuation or letters may be unclear.";
+      } else if (group && /^\d+$/.test(room)) {
+        parsed.review_warning = "Check the room code against the picture; its punctuation or letters may be unclear.";
+      }
+    }
+    return parsed;
+  }
+
   function nearestMarker(markers, y, edge) {
     let best = null;
     let bestDistance = Infinity;
@@ -858,7 +882,7 @@
     parseSchedulePdf,
     extractScheduleClasses: extractClasses,
     extractScheduleName: extractPersonName,
-    parseScheduleClassLines: parseClassLines,
+    parseScheduleClassLines: parseImageClassLines,
     groupScheduleLines: groupTextLines,
     scheduleTimesFromRectangle: timesFromRectangle,
     version: "browser-parser-4-weekends-wrapped-fields",
@@ -866,3 +890,4 @@
     __test: { parseScheduleModel, parseClassLines, groupTextLines, extractClasses },
   };
 })();
+
