@@ -284,3 +284,22 @@ test("copied confirmation uses the existing automatic toast dismissal", async ()
     assert.equal(a.el("toast").hidden, true);
   } finally { await a.window.happyDOM.abort(); }
 });
+
+test('sharing 300 schedules copies a code and link rather than rejecting the collection', async () => {
+  const data = { people: Object.fromEntries(Array.from({ length: 300 }, (_, i) => [`TEST ${String(i + 1).padStart(4, '0')}`, {
+    classes: [{ day: 'Monday', start: '09:00', end: '10:20', course: 'Physics', room: 'A-103' }],
+  }])) };
+  const a = await app(data);
+  try {
+    const before = JSON.stringify(a.stored());
+    a.el('mobileMenuButton').click(); a.el('homeExportButton').click();
+    a.el('generateCodeButton').click();
+    for (let i = 0; i < 1000 && a.el('generateCodeButton').disabled; i++) await new Promise(resolve => setTimeout(resolve, 20));
+    assert.equal(a.el('generateCodeButton').disabled, false);
+    assert.equal(a.el('exportCodeStatus').dataset.tone, 'success');
+    assert.equal(Object.keys((await a.window.WhosFreeShareCode.decode(a.copied())).people).length, 300);
+    a.el('copyExportLinkButton').click(); await a.wait();
+    assert.equal(Object.keys((await a.window.WhosFreeShareCode.decode(a.copied())).people).length, 300);
+    assert.equal(JSON.stringify(a.stored()), before);
+  } finally { await a.window.happyDOM.abort(); }
+});

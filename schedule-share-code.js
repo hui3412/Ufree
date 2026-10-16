@@ -8,6 +8,7 @@
   const EXPORT_FIELDS = ["instructor", "course_code", "section", "semester", "extras"];
   const CLASS_KEYS = new Set(["day", "start", "end", "kind", ...FIELDS]);
   const PERSON_KEYS = new Set(["classes", "semester"]);
+  const MAX_PEOPLE = 10000;
   const MAX_BYTES = 1048576;
   const MAX_CODE = 1800000;
   const STEPS = [1, 5, 15, 30, 60];
@@ -112,7 +113,7 @@
     return output;
   }
   function validatePayload(payload) {
-    if (!payload || payload.v !== 1 || !Array.isArray(payload.p) || !payload.p.length || payload.p.length > 250) throw new Error("This code does not contain a supported schedule collection.");
+    if (!payload || payload.v !== 1 || !Array.isArray(payload.p) || !payload.p.length || payload.p.length > MAX_PEOPLE) throw new Error("This code does not contain a supported schedule collection.");
     const names = new Set();
     let count = 0;
     for (const person of payload.p) {
@@ -153,7 +154,7 @@
   }
   function unpackCompact(compact, slim = false) {
     const invalid = () => { throw new Error("This code does not contain valid schedule data."); };
-    if (!Array.isArray(compact) || !compact.length || compact.length > 250) invalid();
+    if (!Array.isArray(compact) || !compact.length || compact.length > MAX_PEOPLE) invalid();
     let count = 0;
     const clock = minute => `${String(Math.floor(minute / 60)).padStart(2, "0")}:${String(minute % 60).padStart(2, "0")}`;
     const people = compact.map(person => {
@@ -286,7 +287,7 @@
         row(0, start, duration, details); patterns.push({ start, duration, details });
       }
     }
-    const count = integer(250); if (!count) invalid();
+    const count = integer(MAX_PEOPLE); if (!count) invalid();
     const people = []; let total = 0;
     for (let i = 0; i < count; i++) {
       const name = string(), semester = integer(201), entries = integer(500);
@@ -433,7 +434,7 @@ function decode(bytes){
   const readTime=()=>{const n=r.bits(9);assert.ok(n<=288);const value=n===288?r.bits(11):n*5;if(value>1439)invalid();return value;};
   const times=Array.from({length:cfg.split?2:1},()=>Array.from({length:r.int()},()=>cfg.split?readTime():[readTime(),readTime()]));
   const align=()=>{while(r.pos%8)assert.equal(r.bits(1),0);};
-  let total=0;const count=r.int(250);if(!count)invalid();const p=Array.from({length:count},()=>{const n=readText(),s=r.int(201),nc=r.int(500),rs=Array.from({length:nc},()=>({}));total+=nc;if(total>10000)invalid();
+  let total=0;const count=r.int(MAX_PEOPLE);if(!count)invalid();const p=Array.from({length:count},()=>{const n=readText(),s=r.int(201),nc=r.int(500),rs=Array.from({length:nc},()=>({}));total+=nc;if(total>10000)invalid();
     if(cfg.days&&r.bits(1)){const ds=Array.from({length:r.bits(3)},()=>r.bits(3));for(const x of rs)x.day=r.index(ds,width(ds.length));}else for(const x of rs)x.day=r.bits(3);
     if(cfg.columns)align();
     for(let i=0;i<times.length;i++){for(const x of rs){const t=r.index(times[i],width(times[i].length));if(cfg.split){if(i)x.duration=t;else x.start=t;}else [x.start,x.duration]=t;}if(cfg.columns)align();}
@@ -522,7 +523,7 @@ return {encode,decode,configs};
     let extras = [];
     if (tail.length) {
       try { extras = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(tail)); } catch { invalid(); }
-      if (!Array.isArray(extras) || extras.length > 250) invalid();
+      if (!Array.isArray(extras) || extras.length > MAX_PEOPLE) invalid();
     }
     return { core, mask, extras };
   }
@@ -544,6 +545,7 @@ return {encode,decode,configs};
   }
   async function encode(data, options) {
     if (!data?.people || typeof data.people !== "object" || Array.isArray(data.people)) throw new Error("Select schedules to export.");
+    if (Object.keys(data.people).length > MAX_PEOPLE) throw new Error(`This selection is too large for one code. Share at most ${MAX_PEOPLE.toLocaleString("en-CA")} people at once.`);
     const group = Object.hasOwn(data, "shared_group") ? validateSharedGroup(data.shared_group) : null;
     const mask = options === undefined && !group ? null : fieldMask(options?.fields ?? []);
     const projected = mask === null ? data : { people: Object.fromEntries(Object.entries(data?.people || {}).map(([name, person]) => [name, selectedPerson(person, mask)])) };
