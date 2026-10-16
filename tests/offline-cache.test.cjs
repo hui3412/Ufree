@@ -22,7 +22,9 @@ test("OCR assets are cached locally and missing assets never receive HTML", asyn
   listeners.install({ waitUntil: promise => { installation = promise; } });
   await installation;
   const version = require("../package.json").version.split(".")[0];
-  assert.ok(shell.includes(`./schedule-share-code.js?v=${version}`), "share-code support must be cached for offline use");
+  const html = fs.readFileSync(require("node:path").join(__dirname, "../index.html"), "utf8");
+  const shareScript = html.match(/src="(schedule-share-code\.js\?v=\d+)"/)[1];
+  assert.ok(shell.includes(`./${shareScript}`), "the current share-code support must be cached for offline use");
   assert.ok(shell.includes(`./assets/qr/qrcodegen.js?v=${version}`), "QR generation must work offline");
   assert.ok(shell.some(asset => asset.startsWith("./schedule-qr-batches.js?v=")), "independent QR batching must work offline");
   assert.ok(shell.includes(`./schedule-groups.js?v=${version}`), "group availability must work offline");

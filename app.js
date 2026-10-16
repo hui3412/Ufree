@@ -30,6 +30,8 @@
     codeMode: null,
     quickExport: false,
     quickExportReturnFocus: null,
+    exportGroup: null,
+    groupImportAutomatic: false,
     qrBatchRequest: 0,
     qrBatchBusy: false,
     sharedImport: null,
@@ -133,6 +135,13 @@
     importCodeButton: document.getElementById("importCodeButton"),
     importScheduleImageButton: document.getElementById("importScheduleImageButton"),
     importImageStatus: document.getElementById("importImageStatus"),
+    exportGroupSummary: document.getElementById("exportGroupSummary"),
+    sharedGroupImport: document.getElementById("sharedGroupImport"),
+    sharedGroupSummary: document.getElementById("sharedGroupSummary"),
+    sharedGroupName: document.getElementById("sharedGroupName"),
+    sharedGroupError: document.getElementById("sharedGroupError"),
+    addSharedGroupButton: document.getElementById("addSharedGroupButton"),
+    addSharedPeopleButton: document.getElementById("addSharedPeopleButton"),
     codeExportPanel: document.getElementById("codeExportPanel"),
     exportPeopleList: document.getElementById("exportPeopleList"),
     selectAllSchedules: document.getElementById("selectAllSchedules"),
@@ -888,6 +897,8 @@
       pinnedPeople: [...state.pinnedPeople],
       mutedPeople: [...state.mutedPeople],
       groups: state.groups,
+      showGroups: state.showGroups,
+      hideUngrouped: state.hideUngrouped,
       personOrders: state.personOrders,
     }));
   }
@@ -952,6 +963,14 @@
       if (Object.prototype.hasOwnProperty.call(before.nicknames, name)) {
         Object.defineProperty(state.nicknames, name, { value: before.nicknames[name], enumerable: true, writable: true, configurable: true });
       } else delete state.nicknames[name];
+    }
+    // Remove only unchanged groups created by this import, preserving later edits.
+    state.groups = state.groups.filter(group => {
+      const created = !before.groups.some(item => item.id === group.id) && after.groups.find(item => item.id === group.id);
+      return !created || JSON.stringify(group) !== JSON.stringify(created);
+    });
+    for (const key of ["showGroups", "hideUngrouped"]) {
+      if (before[key] !== after[key] && state[key] === after[key]) state[key] = before[key];
     }
     for (const group of state.groups) {
       const oldGroup = before.groups.find(item => item.id === group.id);
@@ -1283,7 +1302,8 @@
       const groups = (Array.isArray(saved?.groups) ? saved.groups : []).slice(0, 100).filter(group => {
         if (!group || typeof group.id !== "string" || !group.id || ids.has(group.id) || typeof group.name !== "string" || !group.name.trim() || !Array.isArray(group.members)) return false;
         ids.add(group.id); return true;
-      }).map(group => ({ id: group.id, name: group.name.trim().slice(0, 60), members: [...new Set(group.members.filter(name => typeof name === "string"))], hidden: group.hidden === true }));
+      }).map(group => ({ id: group.id, name: group.name.trim().slice(0, 60), members: [...new Set(group.members.filter(name => typeof name === "string"))], hidden: group.hidden === true,
+        ...(typeof group.sharedId === "string" && /^[A-Za-z0-9_-]{1,120}$/.test(group.sharedId) ? { sharedId: group.sharedId } : {}) }));
       return { groups, showGroups: saved?.showGroups === true, hideUngrouped: saved?.hideUngrouped === true };
     } catch { return { groups: [], showGroups: false, hideUngrouped: false }; }
   }
@@ -1698,7 +1718,11 @@
       const week = document.createElement("button"); week.type = "button"; week.className = "secondary-button";
       week.textContent = "Weekly availability"; week.setAttribute("aria-label", `View weekly availability for ${group.name}`);
       week.addEventListener("click", () => { menu.open = false; openGroupWeek(group.id, more); });
-      options.append(top, week); menu.append(more, options); actions.append(menu);
+      const share = document.createElement("button"); share.type = "button"; share.className = "secondary-button";
+      share.textContent = "Share Group"; share.setAttribute("aria-label", `Share group ${group.name}`);
+      share.disabled = !members.length || state.isParsing || Boolean(state.pendingImage) || Boolean(state.codeMode);
+      share.addEventListener("click", () => { menu.open = false; openGroupShare(group, more); });
+      options.append(top, week, share); menu.append(more, options); actions.append(menu);
     }
     header.append(copy, actions);
     section.append(header);
@@ -2843,12 +2867,19 @@
     codeStatus(els.exportCodeStatus, `${selected} schedule${selected === 1 ? "" : "s"} selected.`);
   }
 
+  function codePanelReturnFocus() {
+    if (state.quickExportReturnFocus?.isConnected) return state.quickExportReturnFocus;
+    if (state.exportGroup) return [...els.peopleList.querySelectorAll(".people-group")].find(section => section.dataset.groupId === state.exportGroup.id)?.querySelector(".group-more") || els.homeExportButton;
+    return state.quickExportReturnFocus;
+  }
+
   function closeCodePanels() {
     if (state.isParsing) return;
-    const fromHome = state.quickExport, returnFocus = state.quickExportReturnFocus;
+    const fromHome = state.quickExport, returnFocus = codePanelReturnFocus();
     state.codeMode = null;
     state.quickExport = false;
     state.quickExportReturnFocus = null;
+    state.exportGroup = null;
     resetSharedImport();
     resetShareLink(els.exportSharePanel);
     els.codeExportPanel.hidden = true;
@@ -2871,6 +2902,14 @@
     openCodePanel(mode, true);
   }
 
+  function openGroupShare(group, returnFocus) {
+    if (state.isParsing || state.pendingImage || state.codeMode) return;
+    if (!groupMembers(group).length) { showToast("This group has no schedules to share."); return; }
+    state.quickExportReturnFocus = returnFocus;
+    openScheduleModal();
+    openCodePanel("export", true, group);
+  }
+
   function openHelp() {
     if (state.isParsing || state.pendingImage || state.codeMode) return;
     els.helpModal.querySelector("#iosShortcutGuide").open = false;
@@ -2886,17 +2925,21 @@
     returnHomeActionFocus(els.helpButton);
   }
 
-  function openCodePanel(mode, quick = false) {
+  function openCodePanel(mode, quick = false, group = null) {
     if (state.isParsing || state.pendingImage || state.codeMode) return;
     resetSharedImport();
     state.codeMode = mode;
     state.quickExport = quick;
+    state.exportGroup = group ? { id: group.id, name: group.name } : null;
     els.codeExportPanel.hidden = mode !== "export";
     els.codeImportPanel.hidden = mode !== "import";
     if (mode === "export") {
       resetExportFields(els.exportFieldOptions);
+      els.exportSelection.hidden = Boolean(group);
+      els.exportGroupSummary.hidden = !group;
+      els.exportGroupSummary.textContent = group ? `All ${groupMembers(group).length} members of ${group.name} will be shared. Choose Code, QR or Link below.` : "";
       els.exportPeopleList.replaceChildren();
-      for (const name of Object.keys(peopleMap()).sort(comparePeopleNames)) {
+      for (const name of (group ? groupMembers(group) : Object.keys(peopleMap())).sort(comparePeopleNames)) {
         const label = document.createElement("label");
         label.className = "share-selection";
         const input = document.createElement("input");
@@ -2929,7 +2972,7 @@
 
   function encodeSchedules(names, options) {
     const fields = [...options.querySelectorAll("input:checked")].map(input => input.dataset.exportField);
-    return window.WhosFreeShareCode.encode({ people: Object.fromEntries(names.map(name => [name, peopleMap()[name]])) }, { fields });
+    return window.WhosFreeShareCode.encode({ people: Object.fromEntries(names.map(name => [name, peopleMap()[name]])), ...(state.exportGroup ? { shared_group: state.exportGroup } : {}) }, { fields });
   }
 
   function shareCodeReadyMessage(count, code) {
@@ -3002,7 +3045,7 @@
     if (!output.value) return;
     try {
       await navigator.clipboard.writeText(output.value);
-      codeStatus(status, "Link copied. Your friend can open it to add schedules automatically.", "success");
+      codeStatus(status, panel === els.exportSharePanel && state.exportGroup ? "Link copied. Your friend can keep the group or add everybody individually." : "Link copied. Your friend can open it to add schedules automatically.", "success");
     } catch {
       output.focus(); output.select();
       codeStatus(status, "Select and copy the link above.");
@@ -3058,6 +3101,7 @@
     const status = els.exportSharePanel.querySelector(".share-link-status");
     const people = Object.fromEntries(names.map(name => [name, peopleMap()[name]]));
     const fields = [...els.exportFieldOptions.querySelectorAll("input:checked")].map(input => input.dataset.exportField);
+    const sharedGroup = state.exportGroup ? { ...state.exportGroup } : null;
     state.qrBatchBusy = true;
     els.multipleQrButton.disabled = true;
     els.multipleQrButton.setAttribute("aria-expanded", "false");
@@ -3069,7 +3113,7 @@
       if (!window.WhosFreeQrBatches?.pack) throw new Error("The QR tools did not load. Refresh the app and try again.");
       const result = await window.WhosFreeQrBatches.pack(names, async members => {
         try {
-          const code = await window.WhosFreeShareCode.encode({ people: Object.fromEntries(members.map(name => [name, people[name]])) }, { fields });
+          const code = await window.WhosFreeShareCode.encode({ people: Object.fromEntries(members.map(name => [name, people[name]])), ...(sharedGroup ? { shared_group: sharedGroup } : {}) }, { fields });
           return window.WhosFreeShareCode.createLink(code, APP_URL);
         } catch (error) {
           if (/too large|too much|export fewer/i.test(error.message || "")) return null;
@@ -3079,7 +3123,7 @@
       if (!current()) return;
       const fragment = document.createDocumentFragment();
       const instructions = document.createElement("p");
-      instructions.textContent = "Scan each QR separately. Its listed people are added automatically. You can scan them in any order.";
+      instructions.textContent = sharedGroup ? "Scan each QR separately, in any order. Choose Add to group to collect its listed people in the same group, or add everybody individually." : "Scan each QR separately. Its listed people are added automatically. You can scan them in any order.";
       fragment.append(instructions);
       for (let i = 0; i < result.groups.length; i++) {
         if (!current()) return;
@@ -3142,12 +3186,53 @@
 
   function resetSharedImport() {
     state.sharedImport = null;
+    state.groupImportAutomatic = false;
+    els.sharedGroupImport.hidden = true;
+    els.sharedGroupName.value = "";
+    els.sharedGroupError.textContent = "";
+    els.importScheduleImageButton.hidden = false;
+    els.decodeCodeButton.hidden = false;
     els.sharedImportPreview.hidden = true;
     els.sharedImportPeople.replaceChildren();
     els.importCodeField.hidden = false;
     els.importCodeHelp.hidden = false;
     els.decodeCodeButton.textContent = "Import schedules";
     els.closeImportButton.textContent = "Done";
+  }
+
+  function showSharedGroupImport(imported, automatic) {
+    state.sharedImport = imported;
+    state.groupImportAutomatic = automatic;
+    const source = imported.shared_group;
+    const existing = state.groups.find(group => group.sharedId === source.id);
+    let name = existing?.name || source.name;
+    if (!existing) {
+      for (let number = 2; state.groups.some(group => normalizedScheduleName(group.name) === normalizedScheduleName(name)); number++) {
+        const suffix = ` ${number}`; name = source.name.slice(0, 60 - suffix.length).trimEnd() + suffix;
+      }
+    }
+    els.sharedGroupName.value = name;
+    const names = Object.keys(imported.people);
+    els.sharedGroupSummary.textContent = `${source.name} · ${names.length} ${names.length === 1 ? "member" : "members"}: ${names.join(", ")}`;
+    els.sharedGroupError.textContent = "";
+    els.sharedGroupImport.hidden = false;
+    els.sharedImportPreview.hidden = true;
+    els.importScheduleImageButton.hidden = true;
+    els.importCodeField.hidden = true;
+    els.importCodeHelp.hidden = true;
+    els.importImageStatus.textContent = "";
+    els.decodeCodeButton.hidden = true;
+    els.closeImportButton.textContent = "Cancel";
+    codeStatus(els.importCodeStatus, "");
+  }
+
+  function sharedGroupDestination(imported) {
+    const name = els.sharedGroupName.value.trim();
+    if (!name || name.length > 60) throw new Error("Enter a group name of up to 60 characters.");
+    const existing = state.groups.find(group => group.sharedId === imported.shared_group.id && normalizedScheduleName(group.name) === normalizedScheduleName(name));
+    if (state.groups.some(group => group.id !== existing?.id && normalizedScheduleName(group.name) === normalizedScheduleName(name))) throw new Error("A group already uses this name. Choose another name.");
+    if (!existing && state.groups.length >= 100) throw new Error("You can save up to 100 groups. Add everybody individually or remove a group first.");
+    return { name, existing };
   }
 
   async function previewSharedImport(input) {
@@ -3161,6 +3246,10 @@
       await new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 0)));
       const imported = await window.WhosFreeShareCode.decode(input);
       validateData(imported);
+      if (imported.shared_group) {
+        if (state.loadError) throw new Error("Your saved schedules could not be loaded. Nothing was imported. Resolve the storage error first.");
+        showSharedGroupImport(imported, false); return;
+      }
       state.sharedImport = imported;
       els.sharedImportPeople.replaceChildren();
       for (const [name, person] of Object.entries(imported.people)) {
@@ -3183,7 +3272,7 @@
     } finally {
       state.isParsing = false; updateScheduleModal();
       endImportProgress(els.decodeCodeButton);
-      els.decodeCodeButton.focus({ preventScroll: true });
+      (state.sharedImport?.shared_group ? els.sharedGroupName : els.decodeCodeButton).focus({ preventScroll: true });
     }
   }
 
@@ -3247,10 +3336,10 @@
     resolve(choice);
   }
 
-  async function importShareCode({ automatic = false } = {}) {
+  async function importShareCode({ automatic = false, groupChoice = null } = {}) {
     if (state.isParsing || state.codeMode !== "import") return;
-    if (!automatic && !state.sharedImport && /^(?:https?:\/\/|WFL[56])/i.test(els.importCodeInput.value.trim())) { await previewSharedImport(els.importCodeInput.value); return; }
-    const selected = state.sharedImport ? [...els.sharedImportPeople.querySelectorAll("input:checked")].map(input => input.dataset.person) : null;
+    if (!automatic && !state.sharedImport && /^(?:https?:\/\/|WFL[567])/i.test(els.importCodeInput.value.trim())) { await previewSharedImport(els.importCodeInput.value); return; }
+    const selected = state.sharedImport && !state.sharedImport.shared_group ? [...els.sharedImportPeople.querySelectorAll("input:checked")].map(input => input.dataset.person) : null;
     if (selected && !selected.length) return;
     if (!els.importCodeInput.value.trim()) { codeStatus(els.importCodeStatus, "Paste a code to import.", "error"); els.importCodeInput.focus(); return; }
     state.isParsing = true;
@@ -3262,8 +3351,17 @@
       if (automatic && state.loadError) throw new Error("Your saved schedules could not be loaded. Nothing was imported. Resolve the storage error before opening this link again.");
       // Let the loading popup paint before decoding a potentially large QR link.
       if (automatic) await new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 0)));
-      const imported = state.sharedImport ? { ...state.sharedImport, people: Object.fromEntries(selected.map(name => [name, state.sharedImport.people[name]])) } : await window.WhosFreeShareCode.decode(els.importCodeInput.value);
+      const imported = state.sharedImport ? selected ? { ...state.sharedImport, people: Object.fromEntries(selected.map(name => [name, state.sharedImport.people[name]])) } : state.sharedImport : await window.WhosFreeShareCode.decode(els.importCodeInput.value);
       validateData(imported);
+      if (imported.shared_group) {
+        if (state.loadError) throw new Error("Your saved schedules could not be loaded. Nothing was imported. Resolve the storage error first.");
+        if (!groupChoice) { showSharedGroupImport(imported, automatic); return; }
+      }
+      let destination = null;
+      if (imported.shared_group && groupChoice === "group") {
+        try { destination = sharedGroupDestination(imported); }
+        catch (error) { els.sharedGroupError.textContent = error.message; return; }
+      }
       applyAutomaticSemester(imported);
       const result = await window.WhosFreeShareCode.merge(state.hasData ? state.data : null, imported, automatic ? () => "old" : resolveCodeConflict);
       validateData(result.data);
@@ -3272,13 +3370,34 @@
       if (result.added || result.replaced) {
         state.data = result.data;
         warning = await persistCurrentDatabase("Local schedule collection");
-        rememberScheduleChange(before, `Imported ${result.added} and replaced ${result.replaced || 0} schedules from a code`);
       }
+      let groupNote = "", groupChanged = false;
+      if (destination) {
+        const members = [...new Set(Object.values(result.nameMap))];
+        const existing = destination.existing;
+        if (existing) {
+          const combined = [...new Set([...existing.members, ...members])];
+          groupChanged = combined.length !== existing.members.length;
+          existing.members = combined;
+        } else {
+          const id = window.crypto?.randomUUID?.() || `group-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+          state.groups.push({ id, name: destination.name, members, hidden: false, sharedId: imported.shared_group.id });
+          groupChanged = true;
+        }
+        const wasGrouped = state.showGroups;
+        state.showGroups = true;
+        groupChanged ||= !wasGrouped;
+        const saved = !groupChanged || saveGroupPreferences();
+        groupNote = saved ? ` · Group: ${destination.name}` : ` · Group: ${destination.name} (this session only; the browser could not save it)`;
+        refresh({ preserveScroll: true });
+      }
+      if (groupChanged) rememberUndoChange({ ...before, label: `Imported group ${destination.name}`, afterPreferences: scheduleUndoPreferences() });
+      else if (result.added || result.replaced) rememberScheduleChange(before, `Imported ${result.added} and replaced ${result.replaced || 0} schedules from a code`);
       const renameNote = result.renamed.length ? ` Imported different schedules as ${result.renamed.map(item => item.to).join(", ")}. You can edit their names in the people list.` : "";
       const choicesNote = result.replaced || result.kept ? ` Replaced ${result.replaced || 0}. Kept ${result.kept || 0} old schedules.` : "";
       codeStatus(els.importCodeStatus, warning || `Imported ${result.added} schedule${result.added === 1 ? "" : "s"}. Skipped ${result.skipped} identical schedules.${choicesNote}${renameNote}`, warning ? "error" : "success");
-      if (automatic) {
-        automaticMessage = `Added ${result.added} ${result.added === 1 ? "person" : "people"} · Skipped ${result.skipped + result.kept}${warning ? `. ${warning}` : ""}`;
+      if (automatic || groupChoice) {
+        automaticMessage = `Added ${result.added} ${result.added === 1 ? "person" : "people"} · Skipped ${result.skipped + result.kept}${result.replaced ? ` · Updated ${result.replaced}` : ""}${groupNote}${warning ? `. ${warning}` : ""}`;
       } else showToast(warning || scheduleImportToast(before));
       if (state.sharedImport) { resetSharedImport(); els.importCodeInput.value = ""; }
     } catch (error) {
@@ -3287,7 +3406,7 @@
       finishCodeConflict(null); state.isParsing = false; updateScheduleModal();
       endImportProgress(els.decodeCodeButton);
       if (automaticMessage !== null) { closeScheduleModal(); showToast(automaticMessage); }
-      else els.decodeCodeButton.focus({ preventScroll: true });
+      else (state.sharedImport?.shared_group ? els.sharedGroupName : els.decodeCodeButton).focus({ preventScroll: true });
     }
   }
 
@@ -3521,7 +3640,7 @@
     }
     els.codeImportPanel.hidden = state.codeMode !== "import";
     els.codeExportPanel.hidden = state.codeMode !== "export";
-    document.getElementById("scheduleModalTitle").textContent = flow === "review" ? "Review schedule" : flow === "code-import" ? "Import" : flow === "code-export" ? state.quickExport ? "Quick share" : "Share schedules" : "Schedule data";
+    document.getElementById("scheduleModalTitle").textContent = flow === "review" ? "Review schedule" : flow === "code-import" ? "Import" : flow === "code-export" ? state.exportGroup ? `Share group: ${state.exportGroup.name}` : state.quickExport ? "Quick share" : "Share schedules" : "Schedule data";
     dialog.querySelector(".modal-header p").hidden = Boolean(flow);
     if (flow) dialog.dataset.scheduleFlow = flow;
     else delete dialog.dataset.scheduleFlow;
@@ -3552,6 +3671,9 @@
     els.decodeCodeButton.disabled = state.isParsing || Boolean(state.sharedImport && !els.sharedImportPeople.querySelector("input:checked"));
     els.closeImportButton.disabled = state.isParsing;
     els.importCodeInput.disabled = state.isParsing;
+    els.sharedGroupName.disabled = state.isParsing;
+    els.addSharedGroupButton.disabled = state.isParsing;
+    els.addSharedPeopleButton.disabled = state.isParsing;
     els.closeScheduleModal.disabled = Boolean(state.codeMode) && state.isParsing;
     els.selectAllSchedules.disabled = state.isParsing;
     els.exportPeopleList.querySelectorAll("input").forEach(input => { input.disabled = state.isParsing; });
@@ -3612,12 +3734,14 @@
   }
 
   function closeScheduleModal() {
-    const navigationReturnFocus = state.quickExportReturnFocus;
+    const navigationReturnFocus = codePanelReturnFocus();
+    const fromGroup = Boolean(state.exportGroup);
     if (state.codeMode && state.isParsing) return;
     if (state.codeMode) closeCodePanels();
     els.scheduleModal.hidden = true;
     if (els.settingsModal.hidden) document.body.style.overflow = "";
-    returnHomeActionFocus(navigationReturnFocus || els.scheduleDataButton);
+    if (fromGroup && navigationReturnFocus?.isConnected) navigationReturnFocus.focus({ preventScroll: true });
+    else returnHomeActionFocus(navigationReturnFocus || els.scheduleDataButton);
   }
 
   async function removeSchedules() {
@@ -4524,6 +4648,9 @@
       });
     }
     els.decodeCodeButton.addEventListener("click", importShareCode);
+    els.addSharedGroupButton.addEventListener("click", () => importShareCode({ automatic: state.groupImportAutomatic, groupChoice: "group" }));
+    els.addSharedPeopleButton.addEventListener("click", () => importShareCode({ automatic: state.groupImportAutomatic, groupChoice: "individual" }));
+    els.sharedGroupName.addEventListener("keydown", event => { if (event.key === "Enter") { event.preventDefault(); els.addSharedGroupButton.click(); } });
     els.codeConflictPrompt.addEventListener("click", event => {
       const button = event.target.closest("[data-code-conflict-action]");
       if (button) finishCodeConflict(button.dataset.codeConflictAction);
@@ -4640,7 +4767,7 @@
     if (!("serviceWorker" in navigator)) return;
     if (location.protocol !== "https:" && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") return;
 
-    navigator.serviceWorker.register("./service-worker.js?v=106", { updateViaCache: "none" })
+    navigator.serviceWorker.register("./service-worker.js?v=107", { updateViaCache: "none" })
       .then(registration => registration.update())
       .catch(() => {
         // The app works normally even if PWA caching isn't available.

@@ -2763,6 +2763,8 @@ button:disabled { cursor: not-allowed; }
 .action-icon-button svg { flex: 0 0 auto; width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 #codeImportPanel { padding-top: 18px; }
 #importScheduleImageButton { min-height: 42px; padding-top: 0; padding-bottom: 0; }
+#sharedGroupImport > p { margin: 12px 0; line-height: 1.5; }
+#sharedGroupImport .modal-actions { margin-top: 14px; }
 #settingsButton svg { width: 18px; height: 18px; }
 #showGroupsToggle.group-label-button { width: auto; padding: 0 10px; gap: 7px; }
 #showGroupsToggle.group-label-button.compact-label { width: 42px; min-width: 42px; padding: 0; gap: 0; }

@@ -480,6 +480,33 @@ return {encode,decode,configs};
     if (bytes.length > MAX_BYTES) throw new Error("This selection is too large. Export fewer schedules at once.");
     return bytes;
   }
+  function validateSharedGroup(group) {
+    if (!group || typeof group !== "object" || Array.isArray(group) ||
+      typeof group.id !== "string" || !/^[A-Za-z0-9_-]{1,120}$/.test(group.id) ||
+      typeof group.name !== "string" || !group.name.trim() || group.name.length > 60 || /[\u0000-\u001f]/.test(group.name)) {
+      throw new Error("This code has invalid shared group details.");
+    }
+    return { id: group.id, name: group.name.trim() };
+  }
+  // WF7 prefixes the unchanged WF6 selected envelope with bounded group metadata.
+  function groupEnvelope(core, group) {
+    const metadata = new TextEncoder().encode(JSON.stringify({ v: 1, ...group }));
+    const bytes = new Uint8Array(2 + metadata.length + core.length);
+    if (metadata.length > 1024 || bytes.length > MAX_BYTES) throw new Error("This selection is too large. Export fewer schedules at once.");
+    new DataView(bytes.buffer).setUint16(0, metadata.length, true);
+    bytes.set(metadata, 2); bytes.set(core, 2 + metadata.length);
+    return bytes;
+  }
+  function readGroupEnvelope(bytes) {
+    if (bytes.length < 3) throw new Error("This code has incomplete shared group details.");
+    const length = bytes[0] | bytes[1] << 8;
+    if (!length || length > 1024 || 2 + length >= bytes.length) throw new Error("This code has invalid shared group details.");
+    let group;
+    try { group = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes.subarray(2, 2 + length))); }
+    catch { throw new Error("This code has unreadable shared group details."); }
+    if (group?.v !== 1) throw new Error("This shared group format is not supported. Update the app.");
+    return { group: validateSharedGroup(group), core: bytes.subarray(2 + length) };
+  }
   function readSelectedEnvelope(bytes) {
     const invalid = () => { throw new Error("This code does not contain valid selected schedule data."); };
     const mask = bytes[0]; if (mask === undefined || mask > 31) invalid();
@@ -517,12 +544,16 @@ return {encode,decode,configs};
   }
   async function encode(data, options) {
     if (!data?.people || typeof data.people !== "object" || Array.isArray(data.people)) throw new Error("Select schedules to export.");
-    const mask = options === undefined ? null : fieldMask(options?.fields ?? []);
+    const group = Object.hasOwn(data, "shared_group") ? validateSharedGroup(data.shared_group) : null;
+    const mask = options === undefined && !group ? null : fieldMask(options?.fields ?? []);
     const projected = mask === null ? data : { people: Object.fromEntries(Object.entries(data?.people || {}).map(([name, person]) => [name, selectedPerson(person, mask)])) };
     const payload = pack(projected, mask === null);
     const extras = mask & 16 ? Object.values(projected.people).map((person, index) => [index, extraFields(person, PERSON_KEYS), person.classes.map((item, i) => [i, extraFields(item, CLASS_KEYS)]).filter(row => Object.keys(row[1]).length)]).filter(row => Object.keys(row[1]).length || row[2].length) : [];
     const extraBytes = extras.length ? new TextEncoder().encode(JSON.stringify(extras)) : new Uint8Array();
-    const envelope = core => mask === null ? core : selectedEnvelope(core, mask, extraBytes);
+    const envelope = core => {
+      const selected = mask === null ? core : selectedEnvelope(core, mask, extraBytes);
+      return group ? groupEnvelope(selected, group) : selected;
+    };
     const slim = mask === null || !(mask & 6);
     let bytes = envelope(new TextEncoder().encode(JSON.stringify(packCompact(payload, slim))));
     if (bytes.length > MAX_BYTES) throw new Error("This selection is too large. Export fewer schedules at once.");
@@ -558,7 +589,7 @@ return {encode,decode,configs};
         } catch { /* Older browsers can use wrapped DEFLATE or uncompressed data. */ }
       }
     }
-    const code = wrap(bytes, mode, mask === null ? 5 : 6);
+    const code = wrap(bytes, mode, group ? 7 : mask === null ? 5 : 6);
     if (code.length > MAX_CODE) throw new Error("This selection is too large. Export fewer schedules at once.");
     return code;
   }
@@ -570,8 +601,8 @@ return {encode,decode,configs};
       value = new URLSearchParams(url.hash.slice(1)).get("import");
       if (!value) throw new Error("This link does not contain schedules.");
     }
-    if (!/^WFL[56]/.test(value)) return value;
-    if (!/^WFL[56][JDZBRSTUV][A-Za-z0-9_-]+$/.test(value)) throw new Error("The shared link is incomplete or changed.");
+    if (!/^WFL[567]/.test(value)) return value;
+    if (!/^WFL[567][JDZBRSTUV][A-Za-z0-9_-]+$/.test(value)) throw new Error("The shared link is incomplete or changed.");
     const text = value.slice(5);
     if (text.length > Math.ceil((MAX_BYTES + 4) * 4 / 3) || text.length % 4 === 1) throw new Error("The shared link is incomplete or too large.");
     const binary = atob(text.replace(/-/g, "+").replace(/_/g, "/"));
@@ -585,7 +616,7 @@ return {encode,decode,configs};
     return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
   }
   function createLink(code, baseUrl) {
-    if (typeof code !== "string" || code.length > MAX_CODE || !/^WF[56][JDZBRSTUV]/.test(code)) throw new Error("Generate a new export code first.");
+    if (typeof code !== "string" || code.length > MAX_CODE || !/^WF[567][JDZBRSTUV]/.test(code)) throw new Error("Generate a new export code first.");
     const checked = unbase15(code.slice(4));
     if (checked.length < 4 || checksum(checked.subarray(4)) !== new DataView(checked.buffer).getUint32(0, true)) throw new Error("The code is incomplete or changed.");
     const url = new URL(baseUrl);
@@ -606,7 +637,7 @@ return {encode,decode,configs};
       try { return JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes)); }
       catch { throw new Error("This code does not contain readable schedule data."); }
     };
-    let payload, selection = null;
+    let payload, selection = null, group = null;
     if (code.slice(0, 3).toUpperCase() === "WF1") {
       // Restore the original alphanumeric format as well as keeping WF2.
       const legacy = code.toUpperCase(), alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
@@ -622,15 +653,16 @@ return {encode,decode,configs};
       if (buffer || Math.ceil(length * 8 / 5) !== text.length || checksum(bytes).toString(16).padStart(8, "0").toUpperCase() !== legacy.slice(4, 12)) throw new Error("The code is incomplete or changed. Ask your friend to copy it again.");
       if (legacy[3] === "G") bytes = await decompress(bytes, "gzip");
       payload = json(bytes); validatePayload(payload);
-    } else if(/^WF[56][JDZBRSTUV]/.test(code)){
-      if(!/^WF[56][JDZBRSTUV][0-9a-e][\u3400-\u4dbf\u4e00-\u9fff\uac00-\uc03f]+$/.test(code))throw new Error("That is not a valid Who’s Free? export code. Paste the full code from your friend.");
+    } else if(/^WF[567][JDZBRSTUV]/.test(code)){
+      if(!/^WF[567][JDZBRSTUV][0-9a-e][\u3400-\u4dbf\u4e00-\u9fff\uac00-\uc03f]+$/.test(code))throw new Error("That is not a valid Who’s Free? export code. Paste the full code from your friend.");
       const checked=unbase15(code.slice(4));
       if(checked.length<4)throw new Error("The code is incomplete or changed.");
       let bytes=checked.subarray(4);
       if(checksum(bytes)!==new DataView(checked.buffer).getUint32(0,true))throw new Error("The code is incomplete or changed. Ask your friend to copy it again.");
       if("DRU".includes(code[3]))bytes=await decompress(bytes,"deflate-raw");
       else if("ZSV".includes(code[3]))bytes=await decompress(bytes,"deflate");
-      if (code[2] === "6") { selection = readSelectedEnvelope(bytes); bytes = selection.core; }
+      if (code[2] === "7") { const envelope = readGroupEnvelope(bytes); group = envelope.group; bytes = envelope.core; }
+      if ("67".includes(code[2])) { selection = readSelectedEnvelope(bytes); bytes = selection.core; }
       if (selection && selection.mask & 6 && "TUV".includes(code[3])) throw new Error("This code has an invalid field layout.");
       payload="TUV".includes(code[3])?factor5.decode(bytes):"BRS".includes(code[3])?unpackBinary(bytes,true,true):unpackCompact(json(bytes),!selection || !(selection.mask & 6));
       if (selection) for (const person of payload.p) {
@@ -657,7 +689,7 @@ return {encode,decode,configs};
       })) };
     }
     if (selection) applyExtraFields(people, selection.extras);
-    return { schema_version: 1, ...(selection ? { share_profile: "selected", share_fields: EXPORT_FIELDS.filter((_, i) => selection.mask & (1 << i)) } : "45".includes(code[2]) ? { share_profile: "compact" } : {}), people };
+    return { schema_version: 1, ...(selection ? { share_profile: "selected", share_fields: EXPORT_FIELDS.filter((_, i) => selection.mask & (1 << i)) } : "45".includes(code[2]) ? { share_profile: "compact" } : {}), ...(group ? { shared_group: group } : {}), people };
   }
   function sameSchedule(a, b, compact = false) {
     if (Array.isArray(compact)) {
@@ -693,11 +725,13 @@ return {encode,decode,configs};
     const names = new Map(Object.keys(people).map(name => [normalizedName(name), name]));
     const reserved = new Set(Object.keys(incoming.people).map(normalizedName));
     const renamed = [];
+    const nameMap = Object.create(null);
     let added = 0, replaced = 0, skipped = 0, kept = 0;
     for (const [name, person] of Object.entries(incoming.people)) {
       const normalized = normalizedName(name), existingName = names.get(normalized);
       let target = name;
       if (existingName !== undefined) {
+        nameMap[name] = existingName;
         if (sameSchedule(people[existingName], person, incoming.share_profile === "selected" ? incoming.share_fields : incoming.share_profile === "compact")) { skipped++; continue; }
         let number = 2;
         while (names.has(normalizedName(numberedName(existingName, number))) || reserved.has(normalizedName(numberedName(existingName, number)))) number++;
@@ -715,10 +749,12 @@ return {encode,decode,configs};
       }
       Object.defineProperty(people, target, { value: person, enumerable: true, configurable: true, writable: true });
       names.set(normalizedName(target), target); added++;
+      nameMap[name] = target;
     }
-    return { data: { ...(existing || {}), schema_version: existing?.schema_version || 1, people }, added, replaced, skipped, kept, renamed };
+    return { data: { ...(existing || {}), schema_version: existing?.schema_version || 1, people }, added, replaced, skipped, kept, renamed, nameMap };
   }
   globalThis.WhosFreeShareCode = { encode, decode, merge, createLink, __test: { base14, unbase14, wrap, MAX_BYTES, sameSchedule, pack, packCompact, packBinary, unpackBinary, familyName, tokenize, untokenize, WORDS, WORDS5, DICTS5, base15, unbase15, alphabet15, factor5 } };
 })();
+
 
 

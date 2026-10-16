@@ -32,7 +32,7 @@
   <link rel="icon" type="image/png" href="assets/icon-192.png" sizes="192x192">
   <link rel="icon" type="image/x-icon" href="favicon.ico" sizes="16x16 32x32 48x48">
   <link rel="apple-touch-icon" href="assets/apple-touch-icon.png" sizes="180x180">
-  <link rel="stylesheet" href="styles.css?v=106">
+  <link rel="stylesheet" href="styles.css?v=107">
 </head>
 <body>
   <div id="mobileNavBackdrop" class="mobile-nav-backdrop" aria-hidden="true" hidden></div>
@@ -179,6 +179,7 @@
           <button id="importCodeButton" class="secondary-button" type="button">Import</button>
         </div>
         <div id="codeExportPanel" class="share-code-panel" hidden>
+          <p id="exportGroupSummary" class="share-code-note" hidden></p>
           <details id="exportSelection" class="export-selection">
             <summary><span>People to share</span><span id="exportSelectionSummary" class="export-selection-summary">Choose people</span></summary>
             <label class="share-selection"><input id="selectAllSchedules" type="checkbox"><span>Everyone</span></label>
@@ -225,6 +226,17 @@
           <div id="sharedImportPreview" hidden>
             <p>Choose the schedules to add. Nothing is saved until you confirm.</p>
             <div id="sharedImportPeople" class="export-people-list"></div>
+          </div>
+          <div id="sharedGroupImport" hidden>
+            <h3>You were shared a group</h3>
+            <p id="sharedGroupSummary"></p>
+            <p>Keep its members in a group, or add everybody individually. Existing schedules are kept; matching people can join the group.</p>
+            <label class="field-group group-name-field"><span>Group name</span><input id="sharedGroupName" type="text" maxlength="60" autocomplete="off"></label>
+            <p id="sharedGroupError" class="parser-status" data-tone="error" role="alert"></p>
+            <div class="modal-actions">
+              <button id="addSharedGroupButton" class="primary-button" type="button">Add to group</button>
+              <button id="addSharedPeopleButton" class="secondary-button" type="button">Add everybody individually</button>
+            </div>
           </div>
           <div id="importCodeStatus" class="parser-status" role="status" aria-live="polite"></div>
           <div id="codeConflictPrompt" class="share-code-panel" role="group" aria-labelledby="codeConflictMessage" hidden>
@@ -427,10 +439,10 @@
         <details class="help-topic"><summary>Add and edit schedules</summary><p>Open Schedules to import an Omnivox screenshot or create a timetable manually. Picture recognition runs on your device. Review the detected names, days, times, rooms and classes before saving, and correct any uncertain results. The stored-people list starts collapsed; choose Show to edit a saved timetable or its semester. PDF and JSON imports are also available.</p></details>
         <details class="help-topic"><summary>Find who is free</summary><p>Current time follows the clock. Turn it off to choose a day and time, including weekends. All shows everyone; Free shows available people. Class Soon means someone has a short gap before their next class. Use the magnifying glass beside GROUP to search names and nicknames; the search field opens below the buttons. Search respects All/Free and Groups. Leaving the search field closes it and clears the filter; press the magnifying glass to reopen it. The clear button keeps the field open. Select a person for their next class and today's timetable, then use Full schedule to see the week.</p></details>
         <details class="help-topic"><summary>People and individual actions</summary><p>Select a person's name to reveal Full schedule, +, the red trash icon and Share. On a small screen, the page scrolls to these details. + adds them to an existing group. Trash deletes their schedule from this device after confirmation. Share exports only that person's schedule as a URL, QR code or text code.</p></details>
-        <details class="help-topic"><summary>Groups and shared availability</summary><p>Turn on GROUP and use the group management icon beside search to create or edit groups. Choose Edit beside a group to rename it and remove members with the red trash icons. A person can belong to several groups. Hide or show a group's members, and open its … menu to move the group to the top or view weekly availability. Save group applies the changes; Cancel discards them. Removing a member preserves their schedule and other group memberships. Group preferences also let you control whether ungrouped people appear.</p></details>
-        <details class="help-topic"><summary>Share and import</summary><p>The export icon opens quick sharing with Everyone selected. Expand People to share to choose fewer people. Export Code creates text you can copy; Export QR displays a scannable code; Copy Link creates a URL. Times, class names and rooms are included by default. Use … to include teachers, course codes, semesters and other saved details. Open a received link, scan a QR with your phone camera, or paste a text code in Schedules → Import. Opening a link or scanning a QR adds people automatically and shows how many were added or skipped. Existing schedules are kept. Pasting a link or code in Import keeps the manual review and conflict choices. Anyone with your export can read the selected schedule details.</p></details>
+        <details class="help-topic"><summary>Groups and shared availability</summary><p>Turn on GROUP and use the group management icon beside search to create or edit groups. Choose Edit beside a group to rename it and remove members with the red trash icons. A person can belong to several groups. Hide or show a group's members, and open its … menu to move the group to the top, view weekly availability, or Share Group. Share Group offers Code, QR and Link for all its members. The receiver can keep a named group or add everybody individually. Save group applies the changes; Cancel discards them. Removing a member preserves their schedule and other group memberships. Group preferences also let you control whether ungrouped people appear.</p></details>
+        <details class="help-topic"><summary>Share and import</summary><p>The export icon opens quick sharing with Everyone selected. Expand People to share to choose fewer people. Export Code creates text you can copy; Export QR displays a scannable code; Copy Link creates a URL. Times, class names and rooms are included by default. Use … to include teachers, course codes, semesters and other saved details. Open a received link, scan a QR with your phone camera, or paste a text code in Schedules → Import. Opening an ordinary link or scanning an ordinary QR adds people automatically and shows how many were added or skipped. Group shares first ask whether to keep a named group or add everybody individually. Existing schedules are kept. Pasting a link or code in Import keeps the manual review and conflict choices. Anyone with your export can read the selected schedule details.</p></details>
         <details class="help-topic"><summary>Reorder, pin and undo</summary><p>Drag a person to reorder the list on desktop, or hold and move their card on touch screens. With the person's name focused, Alt + Up or Down moves them using the keyboard. Groups remember their own order. Pin people in Settings to keep them above unpinned people. The back arrow undoes recent schedule and ordering changes during the current page session.</p></details>
-        <details class="help-topic"><summary>Settings and notifications</summary><p>Open the cog for nicknames, pinned people, notification preferences and appearance. Choose a light or dark theme and an accent colour. Notifications need your browser's permission; keep UFree open for its time checks. Nicknames, groups and preferences stay on this device and are not included in schedule exports.</p></details>
+        <details class="help-topic"><summary>Settings and notifications</summary><p>Open the cog for nicknames, pinned people, notification preferences and appearance. Choose a light or dark theme and an accent colour. Notifications need your browser's permission; keep UFree open for its time checks. Nicknames and personal preferences stay on this device. Group identity is included only when you choose Share Group.</p></details>
         <details class="help-topic"><summary>Keep a backup</summary><p>Schedules are saved in this browser on this device, with no automatic sync between devices. Export a code or a JSON backup from Schedules before clearing website data, switching browsers or changing devices. Import the backup to restore your timetables. Undo does not survive closing or reloading the page.</p></details>
       </div>
       <section class="help-privacy" aria-labelledby="privacyNoticeTitle">
@@ -541,7 +553,7 @@
       const loading = document.getElementById("importProgressOverlay");
       document.getElementById("importProgressTitle").textContent = "Opening shared schedules";
       document.getElementById("importProgressMessage").textContent = "Loading the app…";
-      loading.querySelector(".import-progress-note").textContent = "Shared schedules are added automatically. Existing schedules are kept.";
+      loading.querySelector(".import-progress-note").textContent = "Shared schedules open on this device. Group shares let you choose how to add their members.";
       loading.setAttribute("aria-busy", "true");
       loading.hidden = false;
       document.documentElement.classList.add("shared-link-starting");
@@ -551,11 +563,11 @@
   <script src="schedule-parser.js?v=90" defer></script>
   <script src="schedule-image-parser.js?v=92" defer></script>
   <script src="schedule-availability.js?v=90" defer></script>
-  <script src="schedule-share-code.js?v=90" defer></script>
+  <script src="schedule-share-code.js?v=107" defer></script>
   <script src="assets/qr/qrcodegen.js?v=90" defer></script>
   <script src="schedule-groups.js?v=90" defer></script>
   <script src="schedule-qr-batches.js?v=97" defer></script>
-  <script src="app.js?v=106" defer></script>
+  <script src="app.js?v=107" defer></script>
 </body>
 </html>
 

@@ -376,7 +376,7 @@ test("icon-only group management edits groups; their options menu contains no du
     const before = a.stored(); a.el("showGroupsToggle").click();
     const section = a.el("peopleList").querySelector('[data-group-id="team"]');
     section.querySelector("details").open = true;
-    assert.deepEqual([...section.querySelectorAll(".group-options-panel button")].map(button => button.textContent), ["Send group to top", "Weekly availability"]);
+    assert.deepEqual([...section.querySelectorAll(".group-options-panel button")].map(button => button.textContent), ["Send group to top", "Weekly availability", "Share Group"]);
     assert.equal(a.el("manageGroupsButton").textContent.trim(), ""); assert.ok(a.el("manageGroupsButton").querySelector("svg"));
     assert.equal(a.el("manageGroupsButton").getAttribute("aria-label"), "Manage groups");
     a.el("manageGroupsButton").click(); a.el("groupsManagerList").querySelector('[aria-label="Edit group Team"]').click();

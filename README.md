@@ -1,5 +1,13 @@
 # UFree
 
+### Share Group
+
+- Each named group's three-dot menu offers **Share Group** after Send group to top and Weekly availability. It exports every saved member of that group, including members outside the current search/free filter, through Code, QR or Link. Optional detail choices work as before.
+- Group shares use WF7/WFL7. The receiving Import popup identifies the group and lets the recipient edit its name and **Add to group**, **Add everybody individually**, or Cancel. Nothing is saved until a choice is made. Ordinary shares still import automatically when opened.
+- Opened group links keep differing local schedules and skip duplicates, while including their canonical local names in the group. Manual group-code imports retain the existing conflict choices and correctly include renamed Keep both people. Group names never overwrite an unrelated local group; collisions suggest a new name.
+- Independent QR batches carry the same source group identity. Later scans can extend the recipient's chosen group, even after a reload. Repeated scans do not duplicate people or groups. Group additions and membership extensions support session Undo; storage failures are reported honestly.
+- Existing WF1–WF6 codes remain supported. Ordinary exports remain WF5/WF6. New group codes require the updated app on the receiving device; upload the updated files to separately hosted deployments too.
+
 ### Combined Import panel
 
 - The main menu's **Import** opens a single panel with **Import schedule image** above the code/link text box. Schedules keeps its original picture button and also uses this combined importer.
@@ -7,7 +15,7 @@
 
 ### Multiple independent QR codes
 
-- When a collection is too large for one QR, **Multiple QR codes** packs the selected people into scrollable QR cards. Each card lists its people and uses a complete existing WF6 share link on the current deployment's domain and path.
+- When a collection is too large for one QR, **Multiple QR codes** packs the selected people into scrollable QR cards. Each card lists its people and uses a complete share link on the current deployment's domain and path (WF6 for ordinary collections, WF7 for groups).
 - Opening a QR/share link adds its people automatically and shows the added/skipped counts. Identical people and different schedules with an existing name are skipped, preserving local data; additions support Undo. Pasted links in the manual importer keep their selection preview and conflict choices. Every QR works independently, in any order. Export field choices are preserved, and schedules are never split into pieces that require reassembly.
 - Packing measures real compressed link byte sizes, starts with large schedules, and tries redistribution and merges to reduce the QR count. The search is bounded for responsiveness; it does not guarantee the mathematically smallest number for every selection.
 - Individually oversized schedules are named explicitly with guidance to use a code/link or fewer optional details. Changing people/details, switching export actions, or closing the dialog discards old results and cancels pending work.

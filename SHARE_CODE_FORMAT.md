@@ -1,8 +1,37 @@
 # Share-code compatibility
 
-New app exports use WF6. Import supports WF1, WF2, WF3, WF4, WF5 and WF6. Do not remove an older
+Ordinary app exports use WF6; group shares use WF7. Import supports WF1 through WF7. Do not remove an older
 decoder when introducing a later version. New versions require an updated app
 on the receiving device. All versions remain self-contained and work offline.
+
+## WF7 group shares
+
+WF7 is used only when sharing a group. It retains every selected-field and payload
+layout rule of WF6. Before compression, the WF6 selected envelope is prefixed with
+a two-byte little-endian metadata length, then UTF-8 JSON metadata:
+`{"v":1,"id":"source-group-id","name":"Group name"}`. Every person in the payload
+is a member of that group; no external membership lookup or multipart reassembly
+is needed. Metadata is limited to 1,024 bytes, IDs to 1–120 ASCII letters/digits,
+underscores or hyphens, and names to 1–60 characters with no control characters.
+The total uncompressed payload retains the existing 1 MiB limit. Existing modes,
+CRC32, 15-bit text encoding and decompression limits remain unchanged. WFL7 is
+the same ASCII URL transport as WFL5/WFL6, on the current deployment's origin/path.
+
+All WF6 candidate layouts are evaluated with this metadata included, so QR
+capacity and batch packing measure the actual complete group link. Every QR
+subset carries the same source identity and only its listed members. Receivers
+can save those subsets into the same locally named group across scans/reloads.
+The source ID identifies shared membership only; it never overwrites a local ID,
+group name, hidden state, order or unrelated group. Local `sharedId` records this
+association. Duplicate and kept/replaced schedules map to their canonical local
+names; Keep both maps to the new numbered name.
+
+Group payloads always pause for the group/individual/cancel choice before any
+write. Opened links retain local conflicts; pasted codes keep manual conflict
+choices. Ordinary WF1–WF6 import behavior and WF5/WF6 output are unchanged.
+Group metadata is transport-only and is not stored in the schedules database.
+Older app versions require an update to read WF7; their existing codes remain
+readable by the updated app.
 
 ## WF6 selected export details
 
