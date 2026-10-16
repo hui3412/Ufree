@@ -1514,6 +1514,10 @@
     const busy = state.isParsing || Boolean(state.pendingImage) || Boolean(state.codeMode);
     els.manageGroupsButton.hidden = !state.showGroups;
     els.manageGroupsButton.disabled = !state.hasData || busy;
+    for (const button of els.peopleList.querySelectorAll("[data-share-group]")) {
+      const group = state.groups.find(item => item.id === button.dataset.shareGroup);
+      button.disabled = busy || !group || !groupMembers(group).length;
+    }
     setViewToggle(els.showGroupsToggle, state.showGroups ? "Hide groups" : "Show groups", state.showGroups);
     scheduleToolbarLayout();
   }
@@ -1720,6 +1724,7 @@
       week.addEventListener("click", () => { menu.open = false; openGroupWeek(group.id, more); });
       const share = document.createElement("button"); share.type = "button"; share.className = "secondary-button";
       share.textContent = "Share Group"; share.setAttribute("aria-label", `Share group ${group.name}`);
+      share.dataset.shareGroup = group.id;
       share.disabled = !members.length || state.isParsing || Boolean(state.pendingImage) || Boolean(state.codeMode);
       share.addEventListener("click", () => { menu.open = false; openGroupShare(group, more); });
       options.append(top, week, share); menu.append(more, options); actions.append(menu);
@@ -4767,7 +4772,7 @@
     if (!("serviceWorker" in navigator)) return;
     if (location.protocol !== "https:" && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") return;
 
-    navigator.serviceWorker.register("./service-worker.js?v=107", { updateViaCache: "none" })
+    navigator.serviceWorker.register("./service-worker.js?v=108", { updateViaCache: "none" })
       .then(registration => registration.update())
       .catch(() => {
         // The app works normally even if PWA caching isn't available.

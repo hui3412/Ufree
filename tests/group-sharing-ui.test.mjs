@@ -14,7 +14,9 @@ async function app(initial = null, groups = [], url = base) {
   const window = new Window({ url, settings: { disableJavaScriptFileLoading: true, disableCSSFileLoading: true } });
   window.document.write(fs.readFileSync(new URL("../index.html", import.meta.url), "utf8"));
   const style = window.document.createElement("style"); style.textContent = fs.readFileSync(new URL("../styles.css", import.meta.url), "utf8"); window.document.head.append(style);
-  window.setInterval = () => 0;
+  let liveTick;
+  window.setInterval = callback => { liveTick = callback; return 0; };
+  Object.defineProperty(window.document, "hidden", { configurable: true, value: false });
   window.matchMedia = () => ({ matches: true, addEventListener() {} });
   Object.assign(window, { TextEncoder, TextDecoder, Blob, CompressionStream, DecompressionStream });
   let copied;
@@ -37,8 +39,42 @@ async function app(initial = null, groups = [], url = base) {
     window.dispatchEvent(new window.HashChangeEvent("hashchange"));
     await wait(() => !el("sharedGroupImport").hidden && el("importProgressOverlay").hidden);
   };
-  return { window, el, wait, stored, prefs, share, openLink, copied: () => copied };
+  return { window, el, wait, stored, prefs, share, openLink, runClock: () => liveTick(), copied: () => copied };
 }
+
+for (const sharing of ["group", "collection", "person"]) test(`Share Group remains available after closing ${sharing} QR sharing across live clock refreshes`, async () => {
+  const empty = { id: "empty", name: "Empty", members: [], hidden: false };
+  const other = { id: "other", name: "Other", members: ["Alice"], hidden: false };
+  const a = await app(data, [team, other, empty]);
+  const groupButton = name => a.window.document.querySelector(`[aria-label="Share group ${name}"]`);
+  try {
+    const before = a.stored(), prefs = plain(a.prefs());
+    if (sharing === "group") a.share();
+    else if (sharing === "collection") a.el("homeExportButton").click();
+    else {
+      a.el("peopleList").querySelector('[data-person="Alice"] .person-select-button').click();
+      a.el("sharePersonScheduleButton").click();
+    }
+    const qr = a.el(sharing === "person" ? "personQuickQrButton" : "exportQrButton");
+    qr.click(); await a.wait(() => !qr.disabled);
+    const previous = groupButton(team.name);
+    a.runClock();
+    assert.notEqual(groupButton(team.name), previous, "the real live timer rerendered the group controls");
+    a.el(sharing === "person" ? "closePersonQuickShare" : "closeScheduleModal").click();
+    assert.equal(groupButton(team.name).disabled, false);
+    assert.equal(groupButton(other.name).disabled, false);
+    assert.equal(groupButton(empty.name).disabled, true, "empty groups remain unavailable");
+    for (let i = 0; i < 2; i++) {
+      a.share();
+      assert.equal(a.el("scheduleModal").hidden, false);
+      a.el("exportQrButton").click(); await a.wait(() => !a.el("exportQrButton").disabled);
+      a.runClock();
+      a.el("closeScheduleModal").click();
+      assert.equal(groupButton(team.name).disabled, false);
+    }
+    assert.equal(a.stored(), before); assert.deepEqual(a.prefs(), prefs);
+  } finally { await a.window.happyDOM.abort(); }
+});
 
 for (const domain of [base, "https://youfree.ca/"]) test(`Share Group is the third action and all methods export exactly its members on ${domain}`, async () => {
   const a = await app(data, [team], domain);
