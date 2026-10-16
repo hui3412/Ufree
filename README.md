@@ -1,5 +1,14 @@
 # UFree
 
+### Dated weekly screenshot fallback
+
+- Keep every existing reader and decoding function unchanged. Only after the complete existing image reader fails, try the separate `schedule-dated-image-parser.js` reader. Successful existing reads return immediately and never invoke it.
+- Support the attached style: five dated weekday headings, white classes with dark outlines, grey empty cells, and paired start/end clocks in each row. Validate column borders, all clock-row borders and every printed time before importing classes. Full-width class borders separate touching classes; small Classroom tags do not.
+- Ignore calendar dates such as Oct 19. Output the same weekly weekday/start/end class records as other imports, with no event dates or calendar-week restriction. Read `s.00001` sections and bare room labels on this new path only.
+- Keep the existing naming, review, editing, duplicate handling and save flow. Flag ambiguous room characters rather than guessing. All OCR uses the already bundled on-device engine and language files.
+- The source canvas is retained until the primary reader or final fallback finishes, so a failed primary crop cannot destroy the fallback input. It is released afterward when requested. The fallback has bounded OCR calls and terminates its worker on success or failure.
+- Validation on the supplied image recovered all 15 class blocks with the visually checked weekly times. Text remains subject to OCR review. Deploy the new fallback script with the updated primary script, HTML and service worker; both readers are cached offline.
+
 ### Share Group
 
 - Each named group's three-dot menu offers **Share Group** after Send group to top and Weekly availability. It exports every saved member of that group, including members outside the current search/free filter, through Code, QR or Link. Optional detail choices work as before.

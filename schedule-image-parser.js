@@ -841,11 +841,12 @@
   async function parseScheduleImage(file, options = {}) {
     if (!(file instanceof Blob)) throw new Error("Choose a schedule picture.");
     const canvas = await imageCanvas(file);
-    try { return await parseScheduleCanvas(canvas, file.name || "schedule.png", { ...options, releaseSourceCanvas: true }); }
+    try { return await parseCanvas(canvas, file.name || "schedule.png", { ...options, releaseSourceCanvas: true }); }
     finally { canvas.width = canvas.height = 1; }
   }
 
-  globalThis.WhosFreeImageParser = { parseScheduleImage, parseScheduleCanvas, __test: { wordsFromData, timeGrid, readTimeGrid, boundaryTimeGrid, variableRowTimeGrid, recognitionPatch, patchWords, borderRows, headersFromItems, classesFromCells, classRegions, containsInk, isolateTimetable } };
+  const parseCanvas = globalThis.WhosFreeDatedImageParser?.withFallback(parseScheduleCanvas, loadOcr) || parseScheduleCanvas;
+  globalThis.WhosFreeImageParser = { parseScheduleImage, parseScheduleCanvas: parseCanvas, __test: { wordsFromData, timeGrid, readTimeGrid, boundaryTimeGrid, variableRowTimeGrid, recognitionPatch, patchWords, borderRows, headersFromItems, classesFromCells, classRegions, containsInk, isolateTimetable } };
 })();
 
 
