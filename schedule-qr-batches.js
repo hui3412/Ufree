@@ -6,35 +6,28 @@
     const order = new Map(unique.map((name, index) => [name, index]));
     const maxBytes = options.maxBytes ?? 2331;
     const encoder = new TextEncoder(), cache = new Map();
-    let extraChecks = 0, searchNodes = 0;
-    const budget = options.maxExtraChecks ?? 160;
-    const maxSearchNodes = options.maxSearchNodes ?? 2500;
-    let phase = "checking", processed = 0, placementTotal = 0, progress = 0;
-    const report = () => {
-      // Real completed work within bounded phases; this is not a time estimate.
-      const next = phase === "complete" ? 1 : phase === "checking" ? .25 * processed / Math.max(1, unique.length)
-        : phase === "packing" ? .25 + .25 * processed / Math.max(1, placementTotal)
-        : .5 + .4 * Math.min(1, Math.max(extraChecks / Math.max(1, budget), searchNodes / Math.max(1, maxSearchNodes)));
-      progress = Math.max(progress, next);
-      options.onProgress?.({ checked: cache.size, people: unique.length, phase, processed, progress });
-    };
+    let phase = "checking", processed = 0, placementTotal = 0;
     const active = () => {
       if (options.isCancelled?.()) {
         const error = new Error("QR generation cancelled."); error.name = "AbortError"; throw error;
       }
     };
-    const measure = async (members, required = false) => {
+    const report = () => {
+      active();
+      const progress = phase === "complete" ? 1 : phase === "checking" ? .3 * processed / Math.max(1, unique.length)
+        : .3 + .65 * processed / Math.max(1, placementTotal);
+      options.onProgress?.({ checked: cache.size, people: unique.length, phase, processed, total: phase === "checking" ? unique.length : placementTotal, progress });
+    };
+    const measure = async members => {
       active();
       const sorted = [...members].sort((a, b) => order.get(a) - order.get(b));
       const key = JSON.stringify(sorted.map(name => order.get(name)));
       if (cache.has(key)) return cache.get(key);
-      if (!required && extraChecks >= budget) return null;
-      if (!required) extraChecks++;
       const link = await makeLink(sorted);
       active();
       const size = typeof link === "string" ? encoder.encode(link).length : Infinity;
-      // Do not retain large failed exports for every candidate combination.
       const result = { names: sorted, size, link: size <= maxBytes ? link : null };
+      // Failed candidates retain only their size, not large encoded strings.
       cache.set(key, result);
       report();
       if (cache.size % 8 === 0) await new Promise(resolve => setTimeout(resolve, 0));
@@ -46,63 +39,40 @@
       const size = encoder.encode(options.fullLink).length;
       cache.set(JSON.stringify(unique.map((_, i) => i)), { names: unique, size, link: size <= maxBytes ? options.fullLink : null });
     }
-    const full = await measure(unique, true);
+    const full = await measure(unique);
     if (full.link) { phase = "complete"; report(); return { groups: [full], oversized: [] }; }
 
     const singles = [], oversized = [];
     for (const name of unique) {
-      const single = await measure([name], true);
+      const single = await measure([name]);
       if (single.link) singles.push(single); else oversized.push(name);
       processed++; report();
     }
-    phase = "packing"; processed = 0; placementTotal = singles.length; report();
     singles.sort((a, b) => b.size - a.size || order.get(a.names[0]) - order.get(b.names[0]));
-    // Best-fit decreasing using actual compression, not summed individual sizes.
-    let best = [];
+    phase = "packing"; processed = 0; placementTotal = singles.length; report();
+    const groups = [];
     for (const single of singles) {
-      let placement = null;
-      for (let i = 0; i < best.length; i++) {
-        const combined = await measure([...best[i].names, ...single.names]);
-        if (combined?.link && (!placement || combined.size > placement.group.size)) placement = { index: i, group: combined };
+      active();
+      let preferred = -1, roomiest = -1;
+      for (let i = 0; i < groups.length; i++) {
+        if (roomiest < 0 || groups[i].size < groups[roomiest].size) roomiest = i;
+        if (groups[i].size + single.size <= maxBytes && (preferred < 0 || groups[i].size > groups[preferred].size)) preferred = i;
       }
-      if (placement) best[placement.index] = placement.group; else best.push(single);
+      // Try a likely close fit, then the roomiest QR. Every person gets their
+      // own attempts; no shared budget can strand the rest as single QRs.
+      // Individual byte sizes only rank candidates. Actual combined encoding
+      // decides whether a group fits, since compression is not additive.
+      const candidates = [...new Set([preferred, roomiest].filter(index => index >= 0))];
+      let placed = false;
+      for (const index of candidates) {
+        const combined = await measure([...groups[index].names, ...single.names]);
+        if (combined.link) { groups[index] = combined; placed = true; break; }
+      }
+      if (!placed) groups.push(single);
       processed++; report();
     }
-    phase = "optimizing"; report();
-    // Seek fewer groups by redistributing large and small schedules. Bound
-    // new encodings and cached search work instead of an unbounded exact search.
-    const search = async (index, groups, target) => {
-      active();
-      if (++searchNodes > maxSearchNodes) return null;
-      if (searchNodes % 64 === 0) { report(); await new Promise(resolve => setTimeout(resolve, 0)); }
-      if (index === singles.length) return groups;
-      const single = singles[index], choices = [];
-      for (let i = 0; i < groups.length; i++) {
-        const combined = await measure([...groups[i].names, ...single.names]);
-        if (combined?.link) choices.push({ index: i, group: combined });
-      }
-      choices.sort((a, b) => b.group.size - a.group.size);
-      for (const choice of choices) {
-        const next = [...groups]; next[choice.index] = choice.group;
-        const found = await search(index + 1, next, target);
-        if (found) return found;
-      }
-      if (groups.length < target) return search(index + 1, [...groups, single], target);
-      return null;
-    };
-    while (best.length > 1) {
-      const improved = await search(0, [], best.length - 1);
-      if (!improved) break;
-      best = improved;
-    }
-    // Also try complete group merges: compression is not perfectly additive.
-    for (let i = 0; i < best.length; i++) for (let j = i + 1; j < best.length;) {
-      const combined = await measure([...best[i].names, ...best[j].names]);
-      if (combined?.link) { best[i] = combined; best.splice(j, 1); i = -1; break; } else j++;
-    }
-    active();
     phase = "complete"; report();
-    return { groups: best, oversized };
+    return { groups, oversized };
   }
   globalThis.WhosFreeQrBatches = { pack };
   if (typeof module !== "undefined" && module.exports) module.exports = { pack };

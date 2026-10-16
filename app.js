@@ -3228,8 +3228,7 @@
         isCancelled: () => !current(),
         onProgress: info => {
           const message = info.phase === "checking" ? `Checking schedules: ${info.processed} of ${names.length}…`
-            : info.phase === "packing" ? "Combining schedules into QR codes…"
-            : info.phase === "optimizing" ? "Finding a smaller set of QR codes…" : "Preparing QR images…";
+            : info.phase === "packing" ? `Combining schedules: ${info.processed} of ${info.total ?? names.length}…` : "Preparing QR images…";
           updateProgress(info.progress * 85, message);
         },
       });
@@ -4905,7 +4904,7 @@
     if (!("serviceWorker" in navigator)) return;
     if (location.protocol !== "https:" && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") return;
 
-    navigator.serviceWorker.register("./service-worker.js?v=118", { updateViaCache: "none" })
+    navigator.serviceWorker.register("./service-worker.js?v=119", { updateViaCache: "none" })
       .then(registration => registration.update())
       .catch(() => {
         // The app works normally even if PWA caching isn't available.

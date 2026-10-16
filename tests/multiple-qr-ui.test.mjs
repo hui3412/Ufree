@@ -151,7 +151,7 @@ test("multiple QR loading bar reflects real callbacks and ignores progress from 
     const first = a.el("multipleQrProgress").value;
     assert.ok(first > 0 && first < 100);
     assert.match(a.el("multipleQrProgress").getAttribute("aria-valuetext"), /Checking schedules: 1 of 2/);
-    report({ phase: "optimizing", progress: .7 });
+    report({ phase: "packing", processed: 1, total: 2, progress: .7 });
     assert.ok(a.el("multipleQrProgress").value > first && a.el("multipleQrProgress").value < 100);
     const progress = a.el("multipleQrProgress").value;
     await tick();
