@@ -2601,9 +2601,6 @@ button:disabled { cursor: not-allowed; }
 }
 .group-options:not([open]) .group-options-panel { display: none; }
 .group-options-panel button { text-align: left; font-size: .82rem; }
-/* Reserve the dropdown's footprint inside the scrollable people panel.
-   A z-index alone cannot escape the panel's overflow clipping. */
-.people-group:has(.group-options[open]) .people-group-header { padding-bottom: 110px; }
 .people-group.group-collapsed { margin-bottom: 16px; }
 @media (max-width: 600px) {
   .review-semester-fields:has(#useCurrentSemesterButton:not([hidden])) { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
