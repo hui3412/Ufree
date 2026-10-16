@@ -1,10 +1,10 @@
-const CACHE_NAME = "whos-free-shell-v102";
+const CACHE_NAME = "whos-free-shell-v103";
 const OCR_CACHE_NAME = "whos-free-ocr-v1";
 const APP_SHELL = [
   "./",
   "./index.html",
-  "./styles.css?v=102",
-  "./app.js?v=102",
+  "./styles.css?v=103",
+  "./app.js?v=103",
   "./schedule-qr-batches.js?v=97",
   "./schedule-share-code.js?v=90",
   "./assets/qr/qrcodegen.js?v=90",
