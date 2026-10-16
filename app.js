@@ -2969,7 +2969,7 @@
       codeStatus(els.exportCodeStatus, error.message || "The code could not be created.", "error");
       if (action === "qr" && /too large|too much|export fewer/i.test(error.message || "")) {
         els.exportSharePanel.hidden = false;
-        codeStatus(els.exportSharePanel.querySelector(".share-link-status"), "Too much data for one QR. Try multiple QR codes, or copy a code or link.", "error");
+        codeStatus(els.exportSharePanel.querySelector(".share-link-status"), names.length > 1 ? "Too much data for one QR. Select fewer schedules, copy the code or link, or export multiple QR codes." : "Too much data for one QR. Copy the code or link.", "error");
         offerMultipleQr();
       }
     } finally { state.isParsing = false; updateScheduleModal(); }
@@ -3130,7 +3130,9 @@
       codeStatus(status, version > 25 ? "Scan with your phone camera. This QR is dense; select fewer people if scanning is difficult." : "Scan with your phone camera, then open the link. Anyone with the QR or link can read these schedules.");
       revealSection(qr);
     } catch (error) {
-      codeStatus(status, error instanceof RangeError ? "Too much data for one QR. Select fewer schedules, or copy the code or link." : "QR could not be created. Refresh the app, or copy the link.", "error");
+      const multipleAvailable = panel === els.exportSharePanel && els.exportPeopleList.querySelectorAll("input:checked").length > 1;
+      const overflowMessage = multipleAvailable ? "Too much data for one QR. Select fewer schedules, copy the code or link, or export multiple QR codes." : "Too much data for one QR. Select fewer schedules, or copy the code or link.";
+      codeStatus(status, error instanceof RangeError ? overflowMessage : "QR could not be created. Refresh the app, or copy the link.", "error");
       if (error instanceof RangeError && panel === els.exportSharePanel) {
         offerMultipleQr();
         revealSection(status, els.multipleQrButton && !els.multipleQrButton.hidden ? els.multipleQrButton : null);
@@ -4638,7 +4640,7 @@
     if (!("serviceWorker" in navigator)) return;
     if (location.protocol !== "https:" && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") return;
 
-    navigator.serviceWorker.register("./service-worker.js?v=103", { updateViaCache: "none" })
+    navigator.serviceWorker.register("./service-worker.js?v=104", { updateViaCache: "none" })
       .then(registration => registration.update())
       .catch(() => {
         // The app works normally even if PWA caching isn't available.
