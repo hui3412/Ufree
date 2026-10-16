@@ -2244,6 +2244,7 @@ input[type="time"],
 
 .schedule-share-link { margin-top: 16px; }
 .export-generation-actions { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.export-generation-actions ~ .share-code-note { margin-top: 12px; }
 .export-field-options { position: relative; flex: 0 0 auto; }
 .export-field-options summary { list-style: none; cursor: pointer; border: 1px solid var(--border); border-radius: 8px; min-width: 44px; min-height: 44px; display: grid; place-items: center; font-size: 22px; line-height: 1; background: var(--card); color: var(--text); }
 .export-field-options summary::-webkit-details-marker { display: none; }
