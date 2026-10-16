@@ -150,3 +150,24 @@ for (const incomplete of [false, true]) test(`complete fallback OCR pipeline ${i
   assert.equal(terminated, 1); assert.equal(image.width, 1); assert.equal(image.height, 1);
   assert.equal(recognized, incomplete ? 2 : 1);
 });
+
+
+test("nearly complete right/bottom outer rules may be clipped when all weekday columns and full clock pairs remain", () => {
+  const image = canvas();
+  image.width = Math.floor(fixture.columns.at(-1).right - 1);
+  image.height = Math.floor(fixture.boundaries.at(-1) - 2);
+  const result = geometry(words, image);
+  assert.equal(result.columns.at(-1).right, image.width);
+  assert.equal(result.grid.inferredBottom, true);
+  assert.deepEqual(plain(result.regions.map(({ day, start, end }) => [day, start, end])), fixture.expected.map(([day, , , start, end]) => [day, start, end]));
+});
+
+test("edge recovery rejects a missing weekday, substantial right crop, or clipped/missing final clock text", () => {
+  const image = canvas(); image.width = Math.floor(fixture.columns.at(-1).right - 1); image.height = Math.floor(fixture.boundaries.at(-1) - 2);
+  assert.throws(() => geometry(words.filter(w => w.text !== "Fri."), image), /dated Monday-to-Friday/);
+  const cropped = canvas(); cropped.width = Math.floor(fixture.columns.at(-1).right - 20);
+  assert.throws(() => geometry(words, cropped), /vertical borders/);
+  assert.throws(() => geometry(words.filter(w => w.text !== "21:05"), image), /every printed start\/end/);
+  const clipped = words.map(w => w.text === "21:05" ? { ...w, y1: image.height } : w);
+  assert.throws(() => geometry(clipped, image), /every printed start\/end/);
+});

@@ -53,11 +53,18 @@
       for (let x = 0; x < canvas.width; x++) if (shade(data, x * 4) < 230) counts[x]++;
     }
     const rules = mergeRules(Array.from(counts, (count, x) => count > samples * .82 ? x : -1).filter(x => x >= 0));
-    const columns = headers.map(header => {
+    const columns = [];
+    for (const [index, header] of headers.entries()) {
       const right = rules.findIndex(x => x > header.cx);
-      if (right < 1) throw unsupported("Could not validate the dated timetable's vertical borders.");
-      return { day: header.day, left: rules[right - 1], right: rules[right] };
-    });
+      if (right < 1) {
+        // A screenshot may lose only the final outside rule. Recover it at
+        // the image edge only when four complete equal columns prove its size.
+        const width = columns.length === 4 ? median(columns.map(column => column.right - column.left)) : 0;
+        const left = columns.at(-1)?.right;
+        if (index !== 4 || !width || header.cx <= left || Math.abs(canvas.width - left - width) > Math.max(3, width * .02)) throw unsupported("Could not validate the dated timetable's vertical borders.");
+        columns.push({ day: header.day, left, right: canvas.width });
+      } else columns.push({ day: header.day, left: rules[right - 1], right: rules[right] });
+    }
     const width = median(columns.map(column => column.right - column.left));
     if (width < 40 || columns.some((column, i) => Math.abs(column.right - column.left - width) > width * .08 || (i && Math.abs(column.left - columns[i - 1].right) > 2))) throw unsupported("The dated timetable columns are incomplete or inconsistent.");
     return columns;
@@ -90,8 +97,13 @@
     const boundaries = mergeRules(rules);
     if (boundaries.length < 9 || boundaries.length > 49) throw unsupported("The dated timetable needs complete clock-row borders.");
     const heights = boundaries.slice(1).map((y, i) => y - boundaries[i]), rowHeight = median(heights);
+    const tail = canvas.height - boundaries.at(-1);
+    const inferredBottom = tail >= rowHeight * .85 && tail <= rowHeight * 1.15;
+    // Only a nearly complete final row may end at the screenshot edge. Its
+    // two full printed clocks must still pass the same checks below.
+    if (inferredBottom) boundaries.push(canvas.height);
     if (rowHeight < 12 || heights.some(value => Math.abs(value - rowHeight) > rowHeight * .15) || boundaries[0] - top > rowHeight * .6 || canvas.height - boundaries.at(-1) > rowHeight * .8) throw unsupported("The dated timetable's rows are cropped or inconsistent.");
-    return { boundaries, rowHeight, gutterLeft, gutterRight: firstLeft, headerBottom: top };
+    return { boundaries, rowHeight, gutterLeft, gutterRight: firstLeft, headerBottom: top, inferredBottom };
   }
 
   function timeValue(text) {
@@ -108,6 +120,7 @@
       const labels = words.filter(word => word.cy > top && word.cy < bottom && word.x0 >= grid.gutterLeft && word.x1 <= grid.gutterRight + 2)
         .map(word => ({ ...word, minute: timeValue(word.text) })).filter(word => word.minute !== null).sort((a, b) => a.cy - b.cy);
       if (labels.length !== 2 || labels[1].minute - labels[0].minute !== 20) return null;
+      if (grid.inferredBottom && row === grid.boundaries.length - 2 && labels.some(word => word.y1 >= bottom - 1)) return null;
       return { start: labels[0].minute, end: labels[1].minute };
     });
   }
