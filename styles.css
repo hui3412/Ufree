@@ -81,6 +81,7 @@ html[data-theme="light"][data-accent-theme="orange"] { --bg: #f5f1ed; }
 
 * {
   box-sizing: border-box;
+  touch-action: manipulation;
 }
 
 html,
