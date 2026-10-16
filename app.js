@@ -410,7 +410,7 @@
     if (!canAnimate()) return;
     const targets = [
       document.querySelector(".brand-copy"),
-      usesMobileNavigation() ? null : document.querySelector(".header-actions"),
+      usesDrawerNavigation() ? null : document.querySelector(".header-actions"),
       document.querySelector(".control-bar"),
       document.querySelector(".people-panel"),
       document.querySelector(".detail-panel"),
@@ -1361,13 +1361,12 @@
     showToast(persisted ? `${group.name} moved to top.` : "Group moved for this session, but could not be saved on this device.");
   }
 
-  const mobileNavMedia = window.matchMedia("(max-width: 900px)");
   const mobileMenuButton = document.getElementById("mobileMenuButton");
   const mobileNavigation = document.getElementById("homeNavigation");
   const mobileNavBackdrop = document.getElementById("mobileNavBackdrop");
   const closeMobileMenuButton = document.getElementById("closeMobileMenuButton");
   const mobileNavAvailable = Boolean(mobileMenuButton && mobileNavigation && mobileNavBackdrop && closeMobileMenuButton);
-  const usesMobileNavigation = () => mobileNavAvailable && mobileNavMedia.matches;
+  const usesDrawerNavigation = () => mobileNavAvailable;
   let mobileNavOpen = false;
   let mobileNavBackground = [];
   let mobileNavOverflow = "";
@@ -1394,23 +1393,15 @@
 
   function syncMobileNavigation() {
     if (!mobileNavAvailable) return;
-    const wasOpen = mobileNavOpen;
-    const hadMenuFocus = mobileNavigation.contains(document.activeElement) || document.activeElement === mobileMenuButton;
-    if (!usesMobileNavigation()) {
-      closeMobileNavigation(false);
-      mobileNavigation.removeAttribute("inert");
-      mobileNavigation.removeAttribute("aria-hidden");
-      if (wasOpen || hadMenuFocus) els.scheduleDataButton.focus({ preventScroll: true });
-    } else if (!mobileNavOpen) {
+    if (!mobileNavOpen) {
       mobileNavigation.setAttribute("inert", "");
       mobileNavigation.setAttribute("aria-hidden", "true");
-      if (hadMenuFocus) mobileMenuButton.focus({ preventScroll: true });
     }
     scheduleToolbarLayout();
   }
 
   function openMobileNavigation() {
-    if (!usesMobileNavigation() || mobileNavOpen || state.importProgress ||
+    if (!usesDrawerNavigation() || mobileNavOpen || state.importProgress ||
         [...document.querySelectorAll(".modal-backdrop")].some(modal => !modal.hidden)) return;
     mobileNavOpen = true;
     mobileNavOverflow = document.body.style.overflow;
@@ -1437,7 +1428,7 @@
 
   function returnHomeActionFocus(button) {
     if ([...document.querySelectorAll(".modal-backdrop")].some(modal => !modal.hidden)) return;
-    (usesMobileNavigation() ? mobileMenuButton : button)?.focus({ preventScroll: true });
+    (usesDrawerNavigation() ? mobileMenuButton : button)?.focus({ preventScroll: true });
   }
 
   function bindMobileNavigation() {
@@ -1455,7 +1446,6 @@
     mobileNavigation.addEventListener("click", event => {
       if (mobileNavOpen && event.target.closest(".header-actions button")) closeMobileNavigation();
     }, true);
-    mobileNavMedia.addEventListener?.("change", syncMobileNavigation);
     syncMobileNavigation();
   }
 
@@ -1475,7 +1465,7 @@
     // Start with full labels so widening the row restores them automatically.
     els.helpButton.classList.remove("compact-label");
     els.scheduleDataButton.classList.remove("compact-label");
-    if (!usesMobileNavigation()) {
+    if (!usesDrawerNavigation()) {
       if (!fits(nav)) els.helpButton.classList.add("compact-label");
       if (!fits(nav)) els.scheduleDataButton.classList.add("compact-label");
     }
@@ -2987,7 +2977,7 @@
   function openQuickCodePanel(mode, event) {
     if (state.isParsing || state.pendingImage || state.codeMode || (mode === "export" && !Object.keys(peopleMap()).length)) return;
     if (!els.helpModal.hidden) closeHelp();
-    state.quickExportReturnFocus = usesMobileNavigation() ? mobileMenuButton : event?.currentTarget || (mode === "import" ? els.homeImportButton : els.homeExportButton);
+    state.quickExportReturnFocus = usesDrawerNavigation() ? mobileMenuButton : event?.currentTarget || (mode === "import" ? els.homeImportButton : els.homeExportButton);
     openScheduleModal();
     openCodePanel(mode, true);
   }
@@ -4885,7 +4875,7 @@
     if (!("serviceWorker" in navigator)) return;
     if (location.protocol !== "https:" && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") return;
 
-    navigator.serviceWorker.register("./service-worker.js?v=115", { updateViaCache: "none" })
+    navigator.serviceWorker.register("./service-worker.js?v=117", { updateViaCache: "none" })
       .then(registration => registration.update())
       .catch(() => {
         // The app works normally even if PWA caching isn't available.

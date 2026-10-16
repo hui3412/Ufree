@@ -2888,31 +2888,28 @@ button:disabled { cursor: not-allowed; }
 .brand-logo { display: block; width: 112px; height: auto; max-width: 100%; object-fit: contain; }
 @media (max-width: 480px) { .brand-logo { width: 96px; } }
 
-/* Desktop actions stay beside the brand; phones use one accessible drawer. */
+/* One shared right-side drawer for desktop and phones. */
 .brand-top-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
-.app-header { flex-direction: row; align-items: center; flex-wrap: nowrap; gap: 24px; }
-.brand-copy { flex: 1 1 auto; min-width: 0; }
-.home-header-controls { width: auto; flex: 0 0 auto; max-width: 50%; }
-.home-header-controls .header-actions { width: auto; justify-content: flex-end; }
-.mobile-menu-button, .mobile-nav-heading, .nav-extra-label, .mobile-nav-backdrop { display: none; }
+.app-header { display: block; }
+.brand-copy { min-width: 0; }
+.mobile-menu-button { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 44px; width: 44px; min-width: 44px; height: 44px; padding: 0; }
 .mobile-menu-button svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
+.mobile-nav-backdrop { display: block; position: fixed; inset: 0; z-index: 70; background: rgba(0,0,0,.4); }
 #mobileNavBackdrop[hidden] { display: none !important; }
+.home-header-controls { position: fixed; inset: 0 0 0 auto; z-index: 71; display: flex; flex-direction: column; align-items: stretch; gap: 20px; width: min(360px, 50vw); max-width: 50vw; padding: max(20px, env(safe-area-inset-top)) 16px max(20px, env(safe-area-inset-bottom)); background: var(--panel); box-shadow: -12px 0 36px rgba(0,0,0,.22); overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; transform: translateX(100%); visibility: hidden; pointer-events: none; transition: transform .24s ease, visibility 0s .24s; }
+.home-header-controls.is-open { transform: translateX(0); visibility: visible; pointer-events: auto; transition: transform .24s ease, visibility 0s; }
+.mobile-nav-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.mobile-nav-heading h2 { font-size: 1.1rem; }
+.home-header-controls .header-actions { flex-direction: column; align-items: stretch; gap: 8px; width: 100%; }
+.home-header-controls .header-data-button, .home-header-controls .nav-icon-button, .home-header-controls .compact-label { width: 100%; min-width: 0; min-height: 48px; height: auto; padding: 12px 14px; justify-content: flex-start; gap: 12px; font-size: .95rem; }
+.home-header-controls .header-data-button svg { width: 20px; height: 20px; }
+.home-header-controls .nav-button-label, .home-header-controls .nav-extra-label { display: inline; }
 @media (max-width: 900px) {
-  .app-header { display: block; }
   .brand-top-row { gap: 12px; }
   .brand-copy .brand-title { gap: 12px; }
   .brand-logo { width: 80px; flex-shrink: 0; }
   .brand-name { font-size: clamp(2rem, 5vw, 3rem); }
-  .mobile-menu-button { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 44px; width: 44px; min-width: 44px; height: 44px; padding: 0; }
-  .mobile-nav-backdrop { display: block; position: fixed; inset: 0; z-index: 70; background: rgba(0,0,0,.4); }
-  .home-header-controls { position: fixed; inset: 0 auto 0 0; z-index: 71; display: flex; flex-direction: column; align-items: stretch; gap: 20px; width: min(320px, calc(100vw - 32px)); max-width: none; padding: max(20px, env(safe-area-inset-top)) 16px max(20px, env(safe-area-inset-bottom)); background: var(--panel); box-shadow: 12px 0 36px rgba(0,0,0,.22); overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; transform: translateX(-100%); visibility: hidden; pointer-events: none; transition: transform .24s ease, visibility 0s .24s; }
-  .home-header-controls.is-open { transform: translateX(0); visibility: visible; pointer-events: auto; transition: transform .24s ease, visibility 0s; }
-  .mobile-nav-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-  .mobile-nav-heading h2 { font-size: 1.1rem; }
-  .home-header-controls .header-actions { flex-direction: column; align-items: stretch; gap: 8px; width: 100%; }
-  .home-header-controls .header-data-button, .home-header-controls .nav-icon-button, .home-header-controls .compact-label { width: 100%; min-width: 0; min-height: 48px; height: auto; padding: 12px 14px; justify-content: flex-start; gap: 12px; font-size: .95rem; }
-  .home-header-controls .header-data-button svg { width: 20px; height: 20px; }
-  .home-header-controls .nav-button-label, .home-header-controls .nav-extra-label { display: inline; }
+  .home-header-controls { width: min(320px, calc(100vw - 32px)); max-width: calc(100vw - 32px); }
 }
 @media (max-width: 350px) {
   .brand-copy .brand-title { gap: 10px; }
@@ -2925,9 +2922,6 @@ button:disabled { cursor: not-allowed; }
 
 /* Keep navigation usable if an older HTML shell lacks a drawer control. */
 .navigation-fallback .mobile-menu-button, .navigation-fallback .mobile-nav-heading { display: none; }
-@media (max-width: 900px) {
-  .navigation-fallback .home-header-controls { position: static; width: 100%; padding: 0; margin-top: 16px; transform: none; visibility: visible; pointer-events: auto; box-shadow: none; overflow: visible; }
-  .navigation-fallback .home-header-controls .header-actions { flex-direction: row; flex-wrap: wrap; justify-content: flex-start; }
-  .navigation-fallback .home-header-controls .header-data-button { width: auto; }
-}
-
+.navigation-fallback .home-header-controls { position: static; width: 100%; max-width: none; padding: 0; margin-top: 16px; transform: none; visibility: visible; pointer-events: auto; box-shadow: none; overflow: visible; }
+.navigation-fallback .home-header-controls .header-actions { flex-direction: row; flex-wrap: wrap; justify-content: flex-start; }
+.navigation-fallback .home-header-controls .header-data-button { width: auto; }

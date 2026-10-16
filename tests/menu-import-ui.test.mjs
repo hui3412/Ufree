@@ -26,7 +26,7 @@ async function app(mobile = false) {
   };
   await tick();
   const stored = () => window.localStorage.getItem("whos-free-local-schedules");
-  const open = () => { if (mobile) el("mobileMenuButton").click(); el("homeImportButton").click(); };
+  const open = () => { el("mobileMenuButton").click(); el("homeImportButton").click(); };
   const upload = () => {
     const file = { name: "schedule.png", type: "image/png" };
     Object.defineProperty(el("scheduleImageInput"), "files", { value: [file], configurable: true });
@@ -84,7 +84,7 @@ for (const mobile of [false, true]) test(`one Import panel offers image above co
     a.el("closeImportButton").click();
     assert.equal(a.el("scheduleModal").hidden, true);
     assert.equal(a.window.document.body.style.overflow, "");
-    assert.equal(a.window.document.activeElement.id, mobile ? "mobileMenuButton" : "homeImportButton");
+    assert.equal(a.window.document.activeElement.id, "mobileMenuButton");
   } finally { await a.window.happyDOM.abort(); }
 });
 

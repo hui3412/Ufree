@@ -339,7 +339,7 @@ test("home export defaults to Everyone in a collapsed selection and supports eac
     assert.deepEqual(Object.keys((await a.window.WhosFreeShareCode.decode(a.copied())).people), ["Alice"]);
     assert.equal(a.stored(), before);
     a.el("closeScheduleModal").click(); assert.equal(a.el("scheduleModal").hidden, true);
-    assert.equal(a.window.document.activeElement.id, "homeExportButton");
+    assert.equal(a.window.document.activeElement.id, "mobileMenuButton");
     assert.equal(a.window.document.body.style.overflow, "");
   } finally { a.window.happyDOM.abort(); }
 });
@@ -353,11 +353,11 @@ test("navigation keeps six actions together, the export icon opens quick share, 
     assert.equal(a.el("homeExportButton").querySelector(".nav-extra-label").textContent, "Export"); assert.ok(a.el("homeExportButton").querySelector("svg"));
     a.el("homeExportButton").click(); assert.equal(a.el("exportSelection").open, false); assert.equal(a.el("selectAllSchedules").checked, true);
     a.window.document.dispatchEvent(new a.window.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
-    assert.equal(a.el("scheduleModal").hidden, true); assert.equal(a.window.document.activeElement.id, "homeExportButton");
+    assert.equal(a.el("scheduleModal").hidden, true); assert.equal(a.window.document.activeElement.id, "mobileMenuButton");
     a.el("helpButton").click(); assert.equal(a.el("helpModal").hidden, false);
     assert.equal(a.window.document.activeElement.id, "closeHelpModal");
     a.window.document.dispatchEvent(new a.window.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
-    assert.equal(a.el("helpModal").hidden, true); assert.equal(a.window.document.activeElement.id, "helpButton");
+    assert.equal(a.el("helpModal").hidden, true); assert.equal(a.window.document.activeElement.id, "mobileMenuButton");
     a.el("settingsButton").click(); assert.equal(a.el("settingsModal").hidden, false); a.el("closeSettingsModal").click();
     assert.equal(a.el("showGroupsToggle").querySelector(".group-toggle-label").textContent, "GROUP");
     a.el("showGroupsToggle").click(); assert.equal(a.el("showGroupsToggle").querySelector(".group-toggle-label").textContent, "GROUP");
@@ -368,12 +368,10 @@ test("navigation keeps six actions together, the export icon opens quick share, 
 for (const mobile of [false, true]) test(`menu Import shares the existing importer and restores focus on ${mobile ? "mobile" : "desktop"}`, async () => {
   const a = await app(null, base, mobile);
   try {
-    const trigger = mobile ? "mobileMenuButton" : "homeImportButton";
+    const trigger = "mobileMenuButton";
     const open = () => {
-      if (mobile) {
-        a.el("mobileMenuButton").click();
-        assert.equal(a.el("mobileMenuButton").getAttribute("aria-expanded"), "true");
-      }
+      a.el("mobileMenuButton").click();
+      assert.equal(a.el("mobileMenuButton").getAttribute("aria-expanded"), "true");
       a.el("homeImportButton").click();
       assert.equal(a.el("mobileMenuButton").getAttribute("aria-expanded"), "false");
       assert.equal(a.el("scheduleModal").hidden, false);

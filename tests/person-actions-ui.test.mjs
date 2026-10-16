@@ -16,6 +16,7 @@ const tick = () => new Promise(resolve => setTimeout(resolve, 20));
 
 async function app(initial = data, groups = [{ id: "team", name: "Team", members: ["Bob"], hidden: false }], mobile = false, options = {}) {
   const window = new Window({ url: base, settings: { disableJavaScriptFileLoading: true, disableCSSFileLoading: true } });
+  window.happyDOM.setWindowSize({ width: mobile ? 390 : 1440, height: 900 });
   window.document.write(fs.readFileSync(new URL("../index.html", import.meta.url), "utf8"));
   if (options.missingControl) window.document.getElementById(options.missingControl)?.remove();
   if (Object.hasOwn(options, "idbRecord")) Object.defineProperty(window, "indexedDB", { value: {
@@ -39,7 +40,12 @@ async function app(initial = data, groups = [{ id: "team", name: "Team", members
   const mobileListeners = [];
   const mobileQuery = { matches: mobile, addEventListener(type, callback) { if (type === "change") mobileListeners.push(callback); } };
   window.matchMedia = query => query.replace(/\s/g, "") === "(max-width:900px)" ? mobileQuery : { matches: query.includes("prefers-reduced-motion") || (mobile && query.includes("max-width")), addEventListener() {} };
-  const setMobile = value => { mobileQuery.matches = value; mobileListeners.forEach(callback => callback({ matches: value })); };
+  const setMobile = value => {
+    mobileQuery.matches = value;
+    window.happyDOM.setWindowSize({ width: value ? 390 : 1440, height: 900 });
+    mobileListeners.forEach(callback => callback({ matches: value }));
+    window.dispatchEvent(new window.Event("resize"));
+  };
   Object.assign(window, { TextEncoder, TextDecoder, Blob, CompressionStream, DecompressionStream });
   let copied, confirmMessage;
   window.confirm = message => { confirmMessage = message; return true; };
@@ -308,7 +314,7 @@ test("Help opens with the bottom iOS guide collapsed, restores focus and allows 
     assert.equal(guide.open, false);
     guide.open = true;
     a.el("closeHelpModal").click();
-    assert.equal(a.window.document.activeElement.id, "helpButton");
+    assert.equal(a.window.document.activeElement.id, "mobileMenuButton");
     assert.equal(a.window.document.body.style.overflow, "");
     a.el("helpButton").click();
     assert.equal(guide.open, false);
@@ -433,9 +439,9 @@ test("leaving search closes and clears it, while using its clear button keeps it
     assert.equal(panel.hidden, false);
     a.el("clearPeopleSearchButton").click(); await tick();
     assert.equal(panel.hidden, false); assert.equal(a.window.document.activeElement, input);
-    query("Bob"); a.el("scheduleDataButton").focus(); await a.wait(() => panel.hidden);
+    query("Bob"); a.el("mobileMenuButton").focus(); await a.wait(() => panel.hidden);
     assert.equal(input.value, ""); assert.equal(a.el("peopleSearchButton").getAttribute("aria-expanded"), "false");
-    assert.equal(a.window.document.activeElement, a.el("scheduleDataButton")); assert.ok(a.card("Alice")); assert.ok(a.card("Bob"));
+    assert.equal(a.window.document.activeElement, a.el("mobileMenuButton")); assert.ok(a.card("Alice")); assert.ok(a.card("Bob"));
     a.el("peopleSearchButton").click(); assert.equal(panel.hidden, false); assert.equal(a.window.document.activeElement, input);
     a.el("peopleSearchButton").focus(); await a.wait(() => panel.hidden);
     a.el("peopleSearchButton").click(); assert.equal(panel.hidden, false);
@@ -462,8 +468,8 @@ test("outside pointer clicks finish selecting people before search closes, and b
 
 
 
-test("mobile menu isolates the background, traps focus and restores page scrolling on Escape and outside tap", async () => {
-  const a = await app(data, [], true);
+for (const mobile of [false, true]) test(`${mobile ? "mobile" : "desktop"} menu isolates the background, traps focus and restores page scrolling on Escape and outside tap`, async () => {
+  const a = await app(data, [], mobile);
   try {
     const before = a.stored(), menu = a.el("homeNavigation"), toggle = a.el("mobileMenuButton");
     assert.equal(menu.hasAttribute("inert"), true);
@@ -495,8 +501,8 @@ test("mobile menu isolates the background, traps focus and restores page scrolli
   } finally { await a.window.happyDOM.abort(); }
 });
 
-test("mobile navigation reuses exactly six existing actions, closes before opening their dialogs and returns focus to the toggle", async () => {
-  const a = await app(data, [], true);
+for (const mobile of [false, true]) test(`${mobile ? "mobile" : "desktop"} navigation reuses exactly six existing actions, closes before opening their dialogs and returns focus to the toggle`, async () => {
+  const a = await app(data, [], mobile);
   try {
     const ids = ["scheduleDataButton", "helpButton", "settingsButton", "homeExportButton", "homeImportButton", "undoChangesButton"];
     assert.deepEqual([...a.el("homeNavigation").querySelector("nav").children].map(e => e.id), ids);
@@ -519,29 +525,79 @@ test("mobile navigation reuses exactly six existing actions, closes before openi
   } finally { await a.window.happyDOM.abort(); }
 });
 
-test("crossing the navigation breakpoint closes the drawer and restores desktop actions without leaving background controls inert", async () => {
+test("resizing between phone and desktop preserves the shared drawer and restores the background only when closed", async () => {
   const a = await app(data, [], true);
   try {
-    a.el("mobileMenuButton").click(); a.setMobile(false);
-    assert.equal(a.el("mobileMenuButton").getAttribute("aria-expanded"), "false");
-    assert.equal(a.el("homeNavigation").hasAttribute("inert"), false);
-    assert.equal(a.el("homeNavigation").hasAttribute("aria-hidden"), false);
-    assert.equal(a.el("homeNavigation").hasAttribute("aria-modal"), false);
+    const before = a.stored();
+    a.el("mobileMenuButton").click();
+    for (const mobile of [false, true, false]) {
+      a.setMobile(mobile);
+      assert.equal(a.el("mobileMenuButton").getAttribute("aria-expanded"), "true");
+      assert.equal(a.el("homeNavigation").hasAttribute("inert"), false);
+      assert.equal(a.el("homeNavigation").getAttribute("aria-modal"), "true");
+      assert.equal(a.el("mobileNavBackdrop").hidden, false);
+      assert.equal(a.window.document.body.style.overflow, "hidden");
+      assert.equal(a.window.document.querySelector(".main-grid").hasAttribute("inert"), true);
+    }
+    a.el("closeMobileMenuButton").click();
+    assert.equal(a.window.document.activeElement.id, "mobileMenuButton");
+    assert.equal(a.el("homeNavigation").hasAttribute("inert"), true);
+    assert.equal(a.el("homeNavigation").getAttribute("aria-hidden"), "true");
     assert.equal(a.el("mobileNavBackdrop").hidden, true);
     assert.equal(a.window.document.body.style.overflow, "");
     assert.equal(a.window.document.querySelector(".main-grid").hasAttribute("inert"), false);
-    assert.equal(a.window.document.activeElement.id, "scheduleDataButton");
     a.setMobile(true);
     assert.equal(a.el("homeNavigation").hasAttribute("inert"), true);
-    assert.equal(a.window.document.activeElement.id, "mobileMenuButton");
-    a.el("mobileMenuButton").click(); a.el("closeMobileMenuButton").click();
-    assert.equal(a.window.document.body.style.overflow, "");
+    assert.equal(a.stored(), before);
+  } finally { await a.window.happyDOM.abort(); }
+});
+
+for (const mobile of [false, true]) test(`${mobile ? "mobile" : "desktop"} drawer slides from the right and keeps a bounded width`, async () => {
+  const a = await app(data, [], mobile);
+  try {
+    const menu = a.el("homeNavigation"), style = () => a.window.getComputedStyle(menu);
+    assert.equal(a.window.getComputedStyle(a.el("mobileMenuButton")).display, "inline-flex");
+    assert.equal(a.window.getComputedStyle(a.el("mobileMenuButton").parentElement).justifyContent, "space-between");
+    assert.equal(style().position, "fixed");
+    assert.equal(style().getPropertyValue("inset"), "0 0 0 auto");
+    assert.equal(style().transform, "translateX(100%)");
+    if (mobile) assert.equal(style().maxWidth, `calc(${a.window.innerWidth}px - 32px)`, "phone drawer leaves some page visible");
+    else {
+      const cap = parseFloat(style().maxWidth);
+      assert.ok(Number.isFinite(cap) && cap <= a.window.innerWidth / 2, "desktop drawer cannot exceed half the viewport");
+    }
+    assert.equal(style().visibility, "hidden");
+    a.el("mobileMenuButton").click();
+    assert.equal(style().transform, "translateX(0)");
+    assert.equal(style().visibility, "visible");
+    assert.equal(style().overflowY, "auto", "menu contents can scroll independently");
+    assert.equal(style().touchAction, "pan-y");
+    a.el("closeMobileMenuButton").click();
+    assert.equal(style().visibility, "hidden");
+  } finally { await a.window.happyDOM.abort(); }
+});
+
+test("a future action added to the single menu is available in both layouts and closes the drawer before running", async () => {
+  const a = await app(data, [], false);
+  try {
+    let calls = 0;
+    const button = a.window.document.createElement("button");
+    button.textContent = "New action";
+    button.addEventListener("click", () => { calls++; assert.equal(a.el("mobileNavBackdrop").hidden, true); });
+    a.el("homeNavigation").querySelector("nav").append(button);
+    for (const mobile of [false, true]) {
+      a.setMobile(mobile); a.el("mobileMenuButton").click(); button.click();
+      assert.equal(a.el("mobileMenuButton").getAttribute("aria-expanded"), "false");
+      assert.equal(a.window.document.body.style.overflow, "");
+      assert.equal(a.window.document.activeElement.id, "mobileMenuButton");
+    }
+    assert.equal(calls, 2);
   } finally { await a.window.happyDOM.abort(); }
 });
 
 
-test("enabled Undo works from the mobile drawer and releases the page", async () => {
-  const a = await app(data, [], true);
+for (const mobile of [false, true]) test(`enabled Undo works from the ${mobile ? "mobile" : "desktop"} drawer and releases the page`, async () => {
+  const a = await app(data, [], mobile);
   try {
     a.card("Alice").querySelector(".person-select-button").click();
     a.el("deletePersonScheduleButton").click();
