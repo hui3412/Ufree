@@ -36,6 +36,7 @@
     qrBatchBusy: false,
     sharedImport: null,
     deviceReady: false,
+    hasHadSchedules: false,
     sharedLinkStartup: false,
     imagePreviewUrl: null,
     notificationsEnabled: false,
@@ -66,6 +67,7 @@
   const LOCAL_STORE_NAME = "app";
   const LOCAL_SCHEDULE_KEY = "schedules";
   const LOCAL_STORAGE_FALLBACK_KEY = "whos-free-local-schedules";
+  const SCHEDULE_HISTORY_KEY = "ufree-has-had-schedules-v1";
   const NOTIFICATION_SETTINGS_KEY = "whos-free-notification-settings-v1";
   const NOTIFICATION_HISTORY_KEY = "whos-free-notification-history-v1";
   const PEOPLE_PREFERENCES_KEY = "whos-free-people-preferences-v1";
@@ -116,6 +118,12 @@
     saveImageScheduleButton: document.getElementById("saveImageScheduleButton"),
     cancelImageScheduleButton: document.getElementById("cancelImageScheduleButton"),
     scheduleModal: document.getElementById("scheduleModal"),
+    firstScheduleWelcome: document.getElementById("firstScheduleWelcome"),
+    firstScheduleWelcomeTitle: document.getElementById("firstScheduleWelcomeTitle"),
+    copyFirstScheduleLink: document.getElementById("copyFirstScheduleLink"),
+    closeFirstScheduleWelcome: document.getElementById("closeFirstScheduleWelcome"),
+    firstScheduleWelcomeStatus: document.getElementById("firstScheduleWelcomeStatus"),
+    firstScheduleLinkFallback: document.getElementById("firstScheduleLinkFallback"),
     advancedScheduleOptions: document.getElementById("advancedScheduleOptions"),
     advancedSchedulePanel: document.getElementById("advancedSchedulePanel"),
     closeScheduleModal: document.getElementById("closeScheduleModal"),
@@ -2591,6 +2599,10 @@
     }
     if (!isPicture && replacement && !window.confirm(`Replace the existing schedule for ${name} with these reviewed classes?`)) return;
     if (renamed) delete workingData.people[editingName];
+    // Observe creation, not loading/rendering: both OCR and manual review save here.
+    const firstCreation = !state.hasHadSchedules && Object.keys(peopleMap()).length === 0
+      && Object.keys(workingData.people).length === 1;
+    let welcomeName = null;
     const before = captureScheduleChange();
     state.isParsing = true;
     updateScheduleModal();
@@ -2609,12 +2621,87 @@
       }
       state.selectedPerson = name;
       const warning = await persistCurrentDatabase("Local schedule collection");
+      if (firstCreation && !warning) welcomeName = name;
       const changed = rememberScheduleChange(before, `${editingName ? "Edited" : replacement ? "Replaced" : "Added"} ${name}'s schedule`);
       clearImageReview();
       setImageStatus(`Saved ${classes.length} schedule entries for ${name} on this device.`, "success");
       showToast(warning || (changed ? `Schedule ${editingName ? "updated" : replacement ? "replaced" : "added"}: ${displayName(name)}` : "No schedule changes"));
     } catch (error) { els.imageReviewError.textContent = error.message; }
     finally { state.isParsing = false; updateScheduleModal(); }
+    if (welcomeName !== null) openFirstScheduleWelcome(welcomeName);
+  }
+
+  function rememberScheduleHistory() {
+    state.hasHadSchedules = true;
+    try { localStorage.setItem(SCHEDULE_HISTORY_KEY, "1"); }
+    catch { /* Existing schedules still suppress onboarding when storage is restricted. */ }
+  }
+
+  let firstScheduleLink = "";
+  let firstScheduleWelcomeRequest = 0;
+  let firstScheduleCopyTimer = null;
+  const FIRST_SCHEDULE_COPY_LABEL = "Copy My Link to Invite Them";
+
+  async function openFirstScheduleWelcome(name) {
+    closeScheduleModal();
+    const request = ++firstScheduleWelcomeRequest;
+    firstScheduleLink = "";
+    els.firstScheduleLinkFallback.hidden = true;
+    els.firstScheduleLinkFallback.value = "";
+    els.copyFirstScheduleLink.disabled = true;
+    els.copyFirstScheduleLink.textContent = FIRST_SCHEDULE_COPY_LABEL;
+    els.firstScheduleWelcomeStatus.textContent = "Preparing your link…";
+    els.firstScheduleWelcome.hidden = false;
+    document.body.style.overflow = "hidden";
+    els.firstScheduleWelcomeTitle.focus({ preventScroll: true });
+    try {
+      // Prepare before the click so clipboard writing retains the user's gesture on Safari.
+      const code = await window.WhosFreeShareCode.encode({ people: { [name]: peopleMap()[name] } }, { fields: [] });
+      if (request !== firstScheduleWelcomeRequest) return;
+      firstScheduleLink = window.WhosFreeShareCode.createLink(code, APP_URL);
+      els.firstScheduleWelcomeStatus.textContent = "";
+      els.copyFirstScheduleLink.disabled = false;
+      if (document.activeElement === els.firstScheduleWelcomeTitle) els.copyFirstScheduleLink.focus({ preventScroll: true });
+    } catch {
+      if (request === firstScheduleWelcomeRequest) els.firstScheduleWelcomeStatus.textContent = "Your schedule is saved. You can try sharing it from Export.";
+    }
+  }
+
+  function closeFirstScheduleWelcome() {
+    ++firstScheduleWelcomeRequest;
+    window.clearTimeout(firstScheduleCopyTimer);
+    firstScheduleLink = "";
+    els.firstScheduleWelcome.hidden = true;
+    unlockClosedModals();
+    returnHomeActionFocus(els.scheduleDataButton);
+  }
+
+  async function copyFirstScheduleLink() {
+    if (!firstScheduleLink || els.copyFirstScheduleLink.disabled) return;
+    const request = firstScheduleWelcomeRequest;
+    window.clearTimeout(firstScheduleCopyTimer);
+    els.copyFirstScheduleLink.disabled = true;
+    try {
+      await navigator.clipboard.writeText(firstScheduleLink);
+      if (request !== firstScheduleWelcomeRequest) return;
+      els.copyFirstScheduleLink.textContent = "Copied!";
+      els.firstScheduleWelcomeStatus.textContent = "Copied!";
+      els.firstScheduleLinkFallback.hidden = true;
+      firstScheduleCopyTimer = window.setTimeout(() => {
+        els.copyFirstScheduleLink.textContent = FIRST_SCHEDULE_COPY_LABEL;
+        els.firstScheduleWelcomeStatus.textContent = "";
+      }, 1800);
+    } catch {
+      if (request !== firstScheduleWelcomeRequest) return;
+      els.copyFirstScheduleLink.textContent = FIRST_SCHEDULE_COPY_LABEL;
+      els.firstScheduleWelcomeStatus.textContent = "Couldn’t copy automatically. Select and copy your link below.";
+      els.firstScheduleLinkFallback.value = firstScheduleLink;
+      els.firstScheduleLinkFallback.hidden = false;
+      els.firstScheduleLinkFallback.focus({ preventScroll: true });
+      els.firstScheduleLinkFallback.select();
+    } finally {
+      if (request === firstScheduleWelcomeRequest) els.copyFirstScheduleLink.disabled = false;
+    }
   }
 
   function openLocalDatabase() {
@@ -2813,6 +2900,7 @@
     try {
       await saveLocalScheduleRecord(record);
       await requestPersistentStorage();
+      if (Object.keys(peopleMap()).length) rememberScheduleHistory();
     } catch (error) {
       storageWarning = error.message;
     }
@@ -3728,6 +3816,7 @@
         catch (error) { migrationWarning = error.message; }
       }
       state.data = record.data;
+      if (Object.keys(record.data.people).length) rememberScheduleHistory();
       state.hasData = true;
       state.scheduleMeta = record.meta || {
         filename: "schedules.json",
@@ -4776,6 +4865,10 @@
       }
     }, true);
     document.addEventListener("focusin", event => {
+      if (!els.firstScheduleWelcome.hidden && !els.firstScheduleWelcome.contains(event.target)) {
+        (els.copyFirstScheduleLink.disabled ? els.closeFirstScheduleWelcome : els.copyFirstScheduleLink).focus({ preventScroll: true });
+        return;
+      }
       if (!state.importProgress) return;
       if (els.importProgressOverlay.contains(event.target)) state.importProgress.focusWithin = event.target;
       else {
@@ -4945,11 +5038,28 @@
       if (event.target === els.scheduleModal) closeScheduleModal();
     });
 
+    els.copyFirstScheduleLink.addEventListener("click", copyFirstScheduleLink);
+    els.closeFirstScheduleWelcome.addEventListener("click", closeFirstScheduleWelcome);
+    els.firstScheduleWelcome.addEventListener("click", event => {
+      if (event.target === els.firstScheduleWelcome) closeFirstScheduleWelcome();
+    });
+
     els.settingsModal.addEventListener("click", event => {
       if (event.target === els.settingsModal) closeSettingsModal();
     });
 
     document.addEventListener("keydown", event => {
+      if (!els.firstScheduleWelcome.hidden) {
+        if (event.key === "Escape") { event.preventDefault(); closeFirstScheduleWelcome(); }
+        else if (event.key === "Tab") {
+          const focusable = [...els.firstScheduleWelcome.querySelectorAll("button, textarea")].filter(item => !item.disabled && !item.hidden);
+          const index = focusable.indexOf(document.activeElement);
+          event.preventDefault();
+          const next = index === -1 ? event.shiftKey ? focusable.at(-1) : focusable[0] : focusable[(index + (event.shiftKey ? -1 : 1) + focusable.length) % focusable.length];
+          next?.focus({ preventScroll: true });
+        }
+        return;
+      }
       if (mobileNavOpen) {
         if (event.key === "Escape") { event.preventDefault(); closeMobileNavigation(); }
         else if (event.key === "Tab") {
@@ -5046,7 +5156,7 @@
     if (!("serviceWorker" in navigator)) return;
     if (location.protocol !== "https:" && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") return;
 
-    navigator.serviceWorker.register("./service-worker.js?v=122", { updateViaCache: "none" })
+    navigator.serviceWorker.register("./service-worker.js?v=123", { updateViaCache: "none" })
       .then(registration => registration.update())
       .catch(() => {
         // The app works normally even if PWA caching isn't available.
@@ -5054,6 +5164,8 @@
   }
 
   function init() {
+    try { state.hasHadSchedules = localStorage.getItem(SCHEDULE_HISTORY_KEY) === "1"; }
+    catch { /* The loaded collection also establishes schedule history. */ }
     try { state.showEveryone = localStorage.getItem(VIEW_PREFERENCE_KEY) === "all"; }
     catch { state.showEveryone = false; }
     const savedNotificationSettings = loadNotificationSettings();

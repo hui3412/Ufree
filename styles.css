@@ -945,6 +945,30 @@ input[type="time"]:disabled {
   display: none;
 }
 
+.first-schedule-welcome { animation: first-schedule-fade-in 180ms ease-out; }
+.first-schedule-card {
+  width: min(460px, 100%);
+  max-height: 100%;
+  overflow-y: auto;
+  padding: 28px;
+  border-radius: 12px;
+  background: var(--panel);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, .25);
+  animation: first-schedule-rise-in 220ms ease-out;
+}
+.first-schedule-card h2 { margin: 0 0 12px; font-size: 1.35rem; font-weight: 500; }
+.first-schedule-card > p { margin: 0; color: var(--muted); font-size: .95rem; line-height: 1.6; }
+.first-schedule-actions { display: grid; gap: 10px; margin-top: 24px; }
+.first-schedule-actions button { width: 100%; min-height: 44px; padding: 12px; white-space: normal; }
+.first-schedule-card .first-schedule-status { margin-top: 12px; min-height: 1.6em; font-size: .85rem; }
+.first-schedule-link { width: 100%; margin-top: 8px; background: var(--input); color: var(--text); font-size: 16px; }
+.first-schedule-link[hidden] { display: none; }
+@keyframes first-schedule-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes first-schedule-rise-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) {
+  .first-schedule-welcome, .first-schedule-card { animation: none; }
+}
+
 .modal-backdrop.import-progress-overlay {
   z-index: 1000;
   background: rgba(0, 0, 0, .78);
