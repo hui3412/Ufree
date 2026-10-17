@@ -1137,7 +1137,24 @@
     return orderedPeople([...pinned, ...remaining.filter(name => isFree(name, day, minute)), ...remaining.filter(name => !isFree(name, day, minute))], scope);
   }
 
-  function movePerson(scope, name, target, after = false) {
+  function personPositions() {
+    return new Map([...els.peopleList.querySelectorAll(".person-card")].map(card =>
+      [JSON.stringify([card.dataset.orderScope, card.dataset.person]), card.getBoundingClientRect()]));
+  }
+
+  function animatePersonPositions(before) {
+    if (prefersReducedMotion()) return;
+    for (const card of els.peopleList.querySelectorAll(".person-card")) {
+      const old = before.get(JSON.stringify([card.dataset.orderScope, card.dataset.person]));
+      if (!old || !old.height || typeof card.animate !== "function") continue;
+      const rect = card.getBoundingClientRect(), x = old.left - rect.left, y = old.top - rect.top;
+      if (Math.abs(x) + Math.abs(y) < .5) continue;
+      card.animate([{ transform: `translate3d(${x}px, ${y}px, 0)` }, { transform: "none" }],
+        { duration: 220, easing: "cubic-bezier(.2,.8,.2,1)" });
+    }
+  }
+
+  function movePerson(scope, name, target, after = false, before = null) {
     const full = orderScopeMembers(scope);
     if (name === target || !full.includes(name) || !full.includes(target)) return false;
     const next = full.filter(item => item !== name);
@@ -1151,12 +1168,14 @@
       }
     }
     if (JSON.stringify(full) === JSON.stringify(next)) return false;
+    before ||= personPositions();
     const previous = state.personOrders[scope] ? [...state.personOrders[scope]] : null;
     // Store the full list, including people hidden by the Free filter.
     state.personOrders[scope] = next;
     const persisted = savePersonOrders();
     rememberUndoChange({ kind: "person-order", scope, previous, label: `Reordered ${displayName(name)} in ${scope === "main" ? "the main list" : scope === "ungrouped" ? "Ungrouped people" : state.groups.find(group => `group:${group.id}` === scope)?.name || "a group"}` });
-    refresh({ preserveScroll: true });
+    refresh({ preserveScroll: true, animatePeople: false });
+    animatePersonPositions(before);
     if (persisted) showToast(`${displayName(name)}'s position saved on this device.`);
     return true;
   }
@@ -1165,11 +1184,111 @@
     els.peopleList.querySelectorAll(".reorder-before, .reorder-after").forEach(card => card.classList.remove("reorder-before", "reorder-after"));
   }
 
-  function markReorderTarget(card, y) {
+  const reorderScroll = () => (window.scrollY || 0) + els.peopleList.scrollTop;
+
+  function beginPersonReorder(name, scope, card, x, y, touchId = null) {
+    const cards = [...card.parentElement.querySelectorAll(".person-card")].filter(item => item.dataset.orderScope === scope);
+    window.gsap?.killTweensOf(cards);
+    for (const item of cards) {
+      item.getAnimations?.().forEach(animation => animation.cancel());
+      item.style.removeProperty("transform");
+      item.style.removeProperty("opacity");
+    }
+    const rects = new Map(cards.map(item => [item, item.getBoundingClientRect()]));
+    const rect = rects.get(card);
+    const drag = state.activeReorder = { name, scope, card, target: null, touchId, cards, rects, scroll: reorderScroll(),
+      x, y, startX: x, offsetY: y - rect.top, previewIndex: null, frame: null };
+    card.classList.add("person-dragging");
+    cards.forEach(item => item.classList.add("person-reorder-preview"));
+    if (touchId !== null && rect.height) {
+      const ghost = drag.ghost = card.cloneNode(true);
+      ghost.classList.remove("person-dragging", "person-reorder-preview");
+      ghost.classList.add("person-drag-ghost");
+      ghost.setAttribute("aria-hidden", "true");
+      ghost.setAttribute("inert", "");
+      ghost.removeAttribute("id");
+      ghost.querySelectorAll("[id]").forEach(item => item.removeAttribute("id"));
+      ghost.querySelectorAll("button, a, input, select, textarea, [tabindex]").forEach(item => { item.tabIndex = -1; });
+      Object.assign(ghost.style, { top: `${rect.top}px`, left: `${rect.left}px`, width: `${rect.width}px`, height: `${rect.height}px` });
+      document.body.append(ghost);
+      card.classList.add("person-drag-source");
+    }
+    updateUndoControls();
+    return drag;
+  }
+
+  function previewPersonReorder(x, y) {
+    const drag = state.activeReorder;
+    if (!drag || !drag.rects.get(drag.card)?.height) return false;
+    drag.x = x; drag.y = y;
+    const rect = drag.rects.get(drag.card), scroll = reorderScroll() - drag.scroll;
+    if (drag.ghost) drag.ghost.style.transform = `translate3d(${Math.max(-16, Math.min(16, x - drag.startX))}px, ${y - drag.offsetY - rect.top}px, 0) scale(${prefersReducedMotion() ? 1 : 1.015})`;
+    const parent = drag.card.parentElement.getBoundingClientRect();
+    if (parent.width && (x < parent.left - 20 || x > parent.right + 20 || y < parent.top - 50 || y > parent.bottom + 50)) {
+      drag.target = null; drag.previewIndex = null;
+      drag.cards.forEach(item => item.style.removeProperty("transform"));
+      return true;
+    }
+    const others = drag.cards.filter(item => item !== drag.card);
+    const center = y - drag.offsetY + rect.height / 2;
+    let index = others.findIndex(item => center < drag.rects.get(item).top - scroll + drag.rects.get(item).height / 2);
+    if (index < 0) index = others.length;
+    const target = others[index] || others.at(-1);
+    if (!target) return true;
+    drag.target = target.dataset.person; drag.after = index === others.length;
+    const ordered = [...others]; ordered.splice(index, 0, drag.card);
+    let unpinned = false;
+    if (ordered.some(item => state.pinnedPeople.has(item.dataset.person) ? unpinned : (unpinned = true, false))) {
+      drag.previewIndex = null;
+      drag.cards.forEach(item => item.style.removeProperty("transform"));
+      return true;
+    }
+    if (drag.previewIndex === index) return true;
+    drag.previewIndex = index;
+    const gaps = drag.cards.slice(1).map((item, i) => drag.rects.get(item).top - drag.rects.get(drag.cards[i]).bottom).sort((a, b) => a - b);
+    const gap = gaps[Math.floor(gaps.length / 2)] || 0;
+    let top = drag.rects.get(drag.cards[0]).top;
+    for (const item of ordered) {
+      item.style.transform = `translate3d(0, ${top - drag.rects.get(item).top}px, 0)`;
+      top += drag.rects.get(item).height + gap;
+    }
+    return true;
+  }
+
+  function scrollPersonReorder() {
+    const drag = state.activeReorder;
+    if (!drag || drag.frame !== null) return;
+    let previousTime = performance.now();
+    const tick = time => {
+      if (state.activeReorder !== drag) return;
+      const step = Math.min(32, Math.max(1, time - previousTime)) / (1000 / 60);
+      previousTime = time;
+      const rect = els.peopleList.getBoundingClientRect();
+      const top = Math.max(0, rect.top), bottom = Math.min(window.innerHeight, rect.bottom);
+      const delta = drag.y < top + 40 ? -Math.min(16, (top + 40 - drag.y) * .4) : drag.y > bottom - 40 ? Math.min(16, (drag.y - bottom + 40) * .4) : 0;
+      if (delta) {
+        const previous = els.peopleList.scrollTop;
+        if (els.peopleList.scrollHeight > els.peopleList.clientHeight) els.peopleList.scrollTop += delta * step;
+        if (els.peopleList.scrollTop === previous && (drag.y < 50 || drag.y > window.innerHeight - 50)) window.scrollBy?.(0, delta * step);
+        previewPersonReorder(drag.x, drag.y);
+      }
+      drag.frame = requestAnimationFrame(tick);
+    };
+    drag.frame = requestAnimationFrame(tick);
+  }
+
+  function markReorderTarget(card, y, x = 0) {
     const drag = state.activeReorder;
     clearReorderMarker();
+    if (drag && (!card || card.dataset.orderScope === drag.scope) && previewPersonReorder(x, y)) {
+      scrollPersonReorder();
+      return;
+    }
     if (!drag || !card || card.dataset.orderScope !== drag.scope || card.dataset.person === drag.name) {
-      if (drag) drag.target = null;
+      if (drag) {
+        drag.target = null; drag.previewIndex = null;
+        drag.cards.forEach(item => item.style.removeProperty("transform"));
+      }
       return;
     }
     drag.target = card.dataset.person;
@@ -1181,12 +1300,19 @@
   function finishPersonReorder(cancel = false) {
     const drag = state.activeReorder;
     if (!drag) return;
+    const before = personPositions();
+    if (drag.ghost) before.set(JSON.stringify([drag.scope, drag.name]), drag.ghost.getBoundingClientRect());
     state.activeReorder = null;
+    if (drag.frame !== null) cancelAnimationFrame(drag.frame);
     clearReorderMarker();
-    drag.card.classList.remove("person-dragging");
+    drag.ghost?.remove();
+    drag.cards.forEach(card => {
+      card.classList.remove("person-reorder-preview", "person-dragging", "person-drag-source");
+      card.style.removeProperty("transform");
+    });
     updateUndoControls();
     state.suppressCardClickUntil = Date.now() + 400;
-    if (!cancel && drag.target) movePerson(drag.scope, drag.name, drag.target, drag.after);
+    if (cancel || !drag.target || !movePerson(drag.scope, drag.name, drag.target, drag.after, before)) animatePersonPositions(before);
   }
 
   function attachPersonReorder(card, name, scope) {
@@ -1198,19 +1324,17 @@
     card.setAttribute("aria-describedby", "personOrderHelp");
     card.addEventListener("dragstart", event => {
       if (state.activeReorder) { event.preventDefault(); return; }
-      state.activeReorder = { name, scope, card, target: null };
-      card.classList.add("person-dragging");
-      updateUndoControls();
+      beginPersonReorder(name, scope, card, event.clientX, event.clientY);
       if (event.dataTransfer) { event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", name); }
     });
     card.addEventListener("dragover", event => {
       if (!state.activeReorder || state.activeReorder.scope !== scope) return;
       event.preventDefault();
-      markReorderTarget(card, event.clientY);
+      markReorderTarget(card, event.clientY, event.clientX);
     });
     card.addEventListener("drop", event => {
       if (!state.activeReorder || state.activeReorder.scope !== scope) return;
-      event.preventDefault(); markReorderTarget(card, event.clientY); finishPersonReorder();
+      event.preventDefault(); markReorderTarget(card, event.clientY, event.clientX); finishPersonReorder();
     });
     card.addEventListener("dragend", () => finishPersonReorder(true));
     const cancelHold = () => {
@@ -1228,14 +1352,13 @@
       hold.timer = window.setTimeout(() => {
         if (state.pendingPersonHold !== hold || !card.isConnected) return;
         state.pendingPersonHold = null;
-        state.activeReorder = { name, scope, card, target: null, touchId: hold.id };
-        card.classList.add("person-dragging");
-        updateUndoControls();
+        beginPersonReorder(name, scope, card, hold.x, hold.y, hold.id);
       }, 450);
     }, { passive: true });
     card.addEventListener("touchmove", event => {
       const hold = state.pendingPersonHold;
       const drag = state.activeReorder;
+      if (event.touches.length !== 1) { cancelHold(); if (drag?.card === card) finishPersonReorder(true); return; }
       const touch = Array.from(event.touches).find(item => item.identifier === (drag?.touchId ?? hold?.id));
       if (!touch) { cancelHold(); return; }
       if (hold?.card === card) {
@@ -1244,12 +1367,7 @@
       }
       if (drag?.card !== card) return;
       if (event.cancelable) event.preventDefault();
-      markReorderTarget(document.elementFromPoint(touch.clientX, touch.clientY)?.closest(".person-card"), touch.clientY);
-      const rect = els.peopleList.getBoundingClientRect();
-      if (touch.clientY < rect.top + 40) els.peopleList.scrollTop -= 16;
-      else if (touch.clientY > rect.bottom - 40) els.peopleList.scrollTop += 16;
-      if (touch.clientY < 50) window.scrollBy?.(0, -16);
-      else if (touch.clientY > window.innerHeight - 50) window.scrollBy?.(0, 16);
+      markReorderTarget(document.elementFromPoint(touch.clientX, touch.clientY)?.closest(".person-card"), touch.clientY, touch.clientX);
     }, { passive: false });
     card.addEventListener("touchend", event => {
       cancelHold();
@@ -4428,7 +4546,7 @@
     scheduleToolbarLayout();
   }
 
-  function refresh({ preserveScroll = false } = {}) {
+  function refresh({ preserveScroll = false, animatePeople = true } = {}) {
     if (state.activeReorder || state.pendingPersonHold) return;
     if (!state.hasData || state.loadError) {
       updatePeopleSearchStatus();
@@ -4498,7 +4616,7 @@
       state.showGroups ? JSON.stringify(state.groups) : "flat",
       ...displayed.map(name => `${name}:${currentClass(name, day, minute)?.course_code || (isFree(name, day, minute) ? "free" : "busy")}`),
     ].join("|");
-    animateCardsIfNeeded(peopleSignature);
+    if (animatePeople) animateCardsIfNeeded(peopleSignature);
     state.lastPeopleSignature = peopleSignature;
 
     if (preserveScroll) els.peopleList.scrollTop = oldScroll;
@@ -4624,6 +4742,30 @@
   }
 
   function bindEvents() {
+    // Gaps between cards are valid drop targets too. Keep this local to the
+    // people list so timetable gestures and ordinary page scrolling stay native.
+    for (const type of ["dragover", "drop"]) els.peopleList.addEventListener(type, event => {
+      if (!state.activeReorder || event.defaultPrevented) return;
+      event.preventDefault();
+      markReorderTarget(event.target.closest?.(".person-card"), event.clientY, event.clientX);
+      if (type === "drop") finishPersonReorder();
+    });
+    const cancelPersonGesture = () => {
+      if (state.pendingPersonHold) {
+        window.clearTimeout(state.pendingPersonHold.timer); state.pendingPersonHold = null;
+      }
+      finishPersonReorder(true);
+    };
+    window.addEventListener("blur", cancelPersonGesture);
+    let reorderViewportWidth = window.innerWidth;
+    window.addEventListener("resize", () => {
+      // Mobile browser bars change viewport height while auto-scrolling.
+      // Only a width change invalidates the captured card layout.
+      if (window.innerWidth !== reorderViewportWidth) cancelPersonGesture();
+      reorderViewportWidth = window.innerWidth;
+    });
+    document.addEventListener("visibilitychange", () => { if (document.hidden) cancelPersonGesture(); });
+    document.addEventListener("touchstart", event => { if (event.touches?.length > 1) cancelPersonGesture(); }, { capture: true, passive: true });
     bindTimetableScrolling(els.reviewGrid);
     bindTimetableScrolling(els.personWeekGrid);
     bindTimetableScrolling(els.groupWeekGrid);
@@ -4904,7 +5046,7 @@
     if (!("serviceWorker" in navigator)) return;
     if (location.protocol !== "https:" && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") return;
 
-    navigator.serviceWorker.register("./service-worker.js?v=121", { updateViaCache: "none" })
+    navigator.serviceWorker.register("./service-worker.js?v=122", { updateViaCache: "none" })
       .then(registration => registration.update())
       .catch(() => {
         // The app works normally even if PWA caching isn't available.
@@ -4967,6 +5109,7 @@
 
   init();
 })();
+
 
 
 

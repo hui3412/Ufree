@@ -10,11 +10,11 @@ const fixture = { schema_version: 1, people: {
   "Person 4": { classes: [] }
 } };
 const groups = { groups: ["a", "b"].map(id => ({ id, name: id.toUpperCase(), members: Object.keys(fixture.people) })) };
-async function app(orders = null, data = fixture, pins = []) {
+async function app(orders = null, data = fixture, pins = [], { reducedMotion = false } = {}) {
   const window = new Window({ url: "http://localhost/Whos-Free/", settings: { disableJavaScriptFileLoading: true, disableCSSFileLoading: true } });
   window.document.write(fs.readFileSync(new URL("../index.html", import.meta.url), "utf8"));
   window.setInterval = () => 0;
-  window.matchMedia = () => ({ matches: false, addEventListener() {} });
+  window.matchMedia = query => ({ matches: reducedMotion && query.includes("prefers-reduced-motion"), addEventListener() {} });
   window.confirm = () => true;
   window.localStorage.setItem("whos-free-local-schedules", JSON.stringify({ data, meta: {} }));
   window.localStorage.setItem("whos-free-groups-v1", JSON.stringify(groups));
@@ -49,6 +49,144 @@ async function app(orders = null, data = fixture, pins = []) {
   const read = () => JSON.parse(window.localStorage.getItem(key));
   return { window, el, cards, names, card, move, event, read, tick, hold };
 }
+
+// A real layout model lets the gesture tests check moving insertion slots,
+// unequal row heights and animation coordinates rather than zero DOM bounds.
+function motionLayout(a) {
+  const originalRect = a.window.Element.prototype.getBoundingClientRect;
+  const originalAnimate = a.window.HTMLElement.prototype.animate;
+  const heights = { "Person 1": 80, "Person 2": 104, "Person 4": 96 };
+  const rectangle = (left, top, width, height) => ({ left, top, right: left + width, bottom: top + height, width, height, x: left, y: top });
+  a.window.Element.prototype.getBoundingClientRect = function () {
+    if (this.classList.contains("person-drag-ghost")) {
+      const delta = /translate3d\(([-.\d]+)px, ([-.\d]+)px/.exec(this.style.transform);
+      return rectangle(parseFloat(this.style.left) + +(delta?.[1] || 0), parseFloat(this.style.top) + +(delta?.[2] || 0), parseFloat(this.style.width), parseFloat(this.style.height));
+    }
+    if (this.classList.contains("person-card")) {
+      let top = 100 - a.el("peopleList").scrollTop;
+      for (const card of this.parentElement.querySelectorAll(".person-card")) {
+        if (card === this) break;
+        top += (heights[card.dataset.person] || 80) + 10;
+      }
+      const offset = /translate3d\(0, ([-.\d]+)px/.exec(this.style.transform);
+      return rectangle(20, top + +(offset?.[1] || 0), 360, heights[this.dataset.person] || 80);
+    }
+    return this.id === "peopleList" ? rectangle(20, 80, 360, 700) : rectangle(0, 0, 0, 0);
+  };
+  const animations = [], frames = new Map(); let frameId = 0;
+  a.window.HTMLElement.prototype.animate = function (keyframes, options) { animations.push({ person: this.dataset.person, keyframes, options }); return { cancel() {} }; };
+  a.window.requestAnimationFrame = callback => { frames.set(++frameId, callback); return frameId; };
+  a.window.cancelAnimationFrame = id => frames.delete(id);
+  a.window.document.elementFromPoint = (x, y) => a.cards().find(card => {
+    const rect = card.getBoundingClientRect(); return y >= rect.top && y <= rect.bottom;
+  }) || a.el("peopleList");
+  const touch = (x, y, identifier = 7) => ({ identifier, clientX: x, clientY: y });
+  const start = name => { const source = a.card(name), rect = source.getBoundingClientRect(); a.event(source, "touchstart", { touches: [touch(50, rect.top + 36)] }); a.hold(); return source; };
+  const move = (source, y) => a.event(source, "touchmove", { touches: [touch(50, y)] });
+  const frame = time => { const tasks = [...frames.values()]; frames.clear(); tasks.forEach(task => task(time)); };
+  const restore = () => {
+    a.window.Element.prototype.getBoundingClientRect = originalRect;
+    if (originalAnimate) a.window.HTMLElement.prototype.animate = originalAnimate;
+    else delete a.window.HTMLElement.prototype.animate;
+  };
+  return { animations, frames, start, move, frame, touch, restore };
+}
+
+test("held cards follow the finger while unequal-height neighbours preview their positions without saving", async () => {
+  const a = await app(); let m;
+  try {
+    m = motionLayout(a); const source = m.start("Person 4");
+    assert.equal(source.isConnected, true, "the active touch target stays in place in the DOM");
+    const ghost = a.window.document.querySelector(".person-drag-ghost");
+    assert.equal(ghost.getAttribute("aria-hidden"), "true"); assert.equal(ghost.hasAttribute("inert"), true);
+    const event = m.move(source, 125);
+    assert.equal(event.defaultPrevented, true);
+    assert.match(ghost.style.transform, /translate3d/);
+    assert.equal(a.card("Person 1").style.transform, "translate3d(0, 106px, 0)");
+    assert.equal(a.card("Person 2").style.transform, "translate3d(0, 106px, 0)");
+    assert.deepEqual(a.names(), ["Person 1", "Person 2", "Person 4"]);
+    assert.equal(a.read(), null); assert.equal(a.el("undoChangesButton").disabled, true);
+    a.event(source, "touchend", { touches: [] });
+    assert.deepEqual(a.names(), ["Person 4", "Person 1", "Person 2"]);
+    assert.deepEqual(a.read().main, ["Person 4", "Person 1", "Person 2", "Person 3"]);
+    assert.equal(a.window.document.querySelector(".person-drag-ghost"), null); assert.equal(m.frames.size, 0);
+    assert.ok(m.animations.some(animation => animation.person === "Person 4" && animation.options.duration === 220), "the released card settles from its finger position");
+    assert.match(a.el("detailPanel").textContent, /Select someone/);
+    a.el("undoChangesButton").click(); await a.tick();
+    assert.deepEqual(a.names(), ["Person 1", "Person 2", "Person 4"]);
+  } finally { m?.restore(); await a.window.happyDOM.abort(); }
+});
+
+test("Escape, interruption and a second finger restore the preview and remove its floating card", async () => {
+  for (const interruption of ["Escape", "blur", "resize", "second-touch", "touchcancel"]) {
+    const a = await app(); let m;
+    try {
+      m = motionLayout(a); const source = m.start("Person 4"); m.move(source, 125);
+      if (interruption === "Escape") a.event(source, "keydown", { key: "Escape" });
+      else if (interruption === "second-touch") a.event(source, "touchstart", { touches: [m.touch(50, 125), m.touch(100, 150, 8)] });
+      else if (interruption === "touchcancel") a.event(source, "touchcancel", { touches: [] });
+      else {
+        if (interruption === "resize") a.window.happyDOM.setWindowSize({ width: 1100, height: 900 });
+        a.window.dispatchEvent(new a.window.Event(interruption));
+      }
+      assert.equal(a.window.document.querySelector(".person-drag-ghost"), null, interruption);
+      assert.equal(m.frames.size, 0, interruption);
+      assert.equal(a.read(), null, interruption);
+      assert.deepEqual(a.names(), ["Person 1", "Person 2", "Person 4"]);
+      assert.ok(a.cards().every(card => !card.style.transform && !card.classList.contains("person-reorder-preview")));
+    } finally { m?.restore(); await a.window.happyDOM.abort(); }
+  }
+});
+
+test("edge scrolling continues with a stationary finger and stops immediately on cancellation", async () => {
+  const a = await app(); let m;
+  try {
+    a.window.happyDOM.setWindowSize({ width: 390, height: 500 });
+    m = motionLayout(a); const source = m.start("Person 1");
+    Object.defineProperty(a.el("peopleList"), "scrollHeight", { value: 1200 });
+    Object.defineProperty(a.el("peopleList"), "clientHeight", { value: 350 });
+    m.move(source, 485); m.frame(16); m.frame(32); m.frame(48);
+    assert.ok(a.el("peopleList").scrollTop > 0);
+    assert.equal(a.read(), null);
+    a.event(source, "touchcancel", { touches: [] });
+    const scroll = a.el("peopleList").scrollTop;
+    m.frame(64); assert.equal(a.el("peopleList").scrollTop, scroll); assert.equal(m.frames.size, 0);
+  } finally { m?.restore(); await a.window.happyDOM.abort(); }
+});
+
+test("native drops in gaps animate the final order and reduced motion skips settling", async () => {
+  for (const reducedMotion of [false, true]) {
+    const a = await app(null, fixture, [], { reducedMotion }); let m;
+    try {
+      m = motionLayout(a); const source = a.card("Person 4");
+      a.event(source, "dragstart", { clientX: 50, clientY: 340 });
+      a.event(a.el("peopleList"), "dragover", { clientX: 50, clientY: 185 });
+      a.event(a.el("peopleList"), "drop", { clientX: 50, clientY: 185 });
+      assert.deepEqual(a.names(), ["Person 1", "Person 4", "Person 2"]);
+      assert.equal(a.window.document.querySelector(".person-drag-ghost"), null);
+      assert.equal(m.animations.length, 0, "settled neighbours already occupy their preview slots");
+      a.move("Person 4", "down");
+      assert.equal(m.animations.length > 0, !reducedMotion);
+    } finally { m?.restore(); await a.window.happyDOM.abort(); }
+  }
+});
+
+test("animated previews preserve the pin boundary and height-only viewport changes keep the gesture active", async () => {
+  const a = await app(null, fixture, ["Person 1"]); let m;
+  try {
+    m = motionLayout(a); const source = m.start("Person 4");
+    m.move(source, 125);
+    assert.ok(a.cards().every(card => !card.style.transform), "invalid placement cannot visually move someone above a pin");
+    a.window.happyDOM.setWindowSize({ width: a.window.innerWidth, height: 650 });
+    a.window.dispatchEvent(new a.window.Event("resize"));
+    assert.ok(a.window.document.querySelector(".person-drag-ghost"), "browser chrome may resize the viewport height during scrolling");
+    a.event(source, "touchend", { touches: [] });
+    assert.equal(a.read(), null);
+    assert.match(a.el("toast").textContent, /Cannot move someone above a pinned person/);
+    assert.equal(a.window.document.querySelector(".person-drag-ghost"), null);
+    assert.equal(m.frames.size, 0);
+  } finally { m?.restore(); await a.window.happyDOM.abort(); }
+});
 
 test("filtered moves preserve hidden people, All/Free order and reloaded positions", async () => {
   const a = await app(); let reloaded;
@@ -288,3 +426,4 @@ test("schedule and person-order changes share chronological Undo; no-op drops ad
     assert.equal(a.el("undoChangesButton").disabled, true);
   } finally { await a.window.happyDOM.abort(); }
 });
+
