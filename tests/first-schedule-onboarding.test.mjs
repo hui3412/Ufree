@@ -10,10 +10,11 @@ const person = { semester: "Fall 2026", classes: [{ day: "Monday", start: "09:00
 const plain = value => JSON.parse(JSON.stringify(value));
 const timetable = classes => plain(classes).map(item => Object.fromEntries(Object.keys(person.classes[0]).map(key => [key, item[key]])));
 
-async function app({ url = "https://youfree.ca/", storage = {}, people } = {}) {
+async function app({ url = "https://youfree.ca/", storage = {}, people, beforeReady } = {}) {
   const window = new Window({ url, settings: { disableJavaScriptFileLoading: true, disableCSSFileLoading: true } });
   window.document.write(fs.readFileSync(new URL("../index.html", import.meta.url), "utf8"));
-  window.setInterval = () => 0;
+  const intervals = [];
+  window.setInterval = callback => { intervals.push(callback); return 0; };
   window.matchMedia = () => ({ matches: true, addEventListener() {} });
   window.confirm = () => true;
   window.URL.createObjectURL = () => "blob:test";
@@ -26,6 +27,7 @@ async function app({ url = "https://youfree.ca/", storage = {}, people } = {}) {
   Object.defineProperty(window.navigator, "clipboard", { value: { writeText: async text => { copied = text; } }, configurable: true });
   for (const file of ["schedule-availability.js", "schedule-share-code.js", "app.js"]) window.eval(fs.readFileSync(new URL(`../${file}`, import.meta.url), "utf8"));
   const el = id => window.document.getElementById(id);
+  beforeReady?.(window, el);
   const wait = async condition => {
     for (let i = 0; i < 250; i++) {
       if (condition()) return;
@@ -52,7 +54,7 @@ async function app({ url = "https://youfree.ca/", storage = {}, people } = {}) {
     el("saveImageScheduleButton").click();
     await wait(() => el("imageReview").hidden && !el("saveImageScheduleButton").disabled);
   };
-  return { window, el, wait, snapshot, stored, manual, upload, save, copied: () => copied };
+  return { window, el, wait, snapshot, stored, manual, upload, save, intervals, copied: () => copied };
 }
 
 test("first manual save opens the exact welcome, traps focus, copies a valid link and closes safely", async () => {
@@ -120,7 +122,7 @@ for (const url of ["https://hui3412.github.io/Ufree/?source=test#old", "https://
   });
 }
 
-test("reload, second creation, Undo and deleting/re-adding never repeat onboarding", async () => {
+test("reload shows the single-schedule reminder while edits, Undo and deleting/re-adding never repeat first-save onboarding", async () => {
   const a = await app();
   let reloaded;
   try {
@@ -129,7 +131,9 @@ test("reload, second creation, Undo and deleting/re-adding never repeat onboardi
     assert.equal(a.el("firstScheduleWelcome").hidden, true, "backdrop closes");
     const saved = a.snapshot();
     reloaded = await app({ storage: saved });
-    assert.equal(reloaded.el("firstScheduleWelcome").hidden, true, "reloading with an existing schedule never shows it");
+    assert.equal(reloaded.el("firstScheduleWelcome").hidden, false);
+    assert.equal(reloaded.el("firstScheduleWelcome").dataset.reason, "single-schedule");
+    reloaded.el("closeFirstScheduleWelcome").click();
     a.manual("Bob"); await a.save();
     assert.equal(a.el("firstScheduleWelcome").hidden, true);
     a.el("undoChangesButton").click();
@@ -148,10 +152,12 @@ test("reload, second creation, Undo and deleting/re-adding never repeat onboardi
   } finally { await a.window.happyDOM.abort(); if (reloaded) await reloaded.window.happyDOM.abort(); }
 });
 
-test("existing users without a history flag never get onboarding, including after replacing or deleting their schedules", async () => {
+test("existing users get the launch reminder but never repeat first-save onboarding after replacing or deleting schedules", async () => {
   const a = await app({ people: { Alice: person } });
   try {
-    assert.equal(a.el("firstScheduleWelcome").hidden, true);
+    assert.equal(a.el("firstScheduleWelcome").hidden, false);
+    assert.equal(a.el("firstScheduleWelcome").dataset.reason, "single-schedule");
+    a.el("closeFirstScheduleWelcome").click();
     assert.equal(a.window.localStorage.getItem(HISTORY), "1");
     a.manual("Alice"); await a.save();
     assert.equal(a.el("firstScheduleWelcome").hidden, true);
@@ -220,4 +226,120 @@ test("closing before link generation finishes prevents late focus changes or reo
     assert.equal(a.window.document.activeElement.id, "mobileMenuButton");
     assert.equal(a.window.document.body.style.overflow, "");
   } finally { await a.window.happyDOM.abort(); }
+});
+
+test("every new launch with exactly one saved schedule reminds users, even with previous onboarding history", async () => {
+  let storage = { [DATABASE]: JSON.stringify({ data: { people: { Alice: person } }, meta: {} }), [HISTORY]: "1" };
+  for (let launch = 0; launch < 3; launch++) {
+    const a = await app({ storage });
+    try {
+      assert.equal(a.el("firstScheduleWelcome").hidden, false);
+      assert.equal(a.el("firstScheduleWelcome").dataset.reason, "single-schedule");
+      assert.match(a.el("firstScheduleWelcomeBody").textContent, /one schedule saved/);
+      for (const method of ["screenshots", "QR codes", "text codes", "URLs"]) assert.ok(a.el("firstScheduleWelcomeBody").textContent.includes(method));
+      assert.equal(a.el("copyFirstScheduleLink").hidden, true);
+      assert.equal(a.el("firstScheduleWelcomeStatus").hidden, true);
+      assert.equal(a.el("importFriendsSchedules").hidden, false);
+      assert.equal(a.window.document.activeElement, a.el("importFriendsSchedules"));
+      a.window.document.dispatchEvent(new a.window.KeyboardEvent("keydown", { key: "Tab" }));
+      assert.equal(a.window.document.activeElement, a.el("closeFirstScheduleWelcome"));
+      a.window.document.dispatchEvent(new a.window.KeyboardEvent("keydown", { key: "Tab" }));
+      assert.equal(a.window.document.activeElement, a.el("importFriendsSchedules"));
+      a.el("mobileMenuButton").focus();
+      assert.equal(a.window.document.activeElement, a.el("importFriendsSchedules"));
+      const before = a.stored();
+      a.el("closeFirstScheduleWelcome").click();
+      for (const callback of a.intervals) callback();
+      await new Promise(resolve => setTimeout(resolve, 30));
+      assert.equal(a.el("firstScheduleWelcome").hidden, true, "live refresh does not reopen a dismissed launch reminder");
+      assert.deepEqual(a.stored(), before);
+      assert.equal(a.window.document.body.style.overflow, "");
+      storage = a.snapshot();
+    } finally { await a.window.happyDOM.abort(); }
+  }
+});
+
+for (const people of [null, {}, { Alice: person, Bob: person }, { Alice: person, Bob: person, Carol: person }]) {
+  test(`no launch reminder for ${people ? Object.keys(people).length : "no"} saved schedules`, async () => {
+    const a = await app({ people });
+    try { assert.equal(a.el("firstScheduleWelcome").hidden, true); }
+    finally { await a.window.happyDOM.abort(); }
+  });
+}
+
+test("the reminder's Import action opens the shared image/code importer and saving a friend does not repeat it", async () => {
+  const a = await app({ people: { Alice: person } });
+  try {
+    const before = a.stored();
+    a.el("importFriendsSchedules").click();
+    await a.wait(() => a.window.document.activeElement === a.el("importScheduleImageButton"));
+    assert.equal(a.el("firstScheduleWelcome").hidden, true);
+    assert.equal(a.el("scheduleModal").hidden, false);
+    assert.equal(a.el("scheduleModalTitle").textContent, "Import");
+    assert.equal(a.el("importCodeField").closest("[hidden]"), null);
+    assert.equal(a.el("importScheduleImageButton").closest("[hidden]"), null);
+    assert.deepEqual(a.stored(), before);
+    a.window.WhosFreeImageParser.parseScheduleImage = async () => ({ name: "Bob", person: structuredClone(person) });
+    await a.upload(); await a.save();
+    assert.deepEqual(Object.keys(a.stored().data.people), ["Alice", "Bob"]);
+    a.el("closeScheduleModal").click();
+    assert.equal(a.el("firstScheduleWelcome").hidden, true);
+  } finally { await a.window.happyDOM.abort(); }
+});
+
+test("shared-link startup finishes before checking the count; incoming friends prevent the reminder", async () => {
+  const sender = await app();
+  let receiver;
+  try {
+    const code = await sender.window.WhosFreeShareCode.encode({ people: { Bob: person } });
+    const url = sender.window.WhosFreeShareCode.createLink(code, "https://youfree.ca/");
+    receiver = await app({ url, people: { Alice: person } });
+    await receiver.wait(() => receiver.stored()?.data.people.Bob && receiver.el("importProgressOverlay").hidden);
+    assert.equal(receiver.el("firstScheduleWelcome").hidden, true);
+    assert.deepEqual(Object.keys(receiver.stored().data.people), ["Alice", "Bob"]);
+  } finally { await sender.window.happyDOM.abort(); if (receiver) await receiver.window.happyDOM.abort(); }
+});
+
+test("a QR/link opened while the reminder is visible dismisses it and imports normally", async () => {
+  const a = await app({ people: { Alice: person } });
+  try {
+    const code = await a.window.WhosFreeShareCode.encode({ people: { Bob: person } });
+    a.window.location.href = a.window.WhosFreeShareCode.createLink(code, "https://youfree.ca/");
+    a.window.dispatchEvent(new a.window.Event("hashchange"));
+    await a.wait(() => a.stored()?.data.people.Bob && a.el("importProgressOverlay").hidden);
+    assert.equal(a.el("firstScheduleWelcome").hidden, true);
+    assert.equal(a.window.document.body.style.overflow, "");
+  } finally { await a.window.happyDOM.abort(); }
+});
+
+test("unreadable storage does not claim there is only one saved schedule", async () => {
+  const a = await app({ storage: { [DATABASE]: "corrupt data" } });
+  try { assert.equal(a.el("firstScheduleWelcome").hidden, true); }
+  finally { await a.window.happyDOM.abort(); }
+});
+
+test("startup waits for an already-open main menu to close before showing the reminder", async () => {
+  const a = await app({ people: { Alice: person }, beforeReady: (_window, el) => el("mobileMenuButton").click() });
+  try {
+    assert.equal(a.el("firstScheduleWelcome").hidden, true);
+    assert.equal(a.el("mobileMenuButton").getAttribute("aria-expanded"), "true");
+    a.el("closeMobileMenuButton").click();
+    await a.wait(() => !a.el("firstScheduleWelcome").hidden);
+    assert.equal(a.window.document.activeElement, a.el("importFriendsSchedules"));
+    assert.equal(a.el("firstScheduleWelcome").hasAttribute("inert"), false);
+  } finally { await a.window.happyDOM.abort(); }
+});
+
+test("a duplicate shared link still reminds the user when only one schedule remains", async () => {
+  const sender = await app();
+  let receiver;
+  try {
+    const code = await sender.window.WhosFreeShareCode.encode({ people: { Alice: person } });
+    const url = sender.window.WhosFreeShareCode.createLink(code, "https://youfree.ca/");
+    receiver = await app({ url, people: { Alice: person } });
+    await receiver.wait(() => !receiver.el("firstScheduleWelcome").hidden);
+    assert.equal(receiver.el("firstScheduleWelcome").dataset.reason, "single-schedule");
+    assert.deepEqual(Object.keys(receiver.stored().data.people), ["Alice"]);
+    assert.equal(receiver.el("importProgressOverlay").hidden, true);
+  } finally { await sender.window.happyDOM.abort(); if (receiver) await receiver.window.happyDOM.abort(); }
 });

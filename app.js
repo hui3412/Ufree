@@ -37,6 +37,7 @@
     sharedImport: null,
     deviceReady: false,
     hasHadSchedules: false,
+    singleScheduleReminderPending: false,
     sharedLinkStartup: false,
     imagePreviewUrl: null,
     notificationsEnabled: false,
@@ -120,6 +121,8 @@
     scheduleModal: document.getElementById("scheduleModal"),
     firstScheduleWelcome: document.getElementById("firstScheduleWelcome"),
     firstScheduleWelcomeTitle: document.getElementById("firstScheduleWelcomeTitle"),
+    firstScheduleWelcomeBody: document.getElementById("firstScheduleWelcomeBody"),
+    importFriendsSchedules: document.getElementById("importFriendsSchedules"),
     copyFirstScheduleLink: document.getElementById("copyFirstScheduleLink"),
     closeFirstScheduleWelcome: document.getElementById("closeFirstScheduleWelcome"),
     firstScheduleWelcomeStatus: document.getElementById("firstScheduleWelcomeStatus"),
@@ -1516,6 +1519,7 @@
     mobileNavBackground = [];
     document.body.style.overflow = mobileNavOverflow;
     if (restoreFocus) mobileMenuButton.focus({ preventScroll: true });
+    queueMicrotask(maybeShowSingleScheduleReminder);
   }
 
   function syncMobileNavigation() {
@@ -2641,11 +2645,34 @@
   let firstScheduleWelcomeRequest = 0;
   let firstScheduleCopyTimer = null;
   const FIRST_SCHEDULE_COPY_LABEL = "Copy My Link to Invite Them";
+  const FIRST_SCHEDULE_WELCOME_TITLE = els.firstScheduleWelcomeTitle.textContent;
+  const FIRST_SCHEDULE_WELCOME_BODY = els.firstScheduleWelcomeBody.textContent;
 
-  async function openFirstScheduleWelcome(name) {
+  function maybeShowSingleScheduleReminder() {
+    if (!state.deviceReady || !state.singleScheduleReminderPending) return;
+    if (state.loadError || !state.hasData || Object.keys(peopleMap()).length !== 1) {
+      state.singleScheduleReminderPending = false;
+      return;
+    }
+    if (state.isParsing || state.pendingImage || state.importProgress || mobileNavOpen
+      || [...document.querySelectorAll(".modal-backdrop")].some(modal => !modal.hidden)) return;
+    // This is a launch reminder, not a reaction to edits, Undo, or the live refresh timer.
+    state.singleScheduleReminderPending = false;
+    openFirstScheduleWelcome(null, { reminder: true });
+  }
+
+  async function openFirstScheduleWelcome(name, { reminder = false } = {}) {
     closeScheduleModal();
     const request = ++firstScheduleWelcomeRequest;
     firstScheduleLink = "";
+    els.firstScheduleWelcome.dataset.reason = reminder ? "single-schedule" : "first-schedule";
+    els.firstScheduleWelcomeTitle.textContent = reminder ? "Add your friends’ schedules" : FIRST_SCHEDULE_WELCOME_TITLE;
+    els.firstScheduleWelcomeBody.textContent = reminder
+      ? "You only have one schedule saved on this device. UFree doesn't sync automatically. Import your friends' schedule screenshots, or ask them for their QR codes, text codes, or URLs to see your group's availability."
+      : FIRST_SCHEDULE_WELCOME_BODY;
+    els.copyFirstScheduleLink.hidden = reminder;
+    els.importFriendsSchedules.hidden = !reminder;
+    els.firstScheduleWelcomeStatus.hidden = reminder;
     els.firstScheduleLinkFallback.hidden = true;
     els.firstScheduleLinkFallback.value = "";
     els.copyFirstScheduleLink.disabled = true;
@@ -2653,6 +2680,10 @@
     els.firstScheduleWelcomeStatus.textContent = "Preparing your link…";
     els.firstScheduleWelcome.hidden = false;
     document.body.style.overflow = "hidden";
+    if (reminder) {
+      els.importFriendsSchedules.focus({ preventScroll: true });
+      return;
+    }
     els.firstScheduleWelcomeTitle.focus({ preventScroll: true });
     try {
       // Prepare before the click so clipboard writing retains the user's gesture on Safari.
@@ -3179,6 +3210,7 @@
       document.body.style.overflow = "";
       (returnFocus || els.homeExportButton).focus({ preventScroll: true });
     }
+    queueMicrotask(maybeShowSingleScheduleReminder);
   }
 
   function openQuickCodePanel(mode, event) {
@@ -3611,6 +3643,7 @@
     const input = location.href;
     // Consume the fragment once so refresh cannot import it again.
     try { history.replaceState(null, "", location.pathname + location.search); } catch { /* Read-only browser histories can still import the link. */ }
+    if (!els.firstScheduleWelcome.hidden) closeFirstScheduleWelcome();
     if (!els.personQuickShareModal.hidden) closePersonQuickShare();
     if (!els.personGroupModal.hidden) closePersonGroup();
     if (!els.personWeekModal.hidden) closePersonWeek();
@@ -4045,6 +4078,7 @@
   }
 
   function openScheduleModal() {
+    if (!els.firstScheduleWelcome.hidden) closeFirstScheduleWelcome();
     const wasHidden = els.scheduleModal.hidden;
     updateScheduleModal();
     els.scheduleModal.hidden = false;
@@ -4069,6 +4103,7 @@
     if (els.settingsModal.hidden) document.body.style.overflow = "";
     if (fromGroup && navigationReturnFocus?.isConnected) navigationReturnFocus.focus({ preventScroll: true });
     else returnHomeActionFocus(navigationReturnFocus || els.scheduleDataButton);
+    queueMicrotask(maybeShowSingleScheduleReminder);
   }
 
   async function removeSchedules() {
@@ -4866,7 +4901,8 @@
     }, true);
     document.addEventListener("focusin", event => {
       if (!els.firstScheduleWelcome.hidden && !els.firstScheduleWelcome.contains(event.target)) {
-        (els.copyFirstScheduleLink.disabled ? els.closeFirstScheduleWelcome : els.copyFirstScheduleLink).focus({ preventScroll: true });
+        (els.firstScheduleWelcome.dataset.reason === "single-schedule" ? els.importFriendsSchedules
+          : els.copyFirstScheduleLink.disabled ? els.closeFirstScheduleWelcome : els.copyFirstScheduleLink).focus({ preventScroll: true });
         return;
       }
       if (!state.importProgress) return;
@@ -5039,6 +5075,10 @@
     });
 
     els.copyFirstScheduleLink.addEventListener("click", copyFirstScheduleLink);
+    els.importFriendsSchedules.addEventListener("click", () => {
+      closeFirstScheduleWelcome();
+      openQuickCodePanel("import");
+    });
     els.closeFirstScheduleWelcome.addEventListener("click", closeFirstScheduleWelcome);
     els.firstScheduleWelcome.addEventListener("click", event => {
       if (event.target === els.firstScheduleWelcome) closeFirstScheduleWelcome();
@@ -5156,7 +5196,7 @@
     if (!("serviceWorker" in navigator)) return;
     if (location.protocol !== "https:" && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") return;
 
-    navigator.serviceWorker.register("./service-worker.js?v=123", { updateViaCache: "none" })
+    navigator.serviceWorker.register("./service-worker.js?v=124", { updateViaCache: "none" })
       .then(registration => registration.update())
       .catch(() => {
         // The app works normally even if PWA caching isn't available.
@@ -5197,7 +5237,7 @@
     requestAnimationFrame(animateAppEntrance);
     openSharedLink();
 
-    loadSchedulesFromDevice().then(() => {
+    loadSchedulesFromDevice().then(async () => {
       if (state.hasData) {
         cleanPeoplePreferences();
         cleanGroupPreferences();
@@ -5206,9 +5246,11 @@
       updateSettingsModal();
       checkBreakNotifications();
       state.deviceReady = true;
+      state.singleScheduleReminderPending = state.hasData && Object.keys(peopleMap()).length === 1;
       if (state.sharedLinkStartup && !location.hash.startsWith("#import=")) endImportProgress();
       state.sharedLinkStartup = false;
-      openSharedLink();
+      await openSharedLink();
+      maybeShowSingleScheduleReminder();
     });
 
     window.setInterval(() => {

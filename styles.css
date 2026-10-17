@@ -963,6 +963,7 @@ input[type="time"]:disabled {
 .first-schedule-card .first-schedule-status { margin-top: 12px; min-height: 1.6em; font-size: .85rem; }
 .first-schedule-link { width: 100%; margin-top: 8px; background: var(--input); color: var(--text); font-size: 16px; }
 .first-schedule-link[hidden] { display: none; }
+#firstScheduleWelcome [hidden] { display: none !important; }
 @keyframes first-schedule-fade-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes first-schedule-rise-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 @media (prefers-reduced-motion: reduce) {
