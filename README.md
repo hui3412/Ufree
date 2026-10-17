@@ -483,3 +483,29 @@ App by David Dajbog and Hui En Quan. Inspiration from Xander Vatch.
 
 The supplied SVG replaces the text masthead, including the legacy entry point. The supplied PNG is referenced in Open Graph and Twitter metadata. Browser, iOS, installable-app and notification icons use the official logo; square and maskable variants preserve its proportions. Branding assets are included in the offline shell.
 
+
+## Local Cache Storage backup
+
+The app writes versioned state snapshots to `ufree-user-sync-v1`, keyed by
+`https://youfree.ca`. That URL is a Cache API key only: no request or upload is
+made. The actual cache belongs to the current origin and storage partition, so
+GitHub Pages and youfree.ca do not share it.
+
+Successful schedule saves, edits, imports, Undo, person ordering, groups, and
+personalization update this best-effort backup. Writes are serialized and capture
+JSON immediately. Deletes write an empty record so old schedules are not restored.
+Startup restores only when localStorage is completely empty and IndexedDB has no
+schedule record; failed database reads never authorize an overwrite. The payload
+is validated, app-owned preference keys are allowlisted, and partial localStorage
+writes are rolled back on failure. Cache errors do not block normal local saves.
+The service worker only searches its app-shell cache for offline pages, so it
+cannot return the JSON backup as HTML. App-shell cleanup retains the user cache.
+
+This does **not** synchronize Safari with an iOS Home Screen app. WebKit isolates
+their website data, including cache storage. It is a local recovery copy where
+storage is shared, not a way around browser isolation or a cloud backup. Use the
+existing code, link, QR, or JSON export/import to transfer schedules between
+isolated contexts. See [WebKit's storage isolation explanation](https://webkit.org/blog/14787/webkit-features-in-safari-17-2/#web-apps).
+
+Focused checks: `node --test tests/cache-sync.test.mjs tests/offline-cache.test.cjs
+ tests/first-schedule-onboarding.test.mjs tests/person-order-ui.test.mjs`.

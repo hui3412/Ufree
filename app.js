@@ -1,3 +1,6 @@
+const CACHE_SYNC_NAME = 'ufree-user-sync-v1';
+const SYNC_URL = 'https://youfree.ca';
+
 (() => {
   "use strict";
 
@@ -76,6 +79,90 @@
   const PERSON_ORDER_KEY = "whos-free-person-order-v1";
   const GROUP_PREFERENCES_KEY = "whos-free-groups-v1";
   const ACCENT_THEME_KEY = "whos-free-accent-theme-v1";
+  // Cache Storage is a best-effort backup within this origin/storage partition.
+  // iOS isolates Safari and Home Screen website data; this cannot bridge that boundary.
+  const CACHE_SYNC_STORAGE_KEYS = [
+    SCHEDULE_HISTORY_KEY, PEOPLE_PREFERENCES_KEY, PERSON_ORDER_KEY,
+    GROUP_PREFERENCES_KEY, VIEW_PREFERENCE_KEY, ACCENT_THEME_KEY,
+    NOTIFICATION_SETTINGS_KEY, NOTIFICATION_HISTORY_KEY, "whos-free-theme",
+  ];
+  let cacheSyncReady = false;
+  let cacheSyncRecord = null;
+  let cacheSyncWrites = Promise.resolve();
+
+  function saveStateToSharedCache(dataObj) {
+    if (!("caches" in window)) return Promise.resolve(false);
+    let json;
+    try { json = JSON.stringify(dataObj); }
+    catch { return Promise.resolve(false); }
+    // Snapshot before waiting and serialize writes so a slow older save cannot win.
+    cacheSyncWrites = cacheSyncWrites.then(async () => {
+      const cache = await caches.open(CACHE_SYNC_NAME);
+      await cache.put(SYNC_URL, new Response(json, {
+        status: 200, headers: { "Content-Type": "application/json" },
+      }));
+      return true;
+    }).catch(() => false);
+    return cacheSyncWrites;
+  }
+
+  function backupStateToSharedCache() {
+    if (!cacheSyncReady) return;
+    try {
+      const storage = {};
+      for (const key of CACHE_SYNC_STORAGE_KEYS) {
+        const value = localStorage.getItem(key);
+        if (value !== null) storage[key] = value;
+      }
+      if (Object.keys(cacheSyncRecord?.data?.people || {}).length) storage[SCHEDULE_HISTORY_KEY] = "1";
+      void saveStateToSharedCache({ version: 1, record: cacheSyncRecord, storage });
+    } catch { /* A blocked/quota-limited cache must never block local saves or OCR. */ }
+  }
+
+  function backupSavedScheduleRecord(record) {
+    try {
+      cacheSyncRecord = record ? JSON.parse(JSON.stringify(record)) : null;
+      backupStateToSharedCache();
+    } catch { /* The primary save remains authoritative. */ }
+  }
+
+  async function loadStateFromSharedCache() {
+    if (!("caches" in window)) return false;
+    const written = [];
+    try {
+      // Do not treat an intentional empty collection, corrupt data, or preferences
+      // as a fresh install. On an IndexedDB read failure, leave existing data alone.
+      if (localStorage.length !== 0) return false;
+      if ("indexedDB" in window && await idbGet(LOCAL_SCHEDULE_KEY) !== undefined) return false;
+      const cache = await caches.open(CACHE_SYNC_NAME);
+      const response = await cache.match(SYNC_URL);
+      if (!response?.ok) return false;
+      const payload = await response.json();
+      if (payload?.version !== 1 || !payload.record?.data ||
+          !payload.storage || typeof payload.storage !== "object" || Array.isArray(payload.storage)) return false;
+      validateData(payload.record.data);
+      const entries = CACHE_SYNC_STORAGE_KEYS.filter(key => Object.hasOwn(payload.storage, key))
+        .map(key => [key, payload.storage[key]]);
+      if (entries.some(([, value]) => typeof value !== "string")) return false;
+      // Recheck after asynchronous reads so another tab's data is never overwritten.
+      if (localStorage.length !== 0) return false;
+      if ("indexedDB" in window && await idbGet(LOCAL_SCHEDULE_KEY) !== undefined) return false;
+      if (localStorage.length !== 0) return false;
+      for (const [key, value] of entries) {
+        localStorage.setItem(key, value);
+        written.push(key);
+      }
+      fallbackWrite(payload.record);
+      written.push(LOCAL_STORAGE_FALLBACK_KEY);
+      return true;
+    } catch {
+      for (const key of written) {
+        try { localStorage.removeItem(key); } catch { /* Storage may be unavailable. */ }
+      }
+      return false;
+    }
+  }
+
   const ACCENT_THEMES = new Set(["blue", "violet", "rose", "mint", "orange"]);
   const BREAK_THRESHOLD_MINUTES = window.WhosFreeAvailability.PASSING_MINUTES;
   // Share back to this deployment, keeping its path but no query or import fragment.
@@ -272,7 +359,7 @@
 
   function saveTheme(theme) {
     try {
-      localStorage.setItem("whos-free-theme", theme);
+      localStorage.setItem("whos-free-theme", theme); backupStateToSharedCache();
     } catch {
       // Theme persistence is optional.
     }
@@ -289,7 +376,7 @@
 
   function saveAccentTheme(theme) {
     try {
-      localStorage.setItem(ACCENT_THEME_KEY, theme);
+      localStorage.setItem(ACCENT_THEME_KEY, theme); backupStateToSharedCache();
     } catch {
       // Appearance persistence is optional.
     }
@@ -1079,6 +1166,7 @@
         nicknames: state.nicknames,
         pinnedPeople: Array.from(state.pinnedPeople),
       }));
+      backupStateToSharedCache();
     } catch {
       // Personalization is best-effort local state.
     }
@@ -1121,7 +1209,7 @@
   function savePersonOrders() {
     const allowed = new Set(["main", "ungrouped", ...state.groups.map(group => `group:${group.id}`)]);
     for (const scope of Object.keys(state.personOrders)) if (!allowed.has(scope)) delete state.personOrders[scope];
-    try { localStorage.setItem(PERSON_ORDER_KEY, JSON.stringify(state.personOrders)); return true; }
+    try { localStorage.setItem(PERSON_ORDER_KEY, JSON.stringify(state.personOrders)); backupStateToSharedCache(); return true; }
     catch { showToast("Order changed for this session, but could not be saved on this device."); return false; }
   }
 
@@ -1447,6 +1535,7 @@
   function saveGroupPreferences() {
     try {
       localStorage.setItem(GROUP_PREFERENCES_KEY, JSON.stringify({ groups: state.groups, showGroups: state.showGroups, hideUngrouped: state.hideUngrouped }));
+      backupStateToSharedCache();
       return true;
     } catch { showToast("Groups work for this session, but this browser couldn't save them."); return false; }
   }
@@ -2837,11 +2926,13 @@
     try {
       await idbSet(LOCAL_SCHEDULE_KEY, record);
       state.storageBackend = "indexeddb";
+      backupSavedScheduleRecord(record);
       return;
     } catch {
       try {
         fallbackWrite(record);
         state.storageBackend = "localstorage";
+        backupSavedScheduleRecord(record);
         return;
       } catch {
         state.storageBackend = "memory";
@@ -2864,6 +2955,7 @@
     } catch {
       // Nothing else to remove.
     }
+    if (removed) backupSavedScheduleRecord(null);
     return removed;
   }
 
@@ -3848,6 +3940,7 @@
         try { await saveLocalScheduleRecord(record); }
         catch (error) { migrationWarning = error.message; }
       }
+      cacheSyncRecord = JSON.parse(JSON.stringify(record));
       state.data = record.data;
       if (Object.keys(record.data.people).length) rememberScheduleHistory();
       state.hasData = true;
@@ -5180,7 +5273,7 @@
 
     els.viewToggleButton.addEventListener("click", () => {
       state.showEveryone = !state.showEveryone;
-      try { localStorage.setItem(VIEW_PREFERENCE_KEY, state.showEveryone ? "all" : "free"); }
+      try { localStorage.setItem(VIEW_PREFERENCE_KEY, state.showEveryone ? "all" : "free"); backupStateToSharedCache(); }
       catch { /* Keep the filter usable when browser storage is unavailable. */ }
       state.selectedPerson = null;
       refresh();
@@ -5196,14 +5289,16 @@
     if (!("serviceWorker" in navigator)) return;
     if (location.protocol !== "https:" && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") return;
 
-    navigator.serviceWorker.register("./service-worker.js?v=124", { updateViaCache: "none" })
+    navigator.serviceWorker.register("./service-worker.js?v=125", { updateViaCache: "none" })
       .then(registration => registration.update())
       .catch(() => {
         // The app works normally even if PWA caching isn't available.
       });
   }
 
-  function init() {
+  async function init() {
+    if ("caches" in window) await loadStateFromSharedCache();
+    state.theme = loadTheme();
     try { state.hasHadSchedules = localStorage.getItem(SCHEDULE_HISTORY_KEY) === "1"; }
     catch { /* The loaded collection also establishes schedule history. */ }
     try { state.showEveryone = localStorage.getItem(VIEW_PREFERENCE_KEY) === "all"; }
@@ -5238,6 +5333,8 @@
     openSharedLink();
 
     loadSchedulesFromDevice().then(async () => {
+      cacheSyncReady = !state.loadError && state.storageBackend !== "memory";
+      if (cacheSyncRecord) backupStateToSharedCache();
       if (state.hasData) {
         cleanPeoplePreferences();
         cleanGroupPreferences();
@@ -5263,6 +5360,7 @@
 
   init();
 })();
+
 
 
 

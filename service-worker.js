@@ -1,10 +1,10 @@
-const CACHE_NAME = "whos-free-shell-v124";
+const CACHE_NAME = "whos-free-shell-v125";
 const OCR_CACHE_NAME = "whos-free-ocr-v1";
 const APP_SHELL = [
   "./",
   "./index.html",
   "./styles.css?v=124",
-  "./app.js?v=124",
+  "./app.js?v=125",
   "./schedule-qr-batches.js?v=119",
   "./schedule-share-code.js?v=120",
   "./assets/qr/qrcodegen.js?v=90",
@@ -75,9 +75,10 @@ self.addEventListener("fetch", event => {
         return response;
       })
       .catch(async () => {
-        const cached = await caches.match(request);
+        const cache = await caches.open(CACHE_NAME);
+        const cached = await cache.match(request);
         if (cached) return cached;
-        if (request.mode === "navigate") return caches.match("./index.html");
+        if (request.mode === "navigate") return cache.match("./index.html");
         return Response.error();
       })
   );
@@ -97,6 +98,7 @@ self.addEventListener("notificationclick", event => {
     })
   );
 });
+
 
 
 
