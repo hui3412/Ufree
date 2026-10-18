@@ -125,3 +125,15 @@ test("large mixed selections remain compact, oversized schedules are explicit, a
     onProgress: info => { if (info.phase === "packing" && info.processed === 12) cancelled = true; },
   }), { name: "AbortError" });
 });
+
+
+test('a known failed complete encoding is not retried before packing subsets', async () => {
+  const calls = [];
+  const result = await pack(['A', 'B', 'C'], async names => {
+    calls.push([...names]);
+    assert.ok(names.length < 3);
+    return 'x'.repeat(names.length * 6);
+  }, { fullLink: '', maxBytes: 10 });
+  assert.deepEqual(members(result), ['A', 'B', 'C']);
+  assert.equal(result.groups.length, 3);
+});

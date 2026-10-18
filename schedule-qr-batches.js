@@ -35,9 +35,9 @@
     };
     report();
     if (!unique.length) { phase = "complete"; report(); return { groups: [], oversized: [] }; }
-    if (options.fullLink) {
+    if (typeof options.fullLink === "string") {
       const size = encoder.encode(options.fullLink).length;
-      cache.set(JSON.stringify(unique.map((_, i) => i)), { names: unique, size, link: size <= maxBytes ? options.fullLink : null });
+      cache.set(JSON.stringify(unique.map((_, i) => i)), { names: unique, size, link: options.fullLink && size <= maxBytes ? options.fullLink : null });
     }
     const full = await measure(unique);
     if (full.link) { phase = "complete"; report(); return { groups: [full], oversized: [] }; }
@@ -77,3 +77,4 @@
   globalThis.WhosFreeQrBatches = { pack };
   if (typeof module !== "undefined" && module.exports) module.exports = { pack };
 })();
+

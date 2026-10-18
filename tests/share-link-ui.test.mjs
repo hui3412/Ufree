@@ -19,7 +19,7 @@ async function app(initial = null, url = base, mobile = false) {
   let copied;
   Object.defineProperty(window.navigator, "clipboard", { value: { writeText: async value => { copied = value; } }, configurable: true });
   if (initial) window.localStorage.setItem("whos-free-local-schedules", JSON.stringify({ data: initial, meta: {} }));
-  for (const file of ["schedule-availability.js", "schedule-groups.js", "schedule-share-code.js", "assets/qr/qrcodegen.js", "app.js"]) window.eval(fs.readFileSync(new URL("../" + file, import.meta.url), "utf8"));
+  for (const file of ["schedule-availability.js", "schedule-groups.js", "schedule-share-code.js", "assets/qr/qrcodegen.js", "schedule-qr-batches.js", "app.js"]) window.eval(fs.readFileSync(new URL("../" + file, import.meta.url), "utf8"));
   const el = id => window.document.getElementById(id);
   const wait = async predicate => {
     for (let i = 0; i < 150; i++) { if (predicate()) return; await tick(); }
@@ -50,7 +50,7 @@ test("URL transport preserves compact schedules and rejects damaged links", asyn
 test("export offers a copyable Ufree link and a locally generated QR; changing selection clears both", async () => {
   const a = await app(data);
   try {
-    a.el("exportSchedulesButton").click(); a.el("selectAllSchedules").click(); a.el("generateCodeButton").click();
+    if (a.el("scheduleModal").hidden) a.el("scheduleDataButton").click(); a.el("exportSchedulesButton").click(); a.el("selectAllSchedules").click(); a.el("generateCodeButton").click();
     await a.wait(() => !a.el("generateCodeButton").disabled);
     const panel = a.el("exportSharePanel"), link = panel.querySelector("textarea").value;
     assert.equal(panel.hidden, true);
@@ -93,7 +93,7 @@ for (const url of [
       assert.ok(panel.querySelector("svg"));
     };
 
-    a.el("exportSchedulesButton").click(); a.el("selectAllSchedules").click();
+    if (a.el("scheduleModal").hidden) a.el("scheduleDataButton").click(); a.el("exportSchedulesButton").click(); a.el("selectAllSchedules").click();
     a.el("exportQrButton").click();
     await a.wait(() => !a.el("generateCodeButton").disabled);
     await checkLink(a.el("exportSharePanel"), ["Alice", "Bob"]);
@@ -225,14 +225,14 @@ test("pasted links also require confirmation and retain existing duplicate/confl
 test("oversized QR retains the complete link and code, and one-person export contains only that person", async () => {
   const a = await app(data);
   try {
-    a.el("exportSchedulesButton").click(); a.el("selectAllSchedules").click(); a.el("generateCodeButton").click();
+    if (a.el("scheduleModal").hidden) a.el("scheduleDataButton").click(); a.el("exportSchedulesButton").click(); a.el("selectAllSchedules").click(); a.el("generateCodeButton").click();
     await a.wait(() => !a.el("generateCodeButton").disabled);
     const panel = a.el("exportSharePanel"), output = panel.querySelector("textarea");
     const code = a.el("exportCodeOutput").value;
     const createLink = a.window.WhosFreeShareCode.createLink;
     a.window.WhosFreeShareCode.createLink = () => base + "#import=" + "x".repeat(2400);
     a.el("exportQrButton").click(); await a.wait(() => !a.el("generateCodeButton").disabled);
-    assert.match(panel.querySelector(".share-link-status").textContent, /Too much data/);
+    assert.match(panel.querySelector(".share-link-status").textContent, /cannot fit in a QR individually/);
     assert.equal(output.value.length > 2331, true); assert.equal(a.el("exportCodeOutput").value, code);
     a.window.WhosFreeShareCode.createLink = createLink;
     a.el("closeScheduleModal").click(); a.el("viewToggleButton").click();
@@ -263,7 +263,7 @@ test("three-dot export choices start basic and regenerate codes, links and QRs w
   const a = await app(rich);
   try {
     const before = a.stored(), options = a.el("exportFieldOptions");
-    a.el("exportSchedulesButton").click(); a.el("selectAllSchedules").click();
+    if (a.el("scheduleModal").hidden) a.el("scheduleDataButton").click(); a.el("exportSchedulesButton").click(); a.el("selectAllSchedules").click();
     assert.equal(options.open, false); assert.equal(options.querySelectorAll("input:checked").length, 0);
     a.el("generateCodeButton").click(); await a.wait(() => !a.el("generateCodeButton").disabled);
     const basicCode = a.el("exportCodeOutput").value;
@@ -281,7 +281,7 @@ test("three-dot export choices start basic and regenerate codes, links and QRs w
     assert.deepEqual(plain(exported.people), rich.people);
     a.el("exportQrButton").click(); await a.wait(() => !a.el("generateCodeButton").disabled); assert.ok(panel.querySelector("svg"));
     assert.equal(a.stored(), before);
-    a.el("closeScheduleModal").click(); a.el("scheduleDataButton").click(); a.el("exportSchedulesButton").click();
+    a.el("closeScheduleModal").click(); a.el("scheduleDataButton").click(); if (a.el("scheduleModal").hidden) a.el("scheduleDataButton").click(); a.el("exportSchedulesButton").click();
     assert.equal(options.querySelectorAll("input:checked").length, 0);
   } finally { a.window.happyDOM.abort(); }
 });
@@ -438,5 +438,6 @@ test("quick Copy Link exposes a selectable link when the clipboard is unavailabl
     a.el("closeScheduleModal").click(); assert.equal(a.el("scheduleModal").hidden, true);
   } finally { a.window.happyDOM.abort(); }
 });
+
 
 

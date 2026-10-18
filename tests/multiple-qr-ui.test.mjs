@@ -31,12 +31,13 @@ async function app(initial, url) {
   const stored = () => window.localStorage.getItem("whos-free-local-schedules");
   const links = [], generator = window.qrcodegen.QrCode, encode = generator.encodeText;
   generator.encodeText = (link, level) => { links.push(link); return encode.call(generator, link, level); };
-  const overflow = async () => {
+  const start = () => {
     el("homeExportButton").click(); el("exportFieldOptions").querySelector(".export-include-all").click();
-    el("exportQrButton").click(); await wait(() => !el("generateCodeButton").disabled);
-    assert.equal(el("multipleQrButton").hidden, false);
+    el("exportQrButton").click();
+    assert.equal(el("multipleQrButton"), null);
   };
-  return { window, el, wait, stored, links, overflow };
+  const overflow = async () => { start(); await wait(() => !el("generateCodeButton").disabled); };
+  return { window, el, wait, stored, links, overflow, start };
 }
 
 for (const base of ["https://hui3412.github.io/Ufree/", "https://youfree.ca/"]) test(`oversized selections create independent QR links on ${base}`, async () => {
@@ -46,12 +47,11 @@ for (const base of ["https://hui3412.github.io/Ufree/", "https://youfree.ca/"]) 
     await a.overflow();
     const fullCode = a.el("exportCodeOutput").value;
     const fullLink = a.el("exportSharePanel").querySelector("textarea").value;
-    assert.match(a.el("exportSharePanel").querySelector(".share-link-status").textContent, /Too much data/);
-    a.el("multipleQrButton").click(); await a.wait(() => !a.el("multipleQrButton").disabled);
+    assert.match(a.el("exportSharePanel").querySelector(".share-link-status").textContent, /independent QR codes cover all/);
     const cards = a.el("multipleQrCodes").querySelectorAll(".qr-batch-card");
     assert.ok(cards.length > 1 && cards.length < 6, "combine multiple people when they fit");
     assert.equal(a.links.length, cards.length);
-    assert.equal(a.el("multipleQrButton").getAttribute("aria-expanded"), "true");
+    assert.equal(a.el("exportQrButton").getAttribute("aria-expanded"), "true");
     assert.equal(a.el("multipleQrProgress").hidden, true);
     assert.equal(a.el("multipleQrProgress").value, 100);
     assert.equal(a.el("exportCodeOutput").value, fullCode);
@@ -84,8 +84,8 @@ for (const base of ["https://hui3412.github.io/Ufree/", "https://youfree.ca/"]) 
     a.el("exportFieldOptions").querySelector('[data-export-field="instructor"]').click();
     assert.equal(a.el("multipleQrCodes").hidden, true);
     assert.equal(a.el("multipleQrCodes").childElementCount, 0);
-    assert.equal(a.el("multipleQrButton").hidden, true);
-    assert.equal(a.el("multipleQrButton").getAttribute("aria-expanded"), "false");
+    assert.equal(a.el("multipleQrButton"), null);
+    assert.equal(a.el("exportQrButton").getAttribute("aria-expanded"), "false");
   } finally { await a.window.happyDOM.abort(); await receiver.window.happyDOM.abort(); }
 });
 
@@ -93,10 +93,9 @@ test("selection changes and closing the export discard pending QR results", asyn
   const a = await app({ people: { A: { classes: [] }, B: { classes: [] } } }, "https://youfree.ca/");
   try {
     a.window.WhosFreeShareCode.createLink = () => "https://youfree.ca/#import=" + "x".repeat(2400);
-    await a.overflow();
     let finish;
     a.window.WhosFreeQrBatches.pack = () => new Promise(resolve => { finish = resolve; });
-    a.el("multipleQrButton").click();
+    a.start();
     await a.wait(() => Boolean(finish));
     assert.equal(a.el("multipleQrProgress").hidden, false);
     a.el("exportPeopleList").querySelector("input").click();
@@ -105,10 +104,9 @@ test("selection changes and closing the export discard pending QR results", asyn
     finish({ groups: [], oversized: [] }); await tick();
     assert.equal(a.el("multipleQrCodes").hidden, true);
     assert.equal(a.el("multipleQrCodes").childElementCount, 0);
-    a.el("selectAllSchedules").click(); a.el("exportQrButton").click();
-    await a.wait(() => !a.el("generateCodeButton").disabled);
     finish = null;
-    a.el("multipleQrButton").click(); await a.wait(() => Boolean(finish)); a.el("closeScheduleModal").click();
+    a.el("selectAllSchedules").click(); a.el("exportQrButton").click();
+    await a.wait(() => Boolean(finish)); a.el("closeScheduleModal").click();
     assert.equal(a.el("multipleQrProgress").hidden, true);
     finish({ groups: [], oversized: [] }); await tick();
     assert.equal(a.el("scheduleModal").hidden, true);
@@ -121,8 +119,7 @@ test("an individually oversized person is identified instead of silently omitted
   const large = { people: { Huge: { classes: Array.from({ length: 35 }, () => ({ day: "Monday", start: "09:00", end: "10:00", course: randomText(190) })) }, Small: { classes: [] } } };
   const a = await app(large, "https://youfree.ca/");
   try {
-    await a.overflow(); a.el("multipleQrButton").click();
-    await a.wait(() => !a.el("multipleQrButton").disabled);
+    await a.overflow();
     const status = a.el("exportSharePanel").querySelector(".share-link-status");
     assert.equal(status.dataset.tone, "warning");
     assert.match(status.textContent, /1 of 2 people/); assert.match(status.textContent, /Huge cannot fit/);
@@ -135,13 +132,12 @@ test("multiple QR loading bar reflects real callbacks and ignores progress from 
   const a = await app({ people: { A: { classes: [] }, B: { classes: [] } } }, "https://youfree.ca/");
   try {
     a.window.WhosFreeShareCode.createLink = () => "https://youfree.ca/#import=" + "x".repeat(2400);
-    await a.overflow();
     let report, finish;
     a.window.WhosFreeQrBatches.pack = (names, makeLink, options) => {
       report = options.onProgress;
       return new Promise(resolve => { finish = resolve; });
     };
-    a.el("multipleQrButton").click();
+    a.start();
     assert.equal(a.el("multipleQrProgress").hidden, false);
     assert.equal(a.el("multipleQrProgress").value, 0);
     const status = a.el("exportSharePanel").querySelector(".share-link-status");
@@ -170,18 +166,92 @@ test("a failed QR generation hides the loading bar and a retry starts fresh", as
   const a = await app({ people: { A: { classes: [] }, B: { classes: [] } } }, "https://youfree.ca/");
   try {
     a.window.WhosFreeShareCode.createLink = () => "https://youfree.ca/#import=" + "x".repeat(2400);
-    await a.overflow();
     a.window.WhosFreeQrBatches.pack = async () => { throw Error("Test failure"); };
-    a.el("multipleQrButton").click(); await a.wait(() => !a.el("multipleQrButton").disabled);
+    await a.overflow();
     assert.equal(a.el("multipleQrProgress").hidden, true);
     assert.match(a.el("exportSharePanel").querySelector(".share-link-status").textContent, /Test failure/);
     let finish;
     a.window.WhosFreeQrBatches.pack = () => new Promise(resolve => { finish = resolve; });
-    a.el("multipleQrButton").click(); await a.wait(() => Boolean(finish));
+    a.el("exportQrButton").click(); await a.wait(() => Boolean(finish));
     assert.equal(a.el("multipleQrProgress").hidden, false);
     assert.equal(a.el("multipleQrProgress").value, 0);
-    finish({ groups: [], oversized: ["A", "B"] }); await a.wait(() => !a.el("multipleQrButton").disabled);
+    finish({ groups: [], oversized: ["A", "B"] }); await a.wait(() => !a.el("exportQrButton").disabled);
     assert.equal(a.el("multipleQrProgress").hidden, true);
     assert.equal(a.el("multipleQrProgress").value, 100);
+  } finally { await a.window.happyDOM.abort(); }
+});
+
+
+test('a fitting selection stays one QR without batch cards or an extra button', async () => {
+  const a = await app({ people: { Alice: { classes: [] }, Bob: { classes: [] } } }, 'https://youfree.ca/');
+  try {
+    await a.overflow();
+    assert.equal(a.links.length, 1);
+    assert.ok(a.el('exportQr').querySelector('svg'));
+    assert.equal(a.el('multipleQrCodes').hidden, true);
+    assert.equal(a.el('multipleQrCodes').childElementCount, 0);
+    assert.deepEqual(Object.keys((await a.window.WhosFreeShareCode.decode(a.links[0])).people), ['Alice', 'Bob']);
+    assert.equal(a.el('multipleQrButton'), null);
+    assert.equal(a.el('multipleQrProgress').value, 100);
+  } finally { await a.window.happyDOM.abort(); }
+});
+
+test('QR export still splits when the complete selection exceeds the share encoder limit', async () => {
+  const a = await app(data, 'https://youfree.ca/');
+  try {
+    const original = a.window.WhosFreeShareCode.encode;
+    let fullAttempts = 0;
+    a.window.WhosFreeShareCode.encode = async (input, options) => {
+      if (Object.keys(input.people).length === 6) { fullAttempts++; throw Error('This selection is too large. Export fewer schedules.'); }
+      return original(input, options);
+    };
+    await a.overflow();
+    assert.equal(fullAttempts, 1, 'do not repeat a known failed full encoding');
+    assert.ok(a.links.length > 1);
+    const names = [];
+    for (const link of a.links) names.push(...Object.keys((await a.window.WhosFreeShareCode.decode(link)).people));
+    assert.deepEqual(names.sort(), Object.keys(data.people).sort());
+    assert.equal(a.el('exportCodeOutput').value, '');
+    assert.equal(a.el('exportSharePanel').querySelector('textarea').value, '');
+  } finally { await a.window.happyDOM.abort(); }
+});
+
+test('individual sharing uses the automatic QR flow, preserves details and cancels on close', async () => {
+  const a = await app({ people: { Alice: data.people['Person 1'], Bob: { classes: [] } } }, 'https://youfree.ca/');
+  try {
+    a.el('peopleList').querySelector('[data-person="Alice"] .person-select-button').click();
+    a.el('sharePersonScheduleButton').click();
+    a.el('personQuickExportFields').querySelector('.export-include-all').click();
+    a.el('personQuickQrButton').click();
+    await a.wait(() => !a.el('personQuickQrButton').disabled);
+    assert.equal(a.links.length, 1);
+    assert.deepEqual(JSON.parse(JSON.stringify((await a.window.WhosFreeShareCode.decode(a.links[0])).people)), { Alice: data.people['Person 1'] });
+    assert.ok(a.el('personQuickQr').querySelector('svg'));
+    assert.equal(a.el('personQuickQrCodes').hidden, true);
+    a.el('personQuickExportFields').querySelector('[data-export-field="instructor"]').click();
+    assert.equal(a.el('personQuickQr').hidden, true);
+    let finish;
+    a.window.WhosFreeQrBatches.pack = () => new Promise(resolve => { finish = resolve; });
+    a.el('personQuickQrButton').click();
+    await a.wait(() => Boolean(finish));
+    a.el('closePersonQuickShare').click();
+    finish({ groups: [{ names: ['Alice'], link: a.links[0] }], oversized: [] }); await tick();
+    assert.equal(a.el('personQuickShareModal').hidden, true);
+    assert.equal(a.el('personQuickQr').childElementCount, 0);
+    assert.equal(a.el('personQuickSharePanel').querySelector('progress').hidden, true);
+  } finally { await a.window.happyDOM.abort(); }
+});
+
+test('an oversized individual receives a clear alternative and can retry with fewer details', async () => {
+  const a = await app({ people: { Huge: { classes: Array.from({ length: 35 }, () => ({ day: 'Monday', start: '09:00', end: '10:00', course: randomText(190) })) }, Bob: { classes: [] } } }, 'https://youfree.ca/');
+  try {
+    a.el('peopleList').querySelector('[data-person="Huge"] .person-select-button').click();
+    a.el('sharePersonScheduleButton').click();
+    a.el('personQuickQrButton').click(); await a.wait(() => !a.el('personQuickQrButton').disabled);
+    assert.equal(a.links.length, 0);
+    assert.match(a.el('personQuickSharePanel').querySelector('.share-link-status').textContent, /Huge cannot fit.*code or link/);
+    assert.equal(a.el('personQuickQrButton').getAttribute('aria-expanded'), 'false');
+    assert.ok(a.el('personQuickCode').value);
+    assert.ok(a.el('personQuickSharePanel').querySelector('textarea').value);
   } finally { await a.window.happyDOM.abort(); }
 });

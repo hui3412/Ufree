@@ -266,9 +266,6 @@ const SYNC_URL = 'https://youfree.ca';
     sharedImportPreview: document.getElementById("sharedImportPreview"),
     sharedImportPeople: document.getElementById("sharedImportPeople"),
     exportSharePanel: document.getElementById("exportSharePanel"),
-    multipleQrButton: document.getElementById("multipleQrButton"),
-    multipleQrCodes: document.getElementById("multipleQrCodes"),
-    multipleQrProgress: document.getElementById("multipleQrProgress"),
     exportFieldOptions: document.getElementById("exportFieldOptions"),
     codeConflictPrompt: document.getElementById("codeConflictPrompt"),
     codeConflictMessage: document.getElementById("codeConflictMessage"),
@@ -3398,9 +3395,15 @@ const SYNC_URL = 'https://youfree.ca';
   }
 
   async function generateShareCode(action = "code") {
-    if (state.isParsing || state.codeMode !== "export") return;
+    if (state.isParsing || state.qrBatchBusy || state.codeMode !== "export") return;
     const names = [...els.exportPeopleList.querySelectorAll("input:checked")].map(input => input.dataset.person);
     if (!names.length) { codeStatus(els.exportCodeStatus, "Select at least one schedule to export.", "error"); return; }
+    if (action === "qr") {
+      resetShareLink(els.exportSharePanel);
+      els.exportFieldOptions.open = false;
+      els.exportCodeField.hidden = true;
+      return generateScheduleQrs(els.exportSharePanel, names, els.exportFieldOptions, state.exportGroup);
+    }
     state.isParsing = true;
     updateScheduleModal();
     codeStatus(els.exportCodeStatus, "Creating the code on this device…");
@@ -3412,10 +3415,7 @@ const SYNC_URL = 'https://youfree.ca';
       populateShareLink(code, els.exportSharePanel);
       els.exportCodeField.hidden = action !== "code";
       codeStatus(els.exportCodeStatus, shareCodeReadyMessage(names.length, code), "success");
-      if (action === "qr") {
-        if (!els.exportSharePanel.querySelector("textarea").value) throw new Error("This code cannot make a QR. Use Export Code instead.");
-        toggleScheduleQr(els.exportSharePanel);
-      } else if (action === "link") {
+      if (action === "link") {
         if (!els.exportSharePanel.querySelector("textarea").value) throw new Error("This code cannot make a link. Use Export Code instead.");
         els.exportSharePanel.querySelector(".share-link-field").hidden = false;
         await copyScheduleLink(els.exportSharePanel);
@@ -3427,16 +3427,11 @@ const SYNC_URL = 'https://youfree.ca';
     } catch (error) {
       els.exportCodeOutput.value = "";
       codeStatus(els.exportCodeStatus, error.message || "The code could not be created.", "error");
-      if (action === "qr" && /too large|too much|export fewer/i.test(error.message || "")) {
-        els.exportSharePanel.hidden = false;
-        codeStatus(els.exportSharePanel.querySelector(".share-link-status"), names.length > 1 ? "Too much data for one QR. Select fewer schedules, copy the code or link, or export multiple QR codes." : "Too much data for one QR. Copy the code or link.", "error");
-        offerMultipleQr();
-      }
     } finally { state.isParsing = false; updateScheduleModal(); }
   }
 
   function resetShareLink(panel) {
-    if (panel === els.exportSharePanel) resetMultipleQr();
+    resetMultipleQr(panel);
     panel.hidden = true;
     panel.querySelector("textarea").value = "";
     const qr = panel.querySelector(".share-qr");
@@ -3470,30 +3465,21 @@ const SYNC_URL = 'https://youfree.ca';
     }
   }
 
-  function resetMultipleQr() {
+  function resetMultipleQr(panel) {
     state.qrBatchRequest++;
     state.qrBatchBusy = false;
-    if (els.multipleQrProgress) {
-      els.multipleQrProgress.hidden = true;
-      els.multipleQrProgress.value = 0;
-      els.multipleQrProgress.removeAttribute("aria-valuetext");
+    const progress = panel.querySelector(".qr-generation-progress");
+    if (progress) {
+      progress.hidden = true;
+      progress.value = 0;
+      progress.removeAttribute("aria-valuetext");
     }
-    if (els.multipleQrButton) {
-      els.multipleQrButton.hidden = true; els.multipleQrButton.disabled = false;
-      els.multipleQrButton.setAttribute("aria-expanded", "false");
-    }
-    if (els.multipleQrCodes) {
-      els.multipleQrCodes.hidden = true;
-      els.multipleQrCodes.removeAttribute("aria-busy");
-      els.multipleQrCodes.replaceChildren();
-    }
-  }
-
-  function offerMultipleQr() {
-    if (els.multipleQrButton && els.exportPeopleList.querySelectorAll("input:checked").length > 1) {
-      els.multipleQrButton.hidden = false;
-      els.multipleQrButton.disabled = false;
-    }
+    const batches = panel.querySelector(".multiple-qr-codes");
+    batches.hidden = true;
+    batches.removeAttribute("aria-busy");
+    batches.replaceChildren();
+    els.generateCodeButton.disabled = els.exportQrButton.disabled = els.copyExportLinkButton.disabled = state.isParsing || state.qrBatchBusy;
+    personQuickShareButtons().forEach(button => { button.disabled = state.personShareBusy; });
   }
 
   function scheduleQrSvg(link, label = "Scan to add these schedules in UFree") {
@@ -3515,46 +3501,58 @@ const SYNC_URL = 'https://youfree.ca';
     return { svg, version: code.version };
   }
 
-  async function generateMultipleQr() {
-    if (state.isParsing || state.qrBatchBusy || state.codeMode !== "export") return;
-    const names = [...els.exportPeopleList.querySelectorAll("input:checked")].map(input => input.dataset.person);
-    if (names.length < 2) return;
+  async function generateScheduleQrs(panel, names, options, group = null) {
     const request = ++state.qrBatchRequest;
-    const current = () => request === state.qrBatchRequest && state.codeMode === "export" && !els.scheduleModal.hidden;
-    const status = els.exportSharePanel.querySelector(".share-link-status");
-    const people = Object.fromEntries(names.map(name => [name, peopleMap()[name]]));
-    const fields = [...els.exportFieldOptions.querySelectorAll("input:checked")].map(input => input.dataset.exportField);
-    const sharedGroup = state.exportGroup ? { ...state.exportGroup } : null;
+    const personal = panel === els.personQuickSharePanel;
+    const current = () => request === state.qrBatchRequest && (personal
+      ? !els.personQuickShareModal.hidden && state.personShareName === names[0]
+      : state.codeMode === "export" && !els.scheduleModal.hidden);
+    const status = panel.querySelector(".share-link-status");
+    const progress = panel.querySelector(".qr-generation-progress");
+    const batches = panel.querySelector(".multiple-qr-codes");
+    const singleQr = panel.querySelector(".share-qr");
+    const output = personal ? els.personQuickCode : els.exportCodeOutput;
+    const codeOutputStatus = personal ? els.personQuickShareStatus : els.exportCodeStatus;
+    const people = JSON.parse(JSON.stringify(Object.fromEntries(names.map(name => [name, peopleMap()[name]]))));
+    const fields = [...options.querySelectorAll("input:checked")].map(input => input.dataset.exportField);
+    const sharedGroup = group ? { ...group } : null;
     state.qrBatchBusy = true;
-    els.multipleQrButton.disabled = true;
-    els.multipleQrButton.setAttribute("aria-expanded", "false");
-    els.multipleQrCodes.hidden = true;
-    els.multipleQrCodes.replaceChildren();
-    els.multipleQrCodes.setAttribute("aria-busy", "true");
+    panel.hidden = false;
+    shareQrButton(panel).setAttribute("aria-expanded", "false");
+    batches.setAttribute("aria-busy", "true");
+    progress.value = 0;
+    progress.hidden = false;
+    updateScheduleModal();
+    if (personal) personQuickShareButtons().forEach(button => { button.disabled = true; });
     const updateProgress = (value, message) => {
       if (!current()) return;
-      els.multipleQrProgress.value = Math.max(els.multipleQrProgress.value, Math.min(100, value));
-      els.multipleQrProgress.setAttribute("aria-valuetext", message);
-      const note = `${message} You can close this view to cancel.`;
-      if (status.textContent !== note) codeStatus(status, note);
+      progress.value = Math.max(progress.value, Math.min(100, value));
+      progress.setAttribute("aria-valuetext", message);
+      codeStatus(status, `${message} You can close this view to cancel.`);
     };
-    els.multipleQrProgress.value = 0;
-    els.multipleQrProgress.hidden = false;
-    updateProgress(0, `Preparing QR codes for ${names.length} people…`);
+    updateProgress(0, `Preparing QR codes for ${names.length} ${names.length === 1 ? "person" : "people"}…`);
+    codeStatus(codeOutputStatus, "Creating QR codes on this device…");
+    const makeLink = async members => {
+      try {
+        const code = await window.WhosFreeShareCode.encode({ people: Object.fromEntries(members.map(name => [name, people[name]])), ...(sharedGroup ? { shared_group: sharedGroup } : {}) }, { fields });
+        return { code, link: window.WhosFreeShareCode.createLink(code, APP_URL) };
+      } catch (error) {
+        if (/too large|too much|export fewer/i.test(error.message || "")) return null;
+        throw error;
+      }
+    };
     try {
       await new Promise(resolve => setTimeout(resolve, 0));
       if (!current()) return;
-      if (!window.WhosFreeQrBatches?.pack) throw new Error("The QR tools did not load. Refresh the app and try again.");
-      const result = await window.WhosFreeQrBatches.pack(names, async members => {
-        try {
-          const code = await window.WhosFreeShareCode.encode({ people: Object.fromEntries(members.map(name => [name, people[name]])), ...(sharedGroup ? { shared_group: sharedGroup } : {}) }, { fields });
-          return window.WhosFreeShareCode.createLink(code, APP_URL);
-        } catch (error) {
-          if (/too large|too much|export fewer/i.test(error.message || "")) return null;
-          throw error;
-        }
-      }, {
-        fullLink: els.exportSharePanel.querySelector("textarea").value,
+      if (!window.WhosFreeQrBatches?.pack || !window.qrcodegen) throw new Error("The QR tools did not load. Refresh the app and try again.");
+      const full = await makeLink(names);
+      if (!current()) return;
+      output.value = full?.code || "";
+      panel.querySelector("textarea").value = full?.link || "";
+      codeStatus(codeOutputStatus, full ? shareCodeReadyMessage(names.length, full.code) : "This selection needs separate QR codes.", full ? "success" : "");
+      const result = await window.WhosFreeQrBatches.pack(names, async members => (await makeLink(members))?.link || null, {
+        // An empty string records an oversized full encoding without retrying it.
+        fullLink: full?.link ?? "",
         isCancelled: () => !current(),
         onProgress: info => {
           const message = info.phase === "checking" ? `Checking schedules: ${info.processed} of ${names.length}…`
@@ -3564,19 +3562,30 @@ const SYNC_URL = 'https://youfree.ca';
       });
       if (!current()) return;
       updateProgress(85, `Drawing QR codes: 0 of ${result.groups.length}…`);
+      // Keep the existing uncluttered presentation when the whole selection fits.
+      if (result.groups.length === 1 && !result.oversized.length) {
+        const { svg, version } = scheduleQrSvg(result.groups[0].link);
+        singleQr.replaceChildren(svg);
+        singleQr.hidden = false;
+        progress.value = 100;
+        shareQrButton(panel).setAttribute("aria-expanded", "true");
+        codeStatus(status, version > 25 ? "Scan with your phone camera. This QR is dense; select fewer people if scanning is difficult." : "Scan with your phone camera, then open the link. Anyone with the QR or link can read these schedules.");
+        revealSection(singleQr);
+        return;
+      }
       const fragment = document.createDocumentFragment();
       const instructions = document.createElement("p");
       instructions.textContent = sharedGroup ? "Scan each QR separately, in any order. Choose Add to group to collect its listed people in the same group, or add everybody individually." : "Scan each QR separately. Its listed people are added automatically. You can scan them in any order.";
       fragment.append(instructions);
       for (let i = 0; i < result.groups.length; i++) {
         if (!current()) return;
-        const group = result.groups[i], card = document.createElement("section");
+        const item = result.groups[i], card = document.createElement("section");
         card.className = "qr-batch-card";
         const heading = document.createElement("h4");
-        heading.textContent = `QR ${i + 1} of ${result.groups.length} · ${group.names.length} ${group.names.length === 1 ? "person" : "people"}`;
-        const list = document.createElement("p"); list.textContent = group.names.map(displayName).join(", ");
+        heading.textContent = `QR ${i + 1} of ${result.groups.length} · ${item.names.length} ${item.names.length === 1 ? "person" : "people"}`;
+        const list = document.createElement("p"); list.textContent = item.names.map(displayName).join(", ");
         const qr = document.createElement("div"); qr.className = "share-qr";
-        qr.append(scheduleQrSvg(group.link, `${heading.textContent}: ${list.textContent}`).svg);
+        qr.append(scheduleQrSvg(item.link, `${heading.textContent}: ${list.textContent}`).svg);
         card.append(heading, list, qr); fragment.append(card);
         updateProgress(85 + 15 * (i + 1) / result.groups.length, `Drawing QR codes: ${i + 1} of ${result.groups.length}…`);
         await new Promise(resolve => setTimeout(resolve, 0));
@@ -3586,46 +3595,25 @@ const SYNC_URL = 'https://youfree.ca';
       const covered = names.length - result.oversized.length;
       const message = result.oversized.length
         ? `${result.groups.length} QR ${result.groups.length === 1 ? "code covers" : "codes cover"} ${covered} of ${names.length} people. ${result.oversized.map(displayName).join(", ")} cannot fit in a QR individually with these details. Share those people by code or link, or choose fewer extra details.`
-        : `${result.groups.length} independent QR ${result.groups.length === 1 ? "code covers" : "codes cover"} all ${names.length} people. Scroll down to scan each one.`;
-      els.multipleQrCodes.replaceChildren(fragment);
-      els.multipleQrCodes.hidden = result.groups.length === 0;
-      els.multipleQrButton.setAttribute("aria-expanded", String(result.groups.length > 0));
+        : `${result.groups.length} independent QR codes cover all ${names.length} people. Scroll down to scan each one.`;
+      batches.replaceChildren(fragment);
+      batches.hidden = result.groups.length === 0;
+      shareQrButton(panel).setAttribute("aria-expanded", String(result.groups.length > 0));
       codeStatus(status, message, result.oversized.length ? "warning" : "success");
-      if (result.groups.length) revealSection(els.multipleQrCodes, els.multipleQrCodes);
+      if (result.groups.length) revealSection(batches, batches);
     } catch (error) {
-      if (current()) codeStatus(status, error.message || "The QR codes could not be created. Try again, or copy a code or link.", "error");
+      if (current()) {
+        const message = error.message || "The QR codes could not be created. Try again, or copy a code or link.";
+        codeStatus(status, message, "error");
+        codeStatus(codeOutputStatus, message, "error");
+      }
     } finally {
       if (current()) {
         state.qrBatchBusy = false;
-        els.multipleQrProgress.hidden = true;
-        els.multipleQrButton.disabled = false;
-        els.multipleQrCodes.removeAttribute("aria-busy");
-      }
-    }
-  }
-
-  function toggleScheduleQr(panel) {
-    const qr = panel.querySelector(".share-qr"), button = shareQrButton(panel);
-    const staticLabel = [els.exportSharePanel, els.personQuickSharePanel].includes(panel);
-    const status = panel.querySelector(".share-link-status");
-    if (!qr.hidden) {
-      qr.hidden = true; if (!staticLabel) button.textContent = "Show QR"; button.setAttribute("aria-expanded", "false"); return;
-    }
-    const link = panel.querySelector("textarea").value;
-    if (!link) return;
-    try {
-      const { svg, version } = scheduleQrSvg(link);
-      qr.replaceChildren(svg); qr.hidden = false;
-      if (!staticLabel) button.textContent = "Hide QR"; button.setAttribute("aria-expanded", "true");
-      codeStatus(status, version > 25 ? "Scan with your phone camera. This QR is dense; select fewer people if scanning is difficult." : "Scan with your phone camera, then open the link. Anyone with the QR or link can read these schedules.");
-      revealSection(qr);
-    } catch (error) {
-      const multipleAvailable = panel === els.exportSharePanel && els.exportPeopleList.querySelectorAll("input:checked").length > 1;
-      const overflowMessage = multipleAvailable ? "Too much data for one QR. Select fewer schedules, copy the code or link, or export multiple QR codes." : "Too much data for one QR. Select fewer schedules, or copy the code or link.";
-      codeStatus(status, error instanceof RangeError ? overflowMessage : "QR could not be created. Refresh the app, or copy the link.", "error");
-      if (error instanceof RangeError && panel === els.exportSharePanel) {
-        offerMultipleQr();
-        revealSection(status, els.multipleQrButton && !els.multipleQrButton.hidden ? els.multipleQrButton : null);
+        progress.hidden = true;
+        batches.removeAttribute("aria-busy");
+        updateScheduleModal();
+        if (personal) personQuickShareButtons().forEach(button => { button.disabled = false; });
       }
     }
   }
@@ -4115,9 +4103,9 @@ const SYNC_URL = 'https://youfree.ca';
     if (els.homeImportButton) els.homeImportButton.disabled = importBusy;
     els.importCodeButton.disabled = importBusy;
     els.importScheduleImageButton.disabled = state.isParsing || Boolean(state.pendingImage) || Boolean(state.sharedImport);
-    els.generateCodeButton.disabled = state.isParsing;
-    els.exportQrButton.disabled = state.isParsing;
-    els.copyExportLinkButton.disabled = state.isParsing;
+    els.generateCodeButton.disabled = state.isParsing || state.qrBatchBusy;
+    els.exportQrButton.disabled = state.isParsing || state.qrBatchBusy;
+    els.copyExportLinkButton.disabled = state.isParsing || state.qrBatchBusy;
     els.decodeCodeButton.disabled = state.isParsing || Boolean(state.sharedImport && !els.sharedImportPeople.querySelector("input:checked"));
     els.closeImportButton.disabled = state.isParsing;
     els.importCodeInput.disabled = state.isParsing;
@@ -4299,7 +4287,13 @@ const SYNC_URL = 'https://youfree.ca';
 
   async function exportPersonQuickSchedule(action) {
     const name = state.personShareName;
-    if (!name || !peopleMap()[name] || state.personShareBusy) return;
+    if (!name || !peopleMap()[name] || state.personShareBusy || state.qrBatchBusy) return;
+    if (action === "qr") {
+      state.personShareRequest++;
+      resetPersonQuickOutputs();
+      els.personQuickExportFields.open = false;
+      return generateScheduleQrs(els.personQuickSharePanel, [name], els.personQuickExportFields);
+    }
     const request = ++state.personShareRequest;
     state.personShareBusy = true;
     personQuickShareButtons().forEach(button => { button.disabled = true; });
@@ -4320,12 +4314,9 @@ const SYNC_URL = 'https://youfree.ca';
         await copyExportCode(els.personQuickCode, els.personQuickShareStatus, () => request === state.personShareRequest);
       } else {
         if (!els.personQuickSharePanel.querySelector("textarea").value) throw new Error("Use Text Code for this schedule instead.");
-        if (action === "qr") toggleScheduleQr(els.personQuickSharePanel);
-        else {
-          els.personQuickSharePanel.querySelector(".share-link-field").hidden = false;
-          await copyScheduleLink(els.personQuickSharePanel);
-          if (request !== state.personShareRequest) return;
-        }
+        els.personQuickSharePanel.querySelector(".share-link-field").hidden = false;
+        await copyScheduleLink(els.personQuickSharePanel);
+        if (request !== state.personShareRequest) return;
       }
     } catch (error) {
       if (request === state.personShareRequest) {
@@ -5137,7 +5128,6 @@ const SYNC_URL = 'https://youfree.ca';
     });
     els.generateCodeButton.addEventListener("click", () => generateShareCode("code"));
     els.exportQrButton.addEventListener("click", () => generateShareCode("qr"));
-    els.multipleQrButton?.addEventListener("click", generateMultipleQr);
     els.copyExportLinkButton.addEventListener("click", () => generateShareCode("link"));
     for (const options of [els.exportFieldOptions, els.personQuickExportFields]) {
       const changed = options === els.exportFieldOptions ? exportSelectionChanged : personQuickFieldsChanged;
@@ -5289,7 +5279,7 @@ const SYNC_URL = 'https://youfree.ca';
     if (!("serviceWorker" in navigator)) return;
     if (location.protocol !== "https:" && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") return;
 
-    navigator.serviceWorker.register("./service-worker.js?v=125", { updateViaCache: "none" })
+    navigator.serviceWorker.register("./service-worker.js?v=126", { updateViaCache: "none" })
       .then(registration => registration.update())
       .catch(() => {
         // The app works normally even if PWA caching isn't available.
@@ -5360,6 +5350,7 @@ const SYNC_URL = 'https://youfree.ca';
 
   init();
 })();
+
 
 
 

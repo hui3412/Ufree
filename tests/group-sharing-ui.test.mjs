@@ -265,8 +265,7 @@ test("independent group QR batches scanned in reverse collect into one renamed g
     generator.encodeText = (link, level) => { links.push(link); return encode.call(generator, link, level); };
     sender.share(); sender.el("exportFieldOptions").querySelector(".export-include-all").click(); sender.el("exportQrButton").click();
     await sender.wait(() => !sender.el("generateCodeButton").disabled);
-    assert.equal(sender.el("multipleQrButton").hidden, false);
-    sender.el("multipleQrButton").click(); await sender.wait(() => !sender.el("multipleQrButton").disabled);
+    assert.equal(sender.el("multipleQrButton"), null);
     assert.ok(links.length > 1);
     for (const link of [...links].reverse()) {
       assert.ok(link.startsWith("https://youfree.ca/#import=WFL7"));
@@ -287,3 +286,4 @@ test("independent group QR batches scanned in reverse collect into one renamed g
     assert.match(receiver.el("toast").textContent, /Added 0 people/);
   } finally { await sender.window.happyDOM.abort(); await receiver.window.happyDOM.abort(); }
 });
+

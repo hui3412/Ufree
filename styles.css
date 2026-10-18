@@ -2287,8 +2287,7 @@ input[type="time"],
 .qr-generation-progress::-webkit-progress-value { background: var(--accent); border-radius: 999px; }
 .qr-generation-progress::-moz-progress-bar { background: var(--accent); border-radius: 999px; }
 
-#multipleQrButton { margin-top: 12px; }
-.multiple-qr-codes[hidden], #multipleQrButton[hidden] { display: none; }
+.multiple-qr-codes[hidden] { display: none; }
 .qr-batch-card { min-width: 0; padding: 14px; border: 1px solid var(--border); border-radius: 10px; }
 .qr-batch-card h4 { margin: 0 0 6px; }
 .qr-batch-card p { margin: 0; line-height: 1.5; overflow-wrap: anywhere; }
@@ -2975,4 +2974,5 @@ button:disabled { cursor: not-allowed; }
 .navigation-fallback .home-header-controls { position: static; width: 100%; max-width: none; padding: 0; margin-top: 16px; transform: none; visibility: visible; pointer-events: auto; box-shadow: none; overflow: visible; }
 .navigation-fallback .home-header-controls .header-actions { flex-direction: row; flex-wrap: wrap; justify-content: flex-start; }
 .navigation-fallback .home-header-controls .header-data-button { width: auto; }
+
 

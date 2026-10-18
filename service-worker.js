@@ -1,11 +1,11 @@
-const CACHE_NAME = "whos-free-shell-v125";
+const CACHE_NAME = "whos-free-shell-v126";
 const OCR_CACHE_NAME = "whos-free-ocr-v1";
 const APP_SHELL = [
   "./",
   "./index.html",
-  "./styles.css?v=124",
-  "./app.js?v=125",
-  "./schedule-qr-batches.js?v=119",
+  "./styles.css?v=126",
+  "./app.js?v=126",
+  "./schedule-qr-batches.js?v=126",
   "./schedule-share-code.js?v=120",
   "./assets/qr/qrcodegen.js?v=90",
   "./schedule-availability.js?v=90",
@@ -98,6 +98,7 @@ self.addEventListener("notificationclick", event => {
     })
   );
 });
+
 
 
 
