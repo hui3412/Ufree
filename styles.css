@@ -3007,3 +3007,20 @@ html[lang="fr"] .nav-extra-label, html[lang="fr"] .nav-button-label { min-width:
 .screenshot-guide-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; margin-top: 16px; }
 .screenshot-guide-actions button { min-height: 44px; white-space: normal; }
 @media (max-width: 480px) { .screenshot-guide-card { padding: 16px; } }
+
+/* Keep the import shortcut after the full people list in normal page flow. */
+.people-list-import {
+  display: flex;
+  justify-content: center;
+  padding: 20px 16px 24px;
+}
+#bottomImportButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  padding: 0;
+  font-size: 2rem;
+  line-height: 1;
+}

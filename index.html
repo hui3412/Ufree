@@ -32,7 +32,7 @@
   <link rel="icon" type="image/png" href="assets/icon-192.png" sizes="192x192">
   <link rel="icon" type="image/x-icon" href="favicon.ico" sizes="16x16 32x32 48x48">
   <link rel="apple-touch-icon" href="assets/apple-touch-icon.png" sizes="180x180">
-  <link rel="stylesheet" href="styles.css?v=131">
+  <link rel="stylesheet" href="styles.css?v=134">
 </head>
 <body>
   <div id="mobileNavBackdrop" class="mobile-nav-backdrop" aria-hidden="true" hidden></div>
@@ -104,6 +104,9 @@
 
         <p id="personOrderHelp" class="visually-hidden">Drag a person to change their order. On touch screens, hold the card briefly before moving; ordinary scrolling does not reorder it. With a person focused, press Alt and Up or Down arrow to move them. Pinned people stay above unpinned people; reorder within either section. Orders are saved separately for the main list and each group. Undo reverses your last order change.</p>
         <div id="peopleList" class="people-list" role="list" aria-label="People"></div>
+        <div class="people-list-import">
+          <button id="bottomImportButton" class="secondary-button" type="button" aria-label="Import" title="Import"><span aria-hidden="true">+</span></button>
+        </div>
       </section>
 
       <section id="detailPanel" class="detail-panel panel" aria-live="polite">
@@ -623,7 +626,7 @@
   <script src="assets/qr/qrcodegen.js?v=90" defer></script>
   <script src="schedule-groups.js?v=90" defer></script>
   <script src="schedule-qr-batches.js?v=126" defer></script>
-  <script src="app.js?v=133" defer></script>
+  <script src="app.js?v=134" defer></script>
 </body>
 </html>
 

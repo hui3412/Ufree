@@ -202,6 +202,7 @@ const SYNC_URL = 'https://youfree.ca';
     closeHelpModal: document.getElementById("closeHelpModal"),
     homeExportButton: document.getElementById("homeExportButton"),
     homeImportButton: document.getElementById("homeImportButton"),
+    bottomImportButton: document.getElementById("bottomImportButton"),
     undoChangesButton: document.getElementById("undoChangesButton"),
     undoScheduleChangesButton: document.getElementById("undoScheduleChangesButton"),
     undoChangesStatus: document.getElementById("undoChangesStatus"),
@@ -4200,6 +4201,7 @@ const SYNC_URL = 'https://youfree.ca';
     els.exportSchedulesButton.disabled = importBusy || peopleCount === 0;
     els.homeExportButton.disabled = importBusy || peopleCount === 0;
     if (els.homeImportButton) els.homeImportButton.disabled = importBusy;
+    if (els.bottomImportButton) els.bottomImportButton.disabled = importBusy;
     els.importCodeButton.disabled = importBusy;
     els.importScheduleImageButton.disabled = writeBlocked || state.isParsing || Boolean(state.pendingImage) || Boolean(state.sharedImport);
     els.generateCodeButton.disabled = state.isParsing || state.qrBatchBusy;
@@ -5130,6 +5132,7 @@ const SYNC_URL = 'https://youfree.ca';
     els.scheduleDataButton.addEventListener("click", openScheduleModal);
     els.homeExportButton.addEventListener("click", event => openQuickCodePanel("export", event));
     els.homeImportButton?.addEventListener("click", event => openQuickCodePanel("import", event));
+    els.bottomImportButton?.addEventListener("click", event => openQuickCodePanel("import", event));
     els.helpButton.addEventListener("click", openHelp);
     els.closeHelpModal.addEventListener("click", closeHelp);
     els.helpModal.addEventListener("click", event => { if (event.target === els.helpModal) closeHelp(); });
@@ -5384,7 +5387,7 @@ const SYNC_URL = 'https://youfree.ca';
     if (!("serviceWorker" in navigator)) return;
     if (location.protocol !== "https:" && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") return;
 
-    navigator.serviceWorker.register("./service-worker.js?v=133", { updateViaCache: "none" })
+    navigator.serviceWorker.register("./service-worker.js?v=134", { updateViaCache: "none" })
       .then(registration => registration.update())
       .catch(() => {
         // The app works normally even if PWA caching isn't available.
