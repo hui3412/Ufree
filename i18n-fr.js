@@ -610,7 +610,6 @@ window.UFreeFrench = {
     "Example of a clear weekly timetable with all weekday headings, times, and class blocks visible.": "Exemple d’un horaire hebdomadaire net où tous les jours, les heures et les blocs de cours sont visibles.",
     "Example screenshot: include the complete timetable.": "Exemple de capture d’écran : incluez l’horaire en entier.",
     "Before your first screenshot": "Avant votre première capture d’écran",
-    "Take a moment to look at this example before choosing your screenshot. You will only need to do this once on this device.": "Prenez un moment pour regarder cet exemple avant de choisir votre capture d’écran. Cette étape n’est nécessaire qu’une seule fois sur cet appareil.",
     "Loading the screenshot example…": "Chargement de l’exemple de capture d’écran…",
     "Choose screenshot": "Choisir une capture d’écran",
     "Keep the example visible to continue.": "Gardez l’exemple visible pour continuer.",
