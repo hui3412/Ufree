@@ -43,7 +43,8 @@ for (const mobile of [false, true]) test(`one Import panel offers image above co
     a.open();
     await tick();
     assert.equal(a.el("scheduleModalTitle").textContent, "Import");
-    assert.equal(a.el("codeImportPanel").firstElementChild, a.el("importScheduleImageButton"));
+    assert.ok(a.el("codeImportPanel").firstElementChild.hasAttribute("data-screenshot-example"));
+    assert.equal(a.el("codeImportPanel").firstElementChild.nextElementSibling.id, "importScheduleImageButton");
     assert.ok(a.el("importScheduleImageButton").compareDocumentPosition(a.el("importCodeField")) & a.window.Node.DOCUMENT_POSITION_FOLLOWING);
     assert.equal(a.el("importCodeField").closest("[hidden]"), null);
     assert.equal(a.window.document.activeElement, a.el("importScheduleImageButton"));

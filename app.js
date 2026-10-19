@@ -2322,10 +2322,19 @@ const SYNC_URL = 'https://youfree.ca';
     els.schedulePdfInput.click();
   }
 
-  function chooseScheduleImage() {
+  function chooseScheduleImage(event) {
     if (!schedulesWritable() || state.isParsing || state.pendingImage) return;
-    els.scheduleImageInput.value = "";
-    els.scheduleImageInput.click();
+    const openPicker = () => {
+      if (!schedulesWritable() || state.isParsing || state.pendingImage) return;
+      els.scheduleImageInput.value = "";
+      els.scheduleImageInput.click();
+    };
+    if (window.UFreeScreenshotGuide) {
+      window.UFreeScreenshotGuide.choose(openPicker, {
+        firstSchedule: !state.hasHadSchedules && Object.keys(peopleMap()).length === 0,
+        returnFocus: event?.currentTarget || document.activeElement,
+      });
+    } else openPicker();
   }
 
   function startImportProgress(message, pictureName = false, title = "Importing schedules") {
@@ -5375,7 +5384,7 @@ const SYNC_URL = 'https://youfree.ca';
     if (!("serviceWorker" in navigator)) return;
     if (location.protocol !== "https:" && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") return;
 
-    navigator.serviceWorker.register("./service-worker.js?v=130", { updateViaCache: "none" })
+    navigator.serviceWorker.register("./service-worker.js?v=131", { updateViaCache: "none" })
       .then(registration => registration.update())
       .catch(() => {
         // The app works normally even if PWA caching isn't available.
@@ -5446,6 +5455,7 @@ const SYNC_URL = 'https://youfree.ca';
 
   init();
 })();
+
 
 
 

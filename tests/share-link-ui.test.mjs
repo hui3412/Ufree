@@ -384,7 +384,8 @@ for (const mobile of [false, true]) test(`menu Import shares the existing import
     assert.ok(a.el("homeImportButton").querySelector("svg"));
     open();
     assert.equal(a.el("importScheduleImageButton").closest("[hidden]"), null);
-    assert.equal(a.el("codeImportPanel").firstElementChild, a.el("importScheduleImageButton"));
+    assert.ok(a.el("codeImportPanel").firstElementChild.hasAttribute("data-screenshot-example"));
+    assert.equal(a.el("codeImportPanel").firstElementChild.nextElementSibling.id, "importScheduleImageButton");
     a.el("closeImportButton").click();
     assert.equal(a.el("scheduleModal").hidden, true);
     assert.equal(a.window.document.activeElement.id, trigger);
