@@ -4,6 +4,27 @@ const SYNC_URL = 'https://youfree.ca';
 (() => {
   "use strict";
 
+
+  // Presentation-only translation. Stored schedules and sharing formats remain canonical.
+  const translateUi = value => window.UFreeI18n?.translate(value) ?? value;
+  const setUiText = (node, value, translate = true) => window.UFreeI18n
+    ? window.UFreeI18n.setText(node, value, translate) : (node.textContent = value);
+  const sourceUiText = node => window.UFreeI18n?.sourceText(node) ?? node.textContent;
+  const setUiAttribute = (node, name, value, translate = true) => window.UFreeI18n
+    ? window.UFreeI18n.setAttribute(node, name, value, translate) : node.setAttribute(name, value);
+  const sourceUiAttribute = (node, name) => window.UFreeI18n?.sourceAttribute(node, name) ?? node.getAttribute(name);
+  const setUiHtml = (node, html) => { node.innerHTML = html; window.UFreeI18n?.localize(node); };
+
+  const setUiParts = (node, parts, separator = "", attribute = null) => {
+    if (window.UFreeI18n) window.UFreeI18n.setParts(node, parts, separator, attribute);
+    else if (attribute) node.setAttribute(attribute, parts.map(part => part.text).join(separator));
+    else node.textContent = parts.map(part => part.text).join(separator);
+  };
+  const classUiParts = c => [
+    { text: c?.course || "Class", translate: !c?.course },
+    { text: c?.room ? ` · ${c.room}` : "", translate: false },
+  ];
+
   const WORK_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
   const ALL_DAYS = [...WORK_DAYS, "Saturday", "Sunday"];
 
@@ -612,6 +633,8 @@ const SYNC_URL = 'https://youfree.ca';
   }
 
   async function showSystemNotification(title, options = {}) {
+    title = translateUi(title);
+    options = { ...options, ...(options.body ? { body: translateUi(options.body) } : {}) };
     if (!("Notification" in window) || Notification.permission !== "granted") return false;
 
     try {
@@ -771,13 +794,13 @@ const SYNC_URL = 'https://youfree.ca';
   function renderNotificationPeople() {
     const names = Object.keys(peopleMap()).sort(comparePeopleNames);
     const openNicknames = new Set(Array.from(els.notificationPeopleList.querySelectorAll(".nickname-disclosure[open]"), editor => editor.dataset.person));
-    els.notificationPeopleCount.textContent = String(names.length);
+    setUiText(els.notificationPeopleCount, String(names.length), false);
     els.notificationPeopleList.replaceChildren();
 
     if (!names.length) {
       const empty = document.createElement("p");
       empty.className = "people-manager-empty";
-      empty.textContent = "Add a schedule before personalizing people.";
+      setUiText(empty, "Add a schedule before personalizing people.");
       els.notificationPeopleList.append(empty);
       return;
     }
@@ -797,7 +820,7 @@ const SYNC_URL = 'https://youfree.ca';
 
       const title = document.createElement("div");
       title.className = "notification-person-name";
-      title.textContent = displayName(name);
+      setUiText(title, displayName(name), false);
 
       const meta = document.createElement("div");
       meta.className = "notification-person-meta";
@@ -806,7 +829,8 @@ const SYNC_URL = 'https://youfree.ca';
       if (nickname) parts.push(name);
       parts.push(pinned ? "Pinned to top" : `${longBreaks} long break${longBreaks === 1 ? "" : "s"}`);
       if (muted) parts.push("alerts muted");
-      meta.textContent = parts.join(" · ");
+      if (window.UFreeI18n) window.UFreeI18n.setParts(meta, parts.map((text, index) => ({ text, translate: !nickname || index > 0 })));
+      else setUiText(meta, parts.join(" · "), false);
       copy.append(title, meta);
 
       const actions = document.createElement("div");
@@ -815,19 +839,19 @@ const SYNC_URL = 'https://youfree.ca';
       const pin = document.createElement("button");
       pin.type = "button";
       pin.className = `preference-icon-button pin-button${pinned ? " active" : ""}`;
-      pin.textContent = "📌";
+      setUiText(pin, "📌");
       pin.setAttribute("aria-pressed", String(pinned));
-      pin.setAttribute("aria-label", pinned ? `Unpin ${displayName(name)}` : `Pin ${displayName(name)} to the top`);
-      pin.title = pinned ? "Unpin" : "Pin to top";
+      setUiAttribute(pin, "aria-label", pinned ? `Unpin ${displayName(name)}` : `Pin ${displayName(name)} to the top`);
+      setUiAttribute(pin, "title", pinned ? "Unpin" : "Pin to top");
       pin.addEventListener("click", () => togglePersonPin(name, pin));
 
       const bell = document.createElement("button");
       bell.type = "button";
       bell.className = `bell-button${muted ? " muted" : ""}`;
-      bell.textContent = muted ? "🔕" : "🔔";
+      setUiText(bell, muted ? "🔕" : "🔔");
       bell.setAttribute("aria-pressed", String(muted));
-      bell.setAttribute("aria-label", muted ? `Unmute break notifications for ${displayName(name)}` : `Mute break notifications for ${displayName(name)}`);
-      bell.title = muted ? "Unmute break notifications" : "Mute break notifications";
+      setUiAttribute(bell, "aria-label", muted ? `Unmute break notifications for ${displayName(name)}` : `Mute break notifications for ${displayName(name)}`);
+      setUiAttribute(bell, "title", muted ? "Unmute break notifications" : "Mute break notifications");
       bell.addEventListener("click", () => togglePersonMute(name, bell));
 
       actions.append(pin, bell);
@@ -837,16 +861,16 @@ const SYNC_URL = 'https://youfree.ca';
       nicknameRow.className = "nickname-row";
       const nicknameLabel = document.createElement("span");
       nicknameLabel.className = "nickname-label visually-hidden";
-      nicknameLabel.textContent = "Nickname";
+      setUiText(nicknameLabel, "Nickname");
       const input = document.createElement("input");
       input.type = "text";
       input.className = "nickname-input";
       input.maxLength = 30;
-      input.placeholder = "Use full name";
+      setUiAttribute(input, "placeholder", "Use full name");
       input.value = nickname;
       input.autocomplete = "off";
       input.spellcheck = false;
-      input.setAttribute("aria-label", `Nickname for ${name}`);
+      setUiAttribute(input, "aria-label", `Nickname for ${name}`);
 
       const saveValue = () => {
         const next = input.value.trim();
@@ -869,7 +893,7 @@ const SYNC_URL = 'https://youfree.ca';
       nicknameEditor.dataset.person = name;
       nicknameEditor.open = openNicknames.has(name);
       const nicknameSummary = document.createElement("summary");
-      nicknameSummary.textContent = nickname ? "Edit nickname" : "Add nickname";
+      setUiText(nicknameSummary, nickname ? "Edit nickname" : "Add nickname");
       nicknameEditor.append(nicknameSummary, nicknameRow);
       row.append(top, nicknameEditor);
       els.notificationPeopleList.append(row);
@@ -886,7 +910,7 @@ const SYNC_URL = 'https://youfree.ca';
 
     els.breakNotificationToggle.checked = state.notificationsEnabled;
     const support = notificationSupportText();
-    els.notificationPermissionStatus.textContent = support.text;
+    setUiText(els.notificationPermissionStatus, support.text);
     els.notificationPermissionStatus.dataset.tone = support.tone;
     els.testNotificationButton.disabled = !("Notification" in window) || Notification.permission !== "granted";
 
@@ -1033,12 +1057,12 @@ const SYNC_URL = 'https://youfree.ca';
     const label = change ? `Undo: ${change.label}` : "No recent changes to undo";
     for (const button of [els.undoChangesButton, els.undoScheduleChangesButton]) {
       button.disabled = busy || !change;
-      button.title = label;
-      button.setAttribute("aria-label", label);
+      setUiAttribute(button, "title", label);
+      setUiAttribute(button, "aria-label", label);
     }
-    els.undoChangesStatus.textContent = change
+    setUiText(els.undoChangesStatus, change
       ? `Last change: ${change.label}. ${state.recentChanges.length} change${state.recentChanges.length === 1 ? "" : "s"} available to undo until you reload.`
-      : "No recent changes. Undo keeps the last 20 schedule or order changes until you reload.";
+      : "No recent changes. Undo keeps the last 20 schedule or order changes until you reload.");
   }
 
   function restoreSchedulePreferences(change) {
@@ -1415,7 +1439,7 @@ const SYNC_URL = 'https://youfree.ca';
     card.dataset.person = name;
     card.dataset.orderScope = scope;
     card.draggable = !window.matchMedia("(pointer: coarse)").matches;
-    card.title = "Drag to reorder, or hold then move on touch screens. Keyboard: Alt + Up or Down arrow.";
+    setUiAttribute(card, "title", "Drag to reorder, or hold then move on touch screens. Keyboard: Alt + Up or Down arrow.");
     card.setAttribute("aria-keyshortcuts", "Alt+ArrowUp Alt+ArrowDown");
     card.setAttribute("aria-describedby", "personOrderHelp");
     card.addEventListener("dragstart", event => {
@@ -1559,7 +1583,7 @@ const SYNC_URL = 'https://youfree.ca';
     if (els.groupsModal.hidden) section?.querySelector(".group-hide")?.focus({ preventScroll: true });
     else {
       renderGroupsManager();
-      [...els.groupsManagerList.querySelectorAll("button")].find(button => button.getAttribute("aria-label") === `${hidden ? "Show" : "Hide"} group ${group?.name}`)?.focus();
+      [...els.groupsManagerList.querySelectorAll("button")].find(button => sourceUiAttribute(button, "aria-label") === `${hidden ? "Show" : "Hide"} group ${group?.name}`)?.focus();
     }
   }
 
@@ -1598,7 +1622,7 @@ const SYNC_URL = 'https://youfree.ca';
     mobileNavigation.setAttribute("aria-hidden", "true");
     mobileNavBackdrop.hidden = true;
     mobileMenuButton.setAttribute("aria-expanded", "false");
-    mobileMenuButton.setAttribute("aria-label", "Open main menu");
+    setUiAttribute(mobileMenuButton, "aria-label", "Open main menu");
     for (const { element, inert } of mobileNavBackground) {
       if (!inert) element.removeAttribute("inert");
     }
@@ -1639,7 +1663,7 @@ const SYNC_URL = 'https://youfree.ca';
     mobileNavigation.classList.add("is-open");
     mobileNavBackdrop.hidden = false;
     mobileMenuButton.setAttribute("aria-expanded", "true");
-    mobileMenuButton.setAttribute("aria-label", "Close main menu");
+    setUiAttribute(mobileMenuButton, "aria-label", "Close main menu");
     closeMobileMenuButton.focus({ preventScroll: true });
   }
 
@@ -1736,31 +1760,31 @@ const SYNC_URL = 'https://youfree.ca';
   }
 
   function setViewToggle(button, label, pressed) {
-    button.setAttribute("aria-label", label); button.title = label;
+    setUiAttribute(button, "aria-label", label); setUiAttribute(button, "title", label);
     button.setAttribute("aria-pressed", String(pressed));
-    button.querySelector("[data-toggle-label]").textContent = label;
+    setUiText(button.querySelector("[data-toggle-label]"), label);
   }
 
   function renderGroupsManager() {
     els.groupsManagerList.replaceChildren();
     if (!state.groups.length) {
       const text = document.createElement("p");
-      text.textContent = "Create a group to find a time everyone can meet.";
+      setUiText(text, "Create a group to find a time everyone can meet.");
       els.groupsManagerList.append(text);
     }
     for (const group of state.groups) {
       const row = document.createElement("div"); row.className = "group-manager-row";
       const copy = document.createElement("div");
-      const title = document.createElement("strong"); title.textContent = group.name;
+      const title = document.createElement("strong"); setUiText(title, group.name, false);
       const members = document.createElement("small");
-      members.textContent = `${groupMembers(group).length} people${group.hidden ? " · Collapsed" : ""}`;
+      setUiText(members, `${groupMembers(group).length} people${group.hidden ? " · Collapsed" : ""}`);
       copy.append(title, members);
       const actions = document.createElement("div"); actions.className = "group-manager-actions";
       for (const [text, action] of [
         ["Edit", () => editGroup(group.id)],
         [group.hidden ? "Show" : "Hide", () => setGroupHidden(group, !group.hidden)],
         ["Delete", () => {
-          if (!window.confirm(`Delete the group “${group.name}”? Its people's schedules will stay on this device.`)) return;
+          if (!window.confirm(translateUi(`Delete the group “${group.name}”? Its people's schedules will stay on this device.`))) return;
           state.groups = state.groups.filter(item => item.id !== group.id);
           if (state.editingGroupId === group.id) cancelGroupEdit();
           saveGroupPreferences(); renderGroupsManager(); refresh({ preserveScroll: true });
@@ -1768,7 +1792,7 @@ const SYNC_URL = 'https://youfree.ca';
       ]) {
         const button = document.createElement("button"); button.type = "button";
         button.className = text === "Delete" ? "mini-danger-button" : "secondary-button compact";
-        button.textContent = text; button.setAttribute("aria-label", `${text} group ${group.name}`);
+        setUiText(button, text); setUiAttribute(button, "aria-label", `${text} group ${group.name}`);
         button.addEventListener("click", action); actions.append(button);
       }
       row.append(copy, actions); els.groupsManagerList.append(row);
@@ -1787,12 +1811,12 @@ const SYNC_URL = 'https://youfree.ca';
       return;
     }
     const members = document.createElement("div"); members.className = "group-current-members";
-    members.setAttribute("role", "list"); members.setAttribute("aria-label", "Current group members");
+    members.setAttribute("role", "list"); setUiAttribute(members, "aria-label", "Current group members");
     const selected = names.filter(name => state.editingGroupMembers.has(name));
     for (const [index, name] of selected.entries()) {
       const row = document.createElement("div"); row.className = "group-member-row";
       row.setAttribute("role", "listitem"); row.dataset.person = name;
-      const label = document.createElement("span"); label.className = "group-member-name"; label.textContent = displayName(name);
+      const label = document.createElement("span"); label.className = "group-member-name"; setUiText(label, displayName(name), false);
       const remove = iconAction(`Remove ${displayName(name)} from group`, "M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7", "person-delete-button group-remove-member");
       remove.addEventListener("click", () => {
         const additionsOpen = els.groupMembersList.querySelector("details")?.open;
@@ -1805,10 +1829,10 @@ const SYNC_URL = 'https://youfree.ca';
       row.append(label, remove); members.append(row);
     }
     if (!selected.length) {
-      const empty = document.createElement("p"); empty.className = "group-editor-empty"; empty.textContent = "No members. Use Add people to choose someone."; members.append(empty);
+      const empty = document.createElement("p"); empty.className = "group-editor-empty"; setUiText(empty, "No members. Use Add people to choose someone."); members.append(empty);
     }
     const additions = document.createElement("details"); additions.className = "group-add-people";
-    const summary = document.createElement("summary"); summary.textContent = "Add people"; additions.append(summary);
+    const summary = document.createElement("summary"); setUiText(summary, "Add people"); additions.append(summary);
     const available = names.filter(name => !state.editingGroupMembers.has(name));
     for (const name of available) {
       const label = document.createElement("label"); label.className = "share-selection";
@@ -1821,7 +1845,7 @@ const SYNC_URL = 'https://youfree.ca';
       });
       label.append(input, document.createTextNode(displayName(name))); additions.append(label);
     }
-    if (!available.length) { const empty = document.createElement("p"); empty.textContent = "Everyone is already in this group."; additions.append(empty); }
+    if (!available.length) { const empty = document.createElement("p"); setUiText(empty, "Everyone is already in this group."); additions.append(empty); }
     els.groupMembersList.append(members, additions);
   }
 
@@ -1831,11 +1855,11 @@ const SYNC_URL = 'https://youfree.ca';
     state.editingGroupMembers = group ? new Set(groupMembers(group)) : null;
     els.groupForm.hidden = false;
     els.groupsManagerList.hidden = true; els.newGroupButton.hidden = true;
-    document.getElementById("groupsModalTitle").textContent = group ? "Edit Group" : "Manage groups";
-    els.groupFormTitle.textContent = group ? "Members" : "New group";
+    setUiText(document.getElementById("groupsModalTitle"), group ? "Edit Group" : "Manage groups");
+    setUiText(els.groupFormTitle, group ? "Members" : "New group");
     els.groupNameInput.value = group?.name || "";
-    els.groupFormError.textContent = "";
-    els.groupMembersInstructions.textContent = group ? "Remove members below, or expand Add people. Changes apply when you save." : "Choose members.";
+    setUiText(els.groupFormError, "");
+    setUiText(els.groupMembersInstructions, group ? "Remove members below, or expand Add people. Changes apply when you save." : "Choose members.");
     renderGroupEditorMembers();
     revealSection(els.groupForm, els.groupNameInput);
   }
@@ -1843,16 +1867,16 @@ const SYNC_URL = 'https://youfree.ca';
   function cancelGroupEdit() {
     els.groupForm.hidden = true; state.editingGroupId = null; state.editingGroupMembers = null;
     els.groupsManagerList.hidden = false; els.newGroupButton.hidden = false;
-    document.getElementById("groupsModalTitle").textContent = "Manage groups";
+    setUiText(document.getElementById("groupsModalTitle"), "Manage groups");
     els.newGroupButton.focus();
   }
 
   function saveGroup(event) {
     event.preventDefault();
     const name = els.groupNameInput.value.trim().slice(0, 60);
-    if (!name) { els.groupFormError.textContent = "Enter a group name."; els.groupNameInput.focus(); return; }
+    if (!name) { setUiText(els.groupFormError, "Enter a group name."); els.groupNameInput.focus(); return; }
     if (state.groups.some(group => group.id !== state.editingGroupId && group.name.normalize("NFC").toLowerCase() === name.normalize("NFC").toLowerCase())) {
-      els.groupFormError.textContent = "A group already uses this name. Choose another name."; return;
+      setUiText(els.groupFormError, "A group already uses this name. Choose another name."); return;
     }
     const members = state.editingGroupId
       ? [...state.editingGroupMembers].filter(person => Object.hasOwn(peopleMap(), person))
@@ -1860,7 +1884,7 @@ const SYNC_URL = 'https://youfree.ca';
     const existing = state.groups.find(group => group.id === state.editingGroupId);
     if (existing) { existing.name = name; existing.members = members; }
     else {
-      if (state.groups.length >= 100) { els.groupFormError.textContent = "You can save up to 100 groups."; return; }
+      if (state.groups.length >= 100) { setUiText(els.groupFormError, "You can save up to 100 groups."); return; }
       if (!state.groups.length) state.showGroups = true;
       const id = window.crypto?.randomUUID?.() || `group-${Date.now()}-${Math.random().toString(36).slice(2)}`;
       state.groups.push({ id, name, members, hidden: false });
@@ -1910,33 +1934,33 @@ const SYNC_URL = 'https://youfree.ca';
     section.classList.toggle("group-collapsed", collapsed);
     const header = document.createElement("div"); header.className = "people-group-header";
     const copy = document.createElement("div");
-    const heading = document.createElement("h3"); heading.textContent = title;
+    const heading = document.createElement("h3"); setUiText(heading, title, !group);
     const count = document.createElement("small");
-    count.textContent = `${members.filter(name => isFree(name, day, minute)).length} of ${members.length} free`;
+    setUiText(count, `${members.filter(name => isFree(name, day, minute)).length} of ${members.length} free`);
     copy.append(heading, count);
     const actions = document.createElement("div"); actions.className = "people-group-actions";
     const hide = document.createElement("button"); hide.type = "button";
     hide.className = "secondary-button group-hide";
-    hide.textContent = collapsed ? "Show" : "Hide";
-    hide.title = `${collapsed ? "Show" : "Hide"} group ${title}`;
-    hide.setAttribute("aria-label", hide.title);
+    setUiText(hide, collapsed ? "Show" : "Hide");
+    setUiAttribute(hide, "title", `${collapsed ? "Show" : "Hide"} group ${title}`);
+    setUiAttribute(hide, "aria-label", sourceUiAttribute(hide, "title"));
     hide.setAttribute("aria-expanded", String(!collapsed));
     hide.addEventListener("click", () => setGroupHidden(group, !collapsed));
     actions.append(hide);
     if (group) {
       const menu = document.createElement("details"); menu.className = "group-options";
-      const more = document.createElement("summary"); more.className = "secondary-button group-more"; more.textContent = "…";
-      more.title = `Options for group ${group.name}`; more.setAttribute("aria-label", more.title);
+      const more = document.createElement("summary"); more.className = "secondary-button group-more"; setUiText(more, "…");
+      setUiAttribute(more, "title", `Options for group ${group.name}`); setUiAttribute(more, "aria-label", sourceUiAttribute(more, "title"));
       const options = document.createElement("div"); options.className = "group-options-panel";
       const top = document.createElement("button"); top.type = "button"; top.className = "secondary-button";
-      top.textContent = "Send group to top"; top.setAttribute("aria-label", `Send group ${group.name} to top`);
+      setUiText(top, "Send group to top"); setUiAttribute(top, "aria-label", `Send group ${group.name} to top`);
       top.disabled = state.groups[0]?.id === group.id;
       top.addEventListener("click", () => { menu.open = false; sendGroupToTop(group); });
       const week = document.createElement("button"); week.type = "button"; week.className = "secondary-button";
-      week.textContent = "Weekly availability"; week.setAttribute("aria-label", `View weekly availability for ${group.name}`);
+      setUiText(week, "Weekly availability"); setUiAttribute(week, "aria-label", `View weekly availability for ${group.name}`);
       week.addEventListener("click", () => { menu.open = false; openGroupWeek(group.id, more); });
       const share = document.createElement("button"); share.type = "button"; share.className = "secondary-button";
-      share.textContent = "Share Group"; share.setAttribute("aria-label", `Share group ${group.name}`);
+      setUiText(share, "Share Group"); setUiAttribute(share, "aria-label", `Share group ${group.name}`);
       share.dataset.shareGroup = group.id;
       share.disabled = !members.length || state.isParsing || Boolean(state.pendingImage) || Boolean(state.codeMode);
       share.addEventListener("click", () => { menu.open = false; openGroupShare(group, more); });
@@ -1945,14 +1969,14 @@ const SYNC_URL = 'https://youfree.ca';
     header.append(copy, actions);
     section.append(header);
     if (collapsed) return section;
-    const list = document.createElement("div"); list.setAttribute("role", "list"); list.setAttribute("aria-label", `${title} people`);
+    const list = document.createElement("div"); list.setAttribute("role", "list"); setUiAttribute(list, "aria-label", `${title} people`);
     const filtered = visible.filter(name => members.includes(name));
     const scope = group ? `group:${group.id}` : "ungrouped";
     const shown = new Set(filtered);
     orderScopeMembers(scope).filter(name => shown.has(name)).forEach(name => list.append(renderPersonCard(name, day, minute, scope)));
     if (!filtered.length) {
       const message = document.createElement("p"); message.className = "group-empty";
-      message.textContent = state.peopleSearchQuery.trim() ? "No matching people in this view." : members.length ? "Nobody in this group is free at this time. Choose Show everyone to see them." : "No people in this group. Edit it to add members.";
+      setUiText(message, state.peopleSearchQuery.trim() ? "No matching people in this view." : members.length ? "Nobody in this group is free at this time. Choose Show everyone to see them." : "No people in this group. Edit it to add members.");
       list.append(message);
     }
     section.append(list);
@@ -1984,19 +2008,19 @@ const SYNC_URL = 'https://youfree.ca';
   function showGroupSlot(day, segment, total, button) {
     els.groupWeekGrid.querySelectorAll(".group-time-block").forEach(item => item.setAttribute("aria-pressed", String(item === button)));
     const title = document.createElement("h3");
-    title.textContent = `${day} · ${formatTime(minuteTime(segment.start))}–${formatTime(minuteTime(segment.end))}`;
+    setUiText(title, `${day} · ${formatTime(minuteTime(segment.start))}–${formatTime(minuteTime(segment.end))}`);
     els.groupSlotDetails.replaceChildren(title);
     const parts = segment.exact || [segment];
     if (parts.length > 1) {
-      const note = document.createElement("p"); note.textContent = "Short transitions are blended in the grid. Exact availability:";
+      const note = document.createElement("p"); setUiText(note, "Short transitions are blended in the grid. Exact availability:");
       els.groupSlotDetails.append(note);
     }
     for (const part of parts) {
       const wrapper = document.createElement("section"); wrapper.className = "group-exact-period";
       const summary = document.createElement("p");
-      summary.textContent = `${parts.length > 1 ? `${formatTime(minuteTime(part.start))}–${formatTime(minuteTime(part.end))} · ` : ""}${groupBlockLabel(part, total)} · ${part.end - part.start} minutes`;
-      const free = document.createElement("p"); free.textContent = `Free: ${part.available.map(displayName).join(", ") || "Nobody"}`;
-      const busy = document.createElement("p"); busy.textContent = `Busy: ${part.unavailable.map(displayName).join(", ") || "Nobody"}`;
+      setUiText(summary, `${parts.length > 1 ? `${formatTime(minuteTime(part.start))}–${formatTime(minuteTime(part.end))} · ` : ""}${groupBlockLabel(part, total)} · ${part.end - part.start} minutes`);
+      const free = document.createElement("p"); setUiParts(free, [{ text: "Free: ", translate: true }, { text: part.available.map(displayName).join(", ") || "Nobody", translate: !part.available.length }]);
+      const busy = document.createElement("p"); setUiParts(busy, [{ text: "Busy: ", translate: true }, { text: part.unavailable.map(displayName).join(", ") || "Nobody", translate: !part.unavailable.length }]);
       wrapper.append(summary, free, busy); els.groupSlotDetails.append(wrapper);
     }
     revealSection(els.groupSlotDetails);
@@ -2007,8 +2031,8 @@ const SYNC_URL = 'https://youfree.ca';
     if (!group) return;
     state.weekGroupId = id; state.groupReturnFocus = trigger;
     const weekly = window.WhosFreeGroups.week(group, peopleMap()), total = weekly.members.length;
-    els.groupWeekTitle.textContent = `${group.name} · Weekly availability`;
-    els.groupWeekSummary.textContent = `${total} ${total === 1 ? "person" : "people"} · ${formatTime(minuteTime(weekly.start))}–${formatTime(minuteTime(weekly.end))} school hours. Shared break suggestions need more than 10 minutes.`;
+    setUiText(els.groupWeekTitle, `${group.name} · Weekly availability`);
+    setUiText(els.groupWeekSummary, `${total} ${total === 1 ? "person" : "people"} · ${formatTime(minuteTime(weekly.start))}–${formatTime(minuteTime(weekly.end))} school hours. Shared break suggestions need more than 10 minutes.`);
     els.groupWeekLegend.replaceChildren();
     for (const fraction of [0, 0.25, 0.5, 0.75, 1]) {
       const label = document.createElement("span"), swatch = document.createElement("i");
@@ -2021,13 +2045,13 @@ const SYNC_URL = 'https://youfree.ca';
     els.groupWeekGrid.style.minWidth = `${54 + weekly.days.length * 140}px`;
     const axis = document.createElement("div"); axis.className = "review-time-axis";
     for (const minute of [weekly.start, ...Array.from({ length: 12 }, (_, i) => (i + 9) * 60).filter(value => value < weekly.end - 25), weekly.end]) {
-      const label = document.createElement("span"); label.textContent = minuteTime(minute);
+      const label = document.createElement("span"); setUiText(label, minuteTime(minute));
       label.style.top = `${minute - weekly.start + 48}px`; axis.append(label);
     }
     els.groupWeekGrid.append(axis);
     for (const day of weekly.days) {
       const column = document.createElement("div"); column.className = "review-day";
-      const heading = document.createElement("div"); heading.className = "review-day-heading group-day-heading"; heading.textContent = day;
+      const heading = document.createElement("div"); heading.className = "review-day-heading group-day-heading"; setUiText(heading, day);
       const track = document.createElement("div"); track.className = "review-day-track"; track.style.height = `${weekly.end - weekly.start}px`;
       if (total) for (const segment of window.WhosFreeGroups.smooth(weekly.availability[day])) {
         const block = document.createElement("button"); block.type = "button"; block.className = "group-time-block";
@@ -2037,15 +2061,15 @@ const SYNC_URL = 'https://youfree.ca';
         const colors = window.WhosFreeGroups.shade(segment.available.length, total);
         block.style.backgroundColor = colors.background; block.style.color = colors.color;
         const label = groupBlockLabel(segment, total);
-        block.textContent = segment.end - segment.start < 25 ? `${segment.available.length}/${total}` : `${label}\n${minuteTime(segment.start)}–${minuteTime(segment.end)}`;
-        block.title = `${day} ${minuteTime(segment.start)}–${minuteTime(segment.end)} · ${label}. Free: ${segment.available.map(displayName).join(", ") || "Nobody"}. Busy: ${segment.unavailable.map(displayName).join(", ") || "Nobody"}.`;
-        if (segment.exact.length > 1) block.title = `${day} ${minuteTime(segment.start)}–${minuteTime(segment.end)} · ${label} (transitions blended). Select for exact times and people.`;
-        block.setAttribute("aria-label", block.title); block.setAttribute("aria-pressed", "false");
+        setUiText(block, segment.end - segment.start < 25 ? `${segment.available.length}/${total}` : `${label}\n${minuteTime(segment.start)}–${minuteTime(segment.end)}`);
+        setUiAttribute(block, "title", `${day} ${minuteTime(segment.start)}–${minuteTime(segment.end)} · ${label}. Free: ${segment.available.map(displayName).join(", ") || "Nobody"}. Busy: ${segment.unavailable.map(displayName).join(", ") || "Nobody"}.`);
+        if (segment.exact.length > 1) setUiAttribute(block, "title", `${day} ${minuteTime(segment.start)}–${minuteTime(segment.end)} · ${label} (transitions blended). Select for exact times and people.`);
+        setUiAttribute(block, "aria-label", sourceUiAttribute(block, "title")); block.setAttribute("aria-pressed", "false");
         block.addEventListener("click", () => showGroupSlot(day, segment, total, block)); track.append(block);
       }
       column.append(heading, track); els.groupWeekGrid.append(column);
     }
-    els.groupSlotDetails.textContent = total ? "Select a time block to see the people available." : "This group has no people. Edit the group to add members.";
+    setUiText(els.groupSlotDetails, total ? "Select a time block to see the people available." : "This group has no people. Edit the group to add members.");
     els.groupWeekModal.hidden = false; document.body.style.overflow = "hidden";
     els.closeGroupWeekModal.focus();
     animateModalOpen(els.groupWeekModal, els.groupWeekModal.querySelector(".group-week-modal"));
@@ -2188,9 +2212,9 @@ const SYNC_URL = 'https://youfree.ca';
 
   function updatePeopleSearchStatus(names = []) {
     els.clearPeopleSearchButton.hidden = !state.peopleSearchQuery;
-    els.peopleSearchStatus.textContent = state.peopleSearchQuery.trim()
+    setUiText(els.peopleSearchStatus, state.peopleSearchQuery.trim()
       ? `${new Set(names).size} matching ${new Set(names).size === 1 ? "person" : "people"} in this view.`
-      : "Search names and nicknames in this view.";
+      : "Search names and nicknames in this view.");
   }
 
   function visiblePeople(day, minute) {
@@ -2214,7 +2238,7 @@ const SYNC_URL = 'https://youfree.ca';
       state.importProgress.toast = message;
       return;
     }
-    els.toast.textContent = message;
+    setUiText(els.toast, message);
     els.toast.hidden = false;
     if (canAnimate()) {
       window.gsap.killTweensOf(els.toast);
@@ -2246,15 +2270,15 @@ const SYNC_URL = 'https://youfree.ca';
   function createEmptyList(headline, detail) {
     const wrap = document.createElement("div");
     wrap.className = "empty-list";
-    wrap.innerHTML = `<h3></h3><p></p>`;
-    wrap.querySelector("h3").textContent = headline;
-    wrap.querySelector("p").textContent = detail;
+    setUiHtml(wrap, `<h3></h3><p></p>`);
+    setUiText(wrap.querySelector("h3"), headline);
+    setUiText(wrap.querySelector("p"), detail);
     return wrap;
   }
 
   function renderDataSetup() {
     updateGroupToolbar();
-    els.peopleHeading.textContent = "Schedules";
+    setUiText(els.peopleHeading, "Schedules");
     els.viewToggleButton.disabled = true;
     els.peopleList.replaceChildren();
 
@@ -2263,13 +2287,14 @@ const SYNC_URL = 'https://youfree.ca';
     const message = fragment.querySelector(".data-setup-message");
 
     if (state.loadError) {
-      title.textContent = "Couldn't load that file";
-      message.textContent = state.loadError;
+      setUiText(title, "Couldn't load that file");
+      setUiText(message, state.loadError);
     }
 
     fragment.querySelector(".create-schedule").addEventListener("click", () => { openScheduleModal(); openManualSchedule(); });
     fragment.querySelectorAll(".add-picture").forEach(button => button.addEventListener("click", chooseScheduleImage));
     els.peopleList.append(fragment);
+    window.UFreeI18n?.localize(els.peopleList);
     renderEmptyDetail();
   }
 
@@ -2301,7 +2326,7 @@ const SYNC_URL = 'https://youfree.ca';
   }
 
   function startImportProgress(message, pictureName = false, title = "Importing schedules") {
-    els.importProgressTitle.textContent = title;
+    setUiText(els.importProgressTitle, title);
     if (state.importProgress) { updateImportProgress(message); return; }
     const overlay = els.importProgressOverlay;
     state.importProgress = {
@@ -2312,14 +2337,14 @@ const SYNC_URL = 'https://youfree.ca';
       hadDialog: [...document.querySelectorAll(".modal-backdrop")].some(element => element !== overlay && !element.hidden),
       background: [...document.body.children].filter(element => element !== overlay && !["SCRIPT", "TEMPLATE"].includes(element.tagName)).map(element => ({ element, inert: element.hasAttribute("inert"), ariaHidden: element.getAttribute("aria-hidden") })),
     };
-    els.importProgressMessage.textContent = message;
+    setUiText(els.importProgressMessage, message);
     els.importPictureNameForm.hidden = !pictureName;
     els.importPictureName.value = "";
     els.finishImportPictureName.disabled = false;
-    els.finishImportPictureName.textContent = "Done entering name";
-    els.importPictureNameHelp.textContent = "Your name will carry over. If you're typing when loading finishes, we'll wait for you.";
+    setUiText(els.finishImportPictureName, "Done entering name");
+    setUiText(els.importPictureNameHelp, "Your name will carry over. If you're typing when loading finishes, we'll wait for you.");
     overlay.querySelector(".import-progress-spinner").hidden = false;
-    overlay.querySelector(".import-progress-note").textContent = title === "Opening shared schedules" ? "Please wait while the shared schedules are opened." : "Please wait until the import finishes.";
+    setUiText(overlay.querySelector(".import-progress-note"), title === "Opening shared schedules" ? "Please wait while the shared schedules are opened." : "Please wait until the import finishes.");
     overlay.setAttribute("aria-busy", "true");
     overlay.hidden = false;
     document.documentElement.classList.remove("shared-link-starting");
@@ -2332,7 +2357,7 @@ const SYNC_URL = 'https://youfree.ca';
   }
 
   function updateImportProgress(message) {
-    if (state.importProgress) els.importProgressMessage.textContent = message;
+    if (state.importProgress) setUiText(els.importProgressMessage, message);
   }
 
   function editImportPictureName(edited = false) {
@@ -2342,7 +2367,7 @@ const SYNC_URL = 'https://youfree.ca';
     name.edited ||= edited;
     name.confirmed = false;
     els.finishImportPictureName.disabled = false;
-    if (!name.ready) els.importPictureNameHelp.textContent = "Your name will carry over. If you're typing when loading finishes, we'll wait for you.";
+    if (!name.ready) setUiText(els.importPictureNameHelp, "Your name will carry over. If you're typing when loading finishes, we'll wait for you.");
   }
 
   function finishImportPictureName(event) {
@@ -2357,7 +2382,7 @@ const SYNC_URL = 'https://youfree.ca';
     } else {
       els.importPictureName.blur();
       els.finishImportPictureName.disabled = true;
-      els.importPictureNameHelp.textContent = "Name ready. You can still change it while the picture loads.";
+      setUiText(els.importPictureNameHelp, "Name ready. You can still change it while the picture loads.");
     }
   }
 
@@ -2366,10 +2391,10 @@ const SYNC_URL = 'https://youfree.ca';
     name.ready = true;
     if (name.started && !name.confirmed) {
       els.importProgressOverlay.querySelector(".import-progress-spinner").hidden = true;
-      els.importProgressOverlay.querySelector(".import-progress-note").textContent = "Ready to review once you're done naming.";
+      setUiText(els.importProgressOverlay.querySelector(".import-progress-note"), "Ready to review once you're done naming.");
       updateImportProgress("Your schedule is ready.");
-      els.importPictureNameHelp.textContent = "Finish entering the name, then press Continue to see the schedule.";
-      els.finishImportPictureName.textContent = "Continue";
+      setUiText(els.importPictureNameHelp, "Finish entering the name, then press Continue to see the schedule.");
+      setUiText(els.finishImportPictureName, "Continue");
       await new Promise(resolve => { name.resolve = resolve; });
     }
     return name.edited ? els.importPictureName.value.trim() : detectedName || "";
@@ -2410,10 +2435,10 @@ const SYNC_URL = 'https://youfree.ca';
   }
 
   function setImageStatus(message, tone = "working") {
-    els.imageParserStatus.textContent = message;
+    setUiText(els.imageParserStatus, message);
     els.imageParserStatus.dataset.tone = tone;
     if (state.codeMode === "import") {
-      els.importImageStatus.textContent = message;
+      setUiText(els.importImageStatus, message);
       els.importImageStatus.dataset.tone = tone;
     }
     updateImportProgress(message);
@@ -2426,18 +2451,18 @@ const SYNC_URL = 'https://youfree.ca';
     if (item.review_warning) card.dataset.warning = item.review_warning;
     if (Number.isFinite(item.recognition_confidence)) card.dataset.confidence = String(item.recognition_confidence);
     const legend = document.createElement("legend");
-    legend.textContent = item.review_warning || "Edit busy block — only the day and times are required";
+    setUiText(legend, item.review_warning || "Edit busy block — only the day and times are required");
     card.append(legend);
     for (const [key, label, type] of [["day", "Day", "select"], ["start", "Starts", "time"], ["end", "Ends", "time"], ["course", "Label (optional)", "text"], ["course_code", "Course code", "text"], ["section", "Section", "text"], ["room", "Room", "text"], ["instructor", "Instructor", "text"]]) {
       const wrapper = document.createElement("label");
       wrapper.className = "field-group";
       const caption = document.createElement("span");
-      caption.textContent = label;
+      setUiText(caption, label);
       const input = document.createElement(type === "select" ? "select" : "input");
       if (type === "select") for (const day of ALL_DAYS) {
         const option = document.createElement("option");
         option.value = day;
-        option.textContent = day;
+        setUiText(option, day);
         input.append(option);
       }
       else input.type = type;
@@ -2451,7 +2476,7 @@ const SYNC_URL = 'https://youfree.ca';
     const remove = document.createElement("button");
     remove.className = "mini-danger-button";
     remove.type = "button";
-    remove.textContent = "Remove busy block";
+    setUiText(remove, "Remove busy block");
     remove.addEventListener("click", () => {
       card.remove();
       selectReviewCard(null);
@@ -2461,7 +2486,7 @@ const SYNC_URL = 'https://youfree.ca';
     const done = document.createElement("button");
     done.className = "secondary-button";
     done.type = "button";
-    done.textContent = "Done editing";
+    setUiText(done, "Done editing");
     done.addEventListener("click", () => {
       selectReviewCard(null);
       revealSection(els.addReviewClassButton, els.addReviewClassButton);
@@ -2490,9 +2515,9 @@ const SYNC_URL = 'https://youfree.ca';
     const needsCheck = card => Boolean(card.dataset.warning);
     const unchecked = cards.filter(needsCheck);
     els.recognitionReviewNotice.hidden = !unchecked.length;
-    els.recognitionReviewSummary.textContent = unchecked.length
-      ? `Note: ${unchecked.length} uncertain detection${unchecked.length === 1 ? "" : "s"}. Please double-check the ⚠ blocks before saving.` : "";
-    cards.forEach(card => { card.querySelector("legend").textContent = "Edit busy block — only the day and times are required"; });
+    setUiText(els.recognitionReviewSummary, unchecked.length
+      ? `Note: ${unchecked.length} uncertain detection${unchecked.length === 1 ? "" : "s"}. Please double-check the ⚠ blocks before saving.` : "");
+    cards.forEach(card => { setUiText(card.querySelector("legend"), "Edit busy block — only the day and times are required"); });
     const valid = cards.filter(card => /^\d{2}:\d{2}$/.test(reviewValue(card, "start")) && /^\d{2}:\d{2}$/.test(reviewValue(card, "end")) && toMinutes(reviewValue(card, "end")) > toMinutes(reviewValue(card, "start")));
     const first = Math.min(480, ...valid.map(card => Math.floor(toMinutes(reviewValue(card, "start")) / 60) * 60));
     const last = Math.max(1200, ...valid.map(card => Math.ceil(toMinutes(reviewValue(card, "end")) / 60) * 60));
@@ -2502,7 +2527,7 @@ const SYNC_URL = 'https://youfree.ca';
     const clock = minute => `${String(Math.floor(minute / 60)).padStart(2, "0")}:${String(minute % 60).padStart(2, "0")}`;
     for (let time = first; time <= last; time += 60) {
       const label = document.createElement("span");
-      label.textContent = clock(time);
+      setUiText(label, clock(time));
       label.style.top = `${time - first + 48}px`;
       axis.append(label);
     }
@@ -2513,8 +2538,8 @@ const SYNC_URL = 'https://youfree.ca';
       const add = document.createElement("button");
       add.type = "button";
       add.className = "review-day-heading";
-      add.textContent = `${day} +`;
-      add.setAttribute("aria-label", `Add busy block on ${day}`);
+      setUiText(add, `${day} +`);
+      setUiAttribute(add, "aria-label", `Add busy block on ${day}`);
       add.addEventListener("click", () => {
         addReviewClass({ day, start: "08:15", end: "09:35", kind: "busy_block" });
         const card = els.imageReviewClasses.lastElementChild;
@@ -2534,8 +2559,8 @@ const SYNC_URL = 'https://youfree.ca';
           gap.className = passing ? "review-passing" : "review-break";
           gap.style.top = `${occupiedUntil - first}px`;
           gap.style.height = `${start - occupiedUntil}px`;
-          gap.textContent = `${passing ? "Class Soon" : "Break"} ${start - occupiedUntil} min`;
-          gap.title = `${day} ${passing ? "Class Soon" : "break"} ${clock(occupiedUntil)}–${clock(start)}`;
+          setUiText(gap, `${passing ? "Class Soon" : "Break"} ${start - occupiedUntil} min`);
+          setUiAttribute(gap, "title", `${day} ${passing ? "Class Soon" : "break"} ${clock(occupiedUntil)}–${clock(start)}`);
           track.append(gap);
         }
         const block = document.createElement("button");
@@ -2543,9 +2568,9 @@ const SYNC_URL = 'https://youfree.ca';
         block.className = "review-grid-block";
         block.style.top = `${start - first}px`;
         block.style.height = `${end - start}px`;
-        block.textContent = `${clock(start)}–${clock(end)} ${needsCheck(card) ? "⚠ " : ""}${reviewValue(card, "course") || "Busy block"}`;
-        block.title = `${day} ${block.textContent}. ${card.dataset.warning || "Select to edit."}`;
-        block.setAttribute("aria-label", `${needsCheck(card) ? "Uncertain detection. " : ""}${block.title}`);
+        setUiParts(block, [{ text: `${clock(start)}–${clock(end)} ${needsCheck(card) ? "⚠ " : ""}`, translate: false }, { text: reviewValue(card, "course") || "Busy block", translate: !reviewValue(card, "course") }]);
+        setUiAttribute(block, "title", `${day} ${sourceUiText(block)}. ${card.dataset.warning || "Select to edit."}`);
+        setUiAttribute(block, "aria-label", `${needsCheck(card) ? "Uncertain detection. " : ""}${sourceUiAttribute(block, "title")}`);
         block.addEventListener("click", () => { selectReviewCard(card); revealSection(card, card.querySelector('[data-field="course"]')); });
         track.append(block);
         occupiedUntil = Math.max(occupiedUntil ?? end, end);
@@ -2599,7 +2624,7 @@ const SYNC_URL = 'https://youfree.ca';
     els.imageReviewClasses.replaceChildren();
     selectReviewCard(null);
     els.imageReview.hidden = true;
-    els.imageReviewError.textContent = "";
+    setUiText(els.imageReviewError, "");
     updateScheduleModal();
   }
 
@@ -2641,13 +2666,13 @@ const SYNC_URL = 'https://youfree.ca';
 
   async function saveImageSchedule(decision = null) {
     if (!state.pendingImage || state.isParsing || state.duplicatePicture) return;
-    els.imageReviewError.textContent = "";
+    setUiText(els.imageReviewError, "");
     const requestedName = els.imageReviewName.value.trim();
     let name = requestedName;
-    if (!name) { els.imageReviewError.textContent = "Enter the person's name before saving."; els.imageReviewName.focus(); return; }
+    if (!name) { setUiText(els.imageReviewError, "Enter the person's name before saving."); els.imageReviewName.focus(); return; }
     const term = els.imageReviewSemester.value;
     const year = els.imageReviewYear.value;
-    if (term && !/^20\d{2}$/.test(year)) { els.imageReviewError.textContent = "Enter a semester year from 2000 to 2099."; els.imageReviewYear.focus(); return; }
+    if (term && !/^20\d{2}$/.test(year)) { setUiText(els.imageReviewError, "Enter a semester year from 2000 to 2099."); els.imageReviewYear.focus(); return; }
     const semester = term ? `${term} ${year}` : null;
     const classes = [...els.imageReviewClasses.querySelectorAll(".review-class")].map(card => ({ ...Object.fromEntries(
       [...card.querySelectorAll("[data-field]")].map(input => [input.dataset.field, input.value.trim() || null])
@@ -2670,7 +2695,7 @@ const SYNC_URL = 'https://youfree.ca';
     Object.defineProperty(workingData.people, name, { value: { ...state.pendingImage.person, source_file: state.pendingImage.person.source_file, semester, classes }, writable: true, enumerable: true, configurable: true });
     try { validateData(workingData); }
     catch (error) {
-      els.imageReviewError.textContent = error.message;
+      setUiText(els.imageReviewError, error.message);
       const invalidIndex = classes.findIndex(item => !ALL_DAYS.includes(item.day) || !Number.isFinite(toMinutes(item.start)) || !Number.isFinite(toMinutes(item.end)) || toMinutes(item.end) <= toMinutes(item.start));
       if (invalidIndex !== -1) {
         const card = els.imageReviewClasses.children[invalidIndex];
@@ -2681,13 +2706,13 @@ const SYNC_URL = 'https://youfree.ca';
     }
     if (matchingName && !approved) {
       state.duplicatePicture = { requestedName, existingName: matchingName };
-      els.duplicatePictureMessage.textContent = `A schedule for ${matchingName} already exists. Replace it, keep both as ${nextPictureName(requestedName, workingData.people)}, or cancel?`;
+      setUiText(els.duplicatePictureMessage, `A schedule for ${matchingName} already exists. Replace it, keep both as ${nextPictureName(requestedName, workingData.people)}, or cancel?`);
       els.duplicatePicturePrompt.hidden = false;
       updateScheduleModal();
       revealSection(els.duplicatePicturePrompt, els.duplicatePicturePrompt.querySelector('[data-duplicate-action="cancel"]'));
       return;
     }
-    if (!isPicture && replacement && !window.confirm(`Replace the existing schedule for ${name} with these reviewed classes?`)) return;
+    if (!isPicture && replacement && !window.confirm(translateUi(`Replace the existing schedule for ${name} with these reviewed classes?`))) return;
     if (renamed) delete workingData.people[editingName];
     // Observe creation, not loading/rendering: both OCR and manual review save here.
     const firstCreation = !state.hasHadSchedules && Object.keys(peopleMap()).length === 0
@@ -2716,7 +2741,7 @@ const SYNC_URL = 'https://youfree.ca';
       clearImageReview();
       setImageStatus(`Saved ${classes.length} schedule entries for ${name} on this device.`, "success");
       showToast(warning || (changed ? `Schedule ${editingName ? "updated" : replacement ? "replaced" : "added"}: ${displayName(name)}` : "No schedule changes"));
-    } catch (error) { els.imageReviewError.textContent = error.message; }
+    } catch (error) { setUiText(els.imageReviewError, error.message); }
     finally { state.isParsing = false; updateScheduleModal(); }
     if (welcomeName !== null) openFirstScheduleWelcome(welcomeName);
   }
@@ -2731,8 +2756,8 @@ const SYNC_URL = 'https://youfree.ca';
   let firstScheduleWelcomeRequest = 0;
   let firstScheduleCopyTimer = null;
   const FIRST_SCHEDULE_COPY_LABEL = "Copy My Link to Invite Them";
-  const FIRST_SCHEDULE_WELCOME_TITLE = els.firstScheduleWelcomeTitle.textContent;
-  const FIRST_SCHEDULE_WELCOME_BODY = els.firstScheduleWelcomeBody.textContent;
+  const FIRST_SCHEDULE_WELCOME_TITLE = sourceUiText(els.firstScheduleWelcomeTitle);
+  const FIRST_SCHEDULE_WELCOME_BODY = sourceUiText(els.firstScheduleWelcomeBody);
 
   function maybeShowSingleScheduleReminder() {
     if (!state.deviceReady || !state.singleScheduleReminderPending) return;
@@ -2752,18 +2777,18 @@ const SYNC_URL = 'https://youfree.ca';
     const request = ++firstScheduleWelcomeRequest;
     firstScheduleLink = "";
     els.firstScheduleWelcome.dataset.reason = reminder ? "single-schedule" : "first-schedule";
-    els.firstScheduleWelcomeTitle.textContent = reminder ? "Add your friends’ schedules" : FIRST_SCHEDULE_WELCOME_TITLE;
-    els.firstScheduleWelcomeBody.textContent = reminder
+    setUiText(els.firstScheduleWelcomeTitle, reminder ? "Add your friends’ schedules" : FIRST_SCHEDULE_WELCOME_TITLE);
+    setUiText(els.firstScheduleWelcomeBody, reminder
       ? "You only have one schedule saved on this device. UFree doesn't sync automatically. Import your friends' schedule screenshots, or ask them for their QR codes, text codes, or URLs to see your group's availability."
-      : FIRST_SCHEDULE_WELCOME_BODY;
+      : FIRST_SCHEDULE_WELCOME_BODY);
     els.copyFirstScheduleLink.hidden = reminder;
     els.importFriendsSchedules.hidden = !reminder;
     els.firstScheduleWelcomeStatus.hidden = reminder;
     els.firstScheduleLinkFallback.hidden = true;
     els.firstScheduleLinkFallback.value = "";
     els.copyFirstScheduleLink.disabled = true;
-    els.copyFirstScheduleLink.textContent = FIRST_SCHEDULE_COPY_LABEL;
-    els.firstScheduleWelcomeStatus.textContent = "Preparing your link…";
+    setUiText(els.copyFirstScheduleLink, FIRST_SCHEDULE_COPY_LABEL);
+    setUiText(els.firstScheduleWelcomeStatus, "Preparing your link…");
     els.firstScheduleWelcome.hidden = false;
     document.body.style.overflow = "hidden";
     if (reminder) {
@@ -2776,11 +2801,11 @@ const SYNC_URL = 'https://youfree.ca';
       const code = await window.WhosFreeShareCode.encode({ people: { [name]: peopleMap()[name] } }, { fields: [] });
       if (request !== firstScheduleWelcomeRequest) return;
       firstScheduleLink = window.WhosFreeShareCode.createLink(code, APP_URL);
-      els.firstScheduleWelcomeStatus.textContent = "";
+      setUiText(els.firstScheduleWelcomeStatus, "");
       els.copyFirstScheduleLink.disabled = false;
       if (document.activeElement === els.firstScheduleWelcomeTitle) els.copyFirstScheduleLink.focus({ preventScroll: true });
     } catch {
-      if (request === firstScheduleWelcomeRequest) els.firstScheduleWelcomeStatus.textContent = "Your schedule is saved. You can try sharing it from Export.";
+      if (request === firstScheduleWelcomeRequest) setUiText(els.firstScheduleWelcomeStatus, "Your schedule is saved. You can try sharing it from Export.");
     }
   }
 
@@ -2801,17 +2826,17 @@ const SYNC_URL = 'https://youfree.ca';
     try {
       await navigator.clipboard.writeText(firstScheduleLink);
       if (request !== firstScheduleWelcomeRequest) return;
-      els.copyFirstScheduleLink.textContent = "Copied!";
-      els.firstScheduleWelcomeStatus.textContent = "Copied!";
+      setUiText(els.copyFirstScheduleLink, "Copied!");
+      setUiText(els.firstScheduleWelcomeStatus, "Copied!");
       els.firstScheduleLinkFallback.hidden = true;
       firstScheduleCopyTimer = window.setTimeout(() => {
-        els.copyFirstScheduleLink.textContent = FIRST_SCHEDULE_COPY_LABEL;
-        els.firstScheduleWelcomeStatus.textContent = "";
+        setUiText(els.copyFirstScheduleLink, FIRST_SCHEDULE_COPY_LABEL);
+        setUiText(els.firstScheduleWelcomeStatus, "");
       }, 1800);
     } catch {
       if (request !== firstScheduleWelcomeRequest) return;
-      els.copyFirstScheduleLink.textContent = FIRST_SCHEDULE_COPY_LABEL;
-      els.firstScheduleWelcomeStatus.textContent = "Couldn’t copy automatically. Select and copy your link below.";
+      setUiText(els.copyFirstScheduleLink, FIRST_SCHEDULE_COPY_LABEL);
+      setUiText(els.firstScheduleWelcomeStatus, "Couldn’t copy automatically. Select and copy your link below.");
       els.firstScheduleLinkFallback.value = firstScheduleLink;
       els.firstScheduleLinkFallback.hidden = false;
       els.firstScheduleLinkFallback.focus({ preventScroll: true });
@@ -3034,7 +3059,7 @@ const SYNC_URL = 'https://youfree.ca';
   }
 
   function setParserStatus(message, tone = "") {
-    els.parserStatus.textContent = message || "";
+    setUiText(els.parserStatus, message || "");
     els.parserStatus.dataset.tone = tone;
     updateImportProgress(message);
   }
@@ -3044,7 +3069,7 @@ const SYNC_URL = 'https://youfree.ca';
       return await window.WhosFreeParser.parseSchedulePdf(file);
     } catch (error) {
       if (error?.code !== "NAME_NOT_FOUND") throw error;
-      const fallback = window.prompt(`Who's schedule is ${file.name}? Enter the student's name:`);
+      const fallback = window.prompt(translateUi(`Who's schedule is ${file.name}? Enter the student's name:`));
       if (!fallback?.trim()) throw new Error("The student's name is required to add this schedule.");
       return window.WhosFreeParser.parseSchedulePdf(file, { nameOverride: fallback.trim() });
     }
@@ -3153,16 +3178,16 @@ const SYNC_URL = 'https://youfree.ca';
       if (navigator.share && navigator.canShare?.({ files: [file] })) {
         try {
           await navigator.share({
-            title: "UFree schedules",
-            text: shareText,
+            title: translateUi("UFree schedules"),
+            text: translateUi(shareText),
             url: APP_URL,
             files: [file],
           });
         } catch (error) {
           if (error?.name === "AbortError") return;
           await navigator.share({
-            title: "UFree schedules",
-            text: shareText,
+            title: translateUi("UFree schedules"),
+            text: translateUi(shareText),
             files: [file],
           });
         }
@@ -3178,7 +3203,7 @@ const SYNC_URL = 'https://youfree.ca';
   }
 
   function codeStatus(element, message, tone = "") {
-    element.textContent = message;
+    setUiText(element, message);
     element.dataset.tone = tone;
     if (element === els.importCodeStatus) updateImportProgress(message);
   }
@@ -3195,16 +3220,16 @@ const SYNC_URL = 'https://youfree.ca';
     }
     const selected = inputs.filter(input => input.checked).length;
     els.exportPeopleEmpty.hidden = visible > 0;
-    els.exportSelectionSummary.textContent = terms.length ? `${visible} matching · ${selected} selected`
+    setUiText(els.exportSelectionSummary, terms.length ? `${visible} matching · ${selected} selected`
       : state.exportGroup ? `${state.exportGroup.name} · ${selected} selected`
-      : selected === inputs.length && selected > 0 ? `Everyone · ${selected}` : `${selected} of ${inputs.length} selected`;
-    els.exportSelectionToggleLabel.textContent = els.exportSelection.open ? "Hide people" : "Show people";
+      : selected === inputs.length && selected > 0 ? `Everyone · ${selected}` : `${selected} of ${inputs.length} selected`);
+    setUiText(els.exportSelectionToggleLabel, els.exportSelection.open ? "Hide people" : "Show people");
   }
 
   function syncExportGroup() {
     els.exportGroupButton.classList.toggle("has-group", Boolean(state.exportGroup));
     els.exportGroupSummary.hidden = !state.exportGroup;
-    els.exportGroupSummary.textContent = state.exportGroup ? `Sharing ${state.exportGroup.name} as a group. The receiver can keep the group or add its members individually.` : "";
+    setUiText(els.exportGroupSummary, state.exportGroup ? `Sharing ${state.exportGroup.name} as a group. The receiver can keep the group or add its members individually.` : "");
     updateScheduleFlow();
   }
 
@@ -3242,8 +3267,8 @@ const SYNC_URL = 'https://youfree.ca';
       const everyoneSelected = [...els.exportPeopleList.querySelectorAll("input")].every(input => input.checked);
       button.setAttribute("aria-pressed", String(group ? state.exportGroup?.id === group.id : !state.exportGroup && everyoneSelected));
       const name = document.createElement("span"), count = document.createElement("span");
-      name.textContent = group?.name || "Everyone individually";
-      count.textContent = `${members.length} ${members.length === 1 ? "person" : "people"}`;
+      setUiText(name, group?.name || "Everyone individually", !group);
+      setUiText(count, `${members.length} ${members.length === 1 ? "person" : "people"}`);
       button.append(name, count);
       button.addEventListener("click", () => chooseExportGroup(group));
       els.exportGroupPicker.append(button);
@@ -3251,7 +3276,7 @@ const SYNC_URL = 'https://youfree.ca';
     if (!state.groups.length) {
       const empty = document.createElement("p");
       empty.className = "share-code-note";
-      empty.textContent = "No saved groups. Create one using the group controls on the main page.";
+      setUiText(empty, "No saved groups. Create one using the group controls on the main page.");
       els.exportGroupPicker.append(empty);
     }
     els.exportSelection.open = false;
@@ -3361,7 +3386,7 @@ const SYNC_URL = 'https://youfree.ca';
           exportSelectionChanged();
         });
         const caption = document.createElement("span");
-        caption.textContent = displayName(name) === name ? name : `${displayName(name)} (${name})`;
+        setUiText(caption, displayName(name) === name ? name : `${displayName(name)} (${name})`, false);
         label.append(input, caption);
         els.exportPeopleList.append(label);
       }
@@ -3371,7 +3396,7 @@ const SYNC_URL = 'https://youfree.ca';
       revealSection(els.codeExportPanel, quick ? els.generateCodeButton : els.exportSelection.querySelector("summary"));
     } else {
       els.importCodeInput.value = "";
-      els.importImageStatus.textContent = "";
+      setUiText(els.importImageStatus, "");
       codeStatus(els.importCodeStatus, "");
       revealSection(els.codeImportPanel, els.importScheduleImageButton);
     }
@@ -3439,7 +3464,7 @@ const SYNC_URL = 'https://youfree.ca';
     qr.replaceChildren();
     const button = shareQrButton(panel);
     if ([els.exportSharePanel, els.personQuickSharePanel].includes(panel)) panel.querySelector(".share-link-field").hidden = true;
-    else button.textContent = "Show QR";
+    else setUiText(button, "Show QR");
     button.setAttribute("aria-expanded", "false");
     codeStatus(panel.querySelector(".share-link-status"), "");
   }
@@ -3490,7 +3515,7 @@ const SYNC_URL = 'https://youfree.ca';
     const ns = "http://www.w3.org/2000/svg", svg = document.createElementNS(ns, "svg");
     const size = code.size + 8;
     svg.setAttribute("viewBox", `0 0 ${size} ${size}`);
-    svg.setAttribute("role", "img"); svg.setAttribute("aria-label", label);
+    svg.setAttribute("role", "img"); setUiAttribute(svg, "aria-label", label);
     svg.setAttribute("shape-rendering", "crispEdges");
     const background = document.createElementNS(ns, "rect");
     background.setAttribute("width", String(size)); background.setAttribute("height", String(size)); background.setAttribute("fill", "#fff");
@@ -3527,7 +3552,7 @@ const SYNC_URL = 'https://youfree.ca';
     const updateProgress = (value, message) => {
       if (!current()) return;
       progress.value = Math.max(progress.value, Math.min(100, value));
-      progress.setAttribute("aria-valuetext", message);
+      setUiAttribute(progress, "aria-valuetext", message);
       codeStatus(status, `${message} You can close this view to cancel.`);
     };
     updateProgress(0, `Preparing QR codes for ${names.length} ${names.length === 1 ? "person" : "people"}…`);
@@ -3575,17 +3600,17 @@ const SYNC_URL = 'https://youfree.ca';
       }
       const fragment = document.createDocumentFragment();
       const instructions = document.createElement("p");
-      instructions.textContent = sharedGroup ? "Scan each QR separately, in any order. Choose Add to group to collect its listed people in the same group, or add everybody individually." : "Scan each QR separately. Its listed people are added automatically. You can scan them in any order.";
+      setUiText(instructions, sharedGroup ? "Scan each QR separately, in any order. Choose Add to group to collect its listed people in the same group, or add everybody individually." : "Scan each QR separately. Its listed people are added automatically. You can scan them in any order.");
       fragment.append(instructions);
       for (let i = 0; i < result.groups.length; i++) {
         if (!current()) return;
         const item = result.groups[i], card = document.createElement("section");
         card.className = "qr-batch-card";
         const heading = document.createElement("h4");
-        heading.textContent = `QR ${i + 1} of ${result.groups.length} · ${item.names.length} ${item.names.length === 1 ? "person" : "people"}`;
-        const list = document.createElement("p"); list.textContent = item.names.map(displayName).join(", ");
+        setUiText(heading, `QR ${i + 1} of ${result.groups.length} · ${item.names.length} ${item.names.length === 1 ? "person" : "people"}`);
+        const list = document.createElement("p"); setUiText(list, item.names.map(displayName).join(", "), false);
         const qr = document.createElement("div"); qr.className = "share-qr";
-        qr.append(scheduleQrSvg(item.link, `${heading.textContent}: ${list.textContent}`).svg);
+        qr.append(scheduleQrSvg(item.link, `${sourceUiText(heading)}: ${sourceUiText(list)}`).svg);
         card.append(heading, list, qr); fragment.append(card);
         updateProgress(85 + 15 * (i + 1) / result.groups.length, `Drawing QR codes: ${i + 1} of ${result.groups.length}…`);
         await new Promise(resolve => setTimeout(resolve, 0));
@@ -3623,15 +3648,15 @@ const SYNC_URL = 'https://youfree.ca';
     state.groupImportAutomatic = false;
     els.sharedGroupImport.hidden = true;
     els.sharedGroupName.value = "";
-    els.sharedGroupError.textContent = "";
+    setUiText(els.sharedGroupError, "");
     els.importScheduleImageButton.hidden = false;
     els.decodeCodeButton.hidden = false;
     els.sharedImportPreview.hidden = true;
     els.sharedImportPeople.replaceChildren();
     els.importCodeField.hidden = false;
     els.importCodeHelp.hidden = false;
-    els.decodeCodeButton.textContent = "Import schedules";
-    els.closeImportButton.textContent = "Done";
+    setUiText(els.decodeCodeButton, "Import schedules");
+    setUiText(els.closeImportButton, "Done");
   }
 
   function showSharedGroupImport(imported, automatic) {
@@ -3647,16 +3672,16 @@ const SYNC_URL = 'https://youfree.ca';
     }
     els.sharedGroupName.value = name;
     const names = Object.keys(imported.people);
-    els.sharedGroupSummary.textContent = `${source.name} · ${names.length} ${names.length === 1 ? "member" : "members"}: ${names.join(", ")}`;
-    els.sharedGroupError.textContent = "";
+    setUiText(els.sharedGroupSummary, `${source.name} · ${names.length} ${names.length === 1 ? "member" : "members"}: ${names.join(", ")}`);
+    setUiText(els.sharedGroupError, "");
     els.sharedGroupImport.hidden = false;
     els.sharedImportPreview.hidden = true;
     els.importScheduleImageButton.hidden = true;
     els.importCodeField.hidden = true;
     els.importCodeHelp.hidden = true;
-    els.importImageStatus.textContent = "";
+    setUiText(els.importImageStatus, "");
     els.decodeCodeButton.hidden = true;
-    els.closeImportButton.textContent = "Cancel";
+    setUiText(els.closeImportButton, "Cancel");
     codeStatus(els.importCodeStatus, "");
   }
 
@@ -3691,14 +3716,14 @@ const SYNC_URL = 'https://youfree.ca';
         const checkbox = document.createElement("input"); checkbox.type = "checkbox"; checkbox.checked = true; checkbox.dataset.person = name;
         checkbox.addEventListener("change", updateScheduleModal);
         const caption = document.createElement("span");
-        caption.textContent = `${name} · ${person.classes.length} class${person.classes.length === 1 ? "" : "es"}${person.semester ? ` · ${person.semester}` : ""}`;
+        setUiText(caption, `${name} · ${person.classes.length} class${person.classes.length === 1 ? "" : "es"}${person.semester ? ` · ${person.semester}` : ""}`);
         label.append(checkbox, caption); els.sharedImportPeople.append(label);
       }
       els.sharedImportPreview.hidden = false;
       els.importCodeField.hidden = true;
       els.importCodeHelp.hidden = true;
-      els.decodeCodeButton.textContent = "Add schedules";
-      els.closeImportButton.textContent = "Cancel";
+      setUiText(els.decodeCodeButton, "Add schedules");
+      setUiText(els.closeImportButton, "Cancel");
       codeStatus(els.importCodeStatus, "Add these schedules to this device? Existing duplicates are skipped.");
     } catch (error) {
       resetSharedImport();
@@ -3739,7 +3764,7 @@ const SYNC_URL = 'https://youfree.ca';
 
   async function copyExportCode(output, status, isCurrent = () => true) {
     if (!output.value) return;
-    const details = status.textContent;
+    const details = sourceUiText(status);
     try {
       await navigator.clipboard.writeText(output.value);
       if (!isCurrent()) return;
@@ -3757,7 +3782,7 @@ const SYNC_URL = 'https://youfree.ca';
     return new Promise(resolve => {
       endImportProgress();
       state.codeConflict = { resolve };
-      els.codeConflictMessage.textContent = `A different schedule for ${conflict.existingName} already exists. Keep both as ${conflict.newName}, replace the old schedule, or keep the old one?`;
+      setUiText(els.codeConflictMessage, `A different schedule for ${conflict.existingName} already exists. Keep both as ${conflict.newName}, replace the old schedule, or keep the old one?`);
       els.codeConflictPrompt.hidden = false;
       revealSection(els.codeConflictPrompt, els.codeConflictPrompt.querySelector('[data-code-conflict-action="old"]'));
     });
@@ -3796,7 +3821,7 @@ const SYNC_URL = 'https://youfree.ca';
       let destination = null;
       if (imported.shared_group && groupChoice === "group") {
         try { destination = sharedGroupDestination(imported); }
-        catch (error) { els.sharedGroupError.textContent = error.message; return; }
+        catch (error) { setUiText(els.sharedGroupError, error.message); return; }
       }
       applyAutomaticSemester(imported);
       const result = await window.WhosFreeShareCode.merge(state.hasData ? state.data : null, imported, automatic ? () => "old" : resolveCodeConflict);
@@ -3955,13 +3980,13 @@ const SYNC_URL = 'https://youfree.ca';
     if (!value) return "Previously imported on this device";
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return "Previously imported on this device";
-    return `Imported ${date.toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}`;
+    return `Imported ${date.toLocaleString(window.UFreeI18n?.locale || [], { dateStyle: "medium", timeStyle: "short" })}`;
   }
 
   async function removePerson(name) {
     if (state.isParsing || state.pendingImage || state.codeMode) return;
     if (!state.hasData || !Object.prototype.hasOwnProperty.call(state.data.people || {}, name)) return;
-    const confirmed = window.confirm(`Remove ${displayName(name)} from this device?`);
+    const confirmed = window.confirm(translateUi(`Remove ${displayName(name)} from this device?`));
     if (!confirmed) return;
 
     const before = captureScheduleChange();
@@ -4003,20 +4028,20 @@ const SYNC_URL = 'https://youfree.ca';
 
   function setStoredPeopleExpanded(expanded) {
     els.peopleManagerList.hidden = !expanded;
-    els.storedPeopleToggle.textContent = expanded ? "Hide" : "Show";
+    setUiText(els.storedPeopleToggle, expanded ? "Hide" : "Show");
     els.storedPeopleToggle.setAttribute("aria-expanded", String(expanded));
-    els.storedPeopleToggle.setAttribute("aria-label", expanded ? "Hide stored people" : "Show stored people");
+    setUiAttribute(els.storedPeopleToggle, "aria-label", expanded ? "Hide stored people" : "Show stored people");
   }
 
   function renderPeopleManager() {
     const names = Object.keys(peopleMap()).sort(comparePeopleNames);
-    els.peopleManagerCount.textContent = String(names.length);
+    setUiText(els.peopleManagerCount, String(names.length), false);
     els.peopleManagerList.replaceChildren();
 
     if (!names.length) {
       const empty = document.createElement("p");
       empty.className = "people-manager-empty";
-      empty.textContent = "No people added yet.";
+      setUiText(empty, "No people added yet.");
       els.peopleManagerList.append(empty);
       return;
     }
@@ -4029,32 +4054,32 @@ const SYNC_URL = 'https://youfree.ca';
       copy.className = "people-manager-copy";
       const title = document.createElement("div");
       title.className = "people-manager-name";
-      title.textContent = displayName(name);
+      setUiText(title, displayName(name), false);
       const detail = document.createElement("div");
       detail.className = "people-manager-meta";
       const person = peopleMap()[name] || {};
       const identity = displayName(name) !== name ? `${name} · ` : "";
-      detail.textContent = `${identity}${Array.isArray(person.classes) ? person.classes.length : 0} class meetings${person.source_file ? ` · ${person.source_file}` : ""}`;
+      setUiText(detail, `${identity}${Array.isArray(person.classes) ? person.classes.length : 0} class meetings${person.source_file ? ` · ${person.source_file}` : ""}`);
       const label = document.createElement("div");
       label.className = `schedule-semester${semesterIsOlder(person.semester) ? " semester-older" : ""}`;
-      label.textContent = scheduleLabel(person, true);
+      setUiText(label, scheduleLabel(person, true));
       copy.append(title, detail);
       copy.append(label);
 
       const removeButton = document.createElement("button");
       removeButton.type = "button";
       removeButton.className = "mini-danger-button";
-      removeButton.textContent = "Remove";
+      setUiText(removeButton, "Remove");
       removeButton.disabled = state.isParsing || Boolean(state.pendingImage) || Boolean(state.codeMode);
-      removeButton.setAttribute("aria-label", `Remove ${displayName(name)}`);
+      setUiAttribute(removeButton, "aria-label", `Remove ${displayName(name)}`);
       removeButton.addEventListener("click", () => removePerson(name));
 
       const editButton = document.createElement("button");
       editButton.type = "button";
       editButton.className = "secondary-button";
-      editButton.textContent = "Edit";
+      setUiText(editButton, "Edit");
       editButton.disabled = state.isParsing || Boolean(state.pendingImage) || Boolean(state.codeMode);
-      editButton.setAttribute("aria-label", `Edit ${displayName(name)}`);
+      setUiAttribute(editButton, "aria-label", `Edit ${displayName(name)}`);
       editButton.addEventListener("click", () => openManualSchedule(name, JSON.parse(JSON.stringify(person))));
       row.append(copy, editButton, removeButton);
       els.peopleManagerList.append(row);
@@ -4078,7 +4103,7 @@ const SYNC_URL = 'https://youfree.ca';
     }
     els.codeImportPanel.hidden = state.codeMode !== "import";
     els.codeExportPanel.hidden = state.codeMode !== "export";
-    document.getElementById("scheduleModalTitle").textContent = flow === "review" ? "Review schedule" : flow === "code-import" ? "Import" : flow === "code-export" ? state.exportGroup ? `Share group: ${state.exportGroup.name}` : state.quickExport ? "Quick share" : "Share schedules" : "Schedule data";
+    setUiText(document.getElementById("scheduleModalTitle"), flow === "review" ? "Review schedule" : flow === "code-import" ? "Import" : flow === "code-export" ? state.exportGroup ? `Share group: ${state.exportGroup.name}` : state.quickExport ? "Quick share" : "Share schedules" : "Schedule data");
     dialog.querySelector(".modal-header p").hidden = Boolean(flow);
     if (flow) dialog.dataset.scheduleFlow = flow;
     else delete dialog.dataset.scheduleFlow;
@@ -4131,7 +4156,7 @@ const SYNC_URL = 'https://youfree.ca';
 
     if (state.hasData) {
       const meta = state.scheduleMeta || {};
-      els.scheduleStorageStatus.innerHTML = `
+      setUiHtml(els.scheduleStorageStatus, `
         <div class="storage-status-row">
           <div>
             <div class="storage-status-label">Local schedule database</div>
@@ -4139,20 +4164,20 @@ const SYNC_URL = 'https://youfree.ca';
             <div class="storage-status-meta"></div>
           </div>
           <span class="local-badge">On device</span>
-        </div>`;
-      els.scheduleStorageStatus.querySelector(".storage-status-value").textContent = meta.filename || "Local schedule collection";
-      els.scheduleStorageStatus.querySelector(".storage-status-meta").textContent = `${peopleCount} ${peopleCount === 1 ? "person" : "people"} · ${formatImportedAt(meta.importedAt)}`;
-      els.importSchedulesButton.textContent = "Import another schedules.json";
+        </div>`);
+      setUiText(els.scheduleStorageStatus.querySelector(".storage-status-value"), meta.filename || "Local schedule collection", !meta.filename);
+      setUiText(els.scheduleStorageStatus.querySelector(".storage-status-meta"), `${peopleCount} ${peopleCount === 1 ? "person" : "people"} · ${formatImportedAt(meta.importedAt)}`);
+      setUiText(els.importSchedulesButton, "Import another schedules.json");
     } else {
-      els.scheduleStorageStatus.innerHTML = `
+      setUiHtml(els.scheduleStorageStatus, `
         <div class="storage-status-row">
           <div>
             <div class="storage-status-label">This device</div>
             <div class="storage-status-value">No schedules stored</div>
             <div class="storage-status-meta">Add a schedule picture or PDF, or import schedules.json.</div>
           </div>
-        </div>`;
-      els.importSchedulesButton.textContent = "Import schedules.json";
+        </div>`);
+      setUiText(els.importSchedulesButton, "Import schedules.json");
     }
     updateScheduleFlow();
     updateSettingsModal();
@@ -4190,7 +4215,7 @@ const SYNC_URL = 'https://youfree.ca';
   async function removeSchedules() {
     if (state.isParsing || state.pendingImage || state.codeMode) return;
     if (!state.hasData) return;
-    const confirmed = window.confirm("Remove the schedules stored in this browser? You can add the JSON file again later.");
+    const confirmed = window.confirm(translateUi("Remove the schedules stored in this browser? You can add the JSON file again later."));
     if (!confirmed) return;
 
     const before = captureScheduleChange();
@@ -4216,8 +4241,8 @@ const SYNC_URL = 'https://youfree.ca';
     const button = document.createElement("button");
     button.type = "button";
     button.className = `secondary-button person-action-icon ${extraClass}`.trim();
-    button.title = label;
-    button.setAttribute("aria-label", label);
+    setUiAttribute(button, "title", label);
+    setUiAttribute(button, "aria-label", label);
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     svg.setAttribute("viewBox", "0 0 24 24");
     svg.setAttribute("aria-hidden", "true");
@@ -4254,7 +4279,7 @@ const SYNC_URL = 'https://youfree.ca';
     state.personShareName = name;
     state.personShareBusy = false;
     state.personShareReturnFocus = returnFocus;
-    els.personQuickShareTitle.textContent = `Share ${displayName(name)}`;
+    setUiText(els.personQuickShareTitle, `Share ${displayName(name)}`);
     resetExportFields(els.personQuickExportFields);
     resetPersonQuickOutputs();
     personQuickShareButtons().forEach(button => { button.disabled = false; });
@@ -4335,17 +4360,17 @@ const SYNC_URL = 'https://youfree.ca';
   function openPersonGroup(name) {
     if (state.isParsing || state.pendingImage || state.codeMode || !peopleMap()[name]) return;
     state.groupPerson = name;
-    els.personGroupTitle.textContent = `Add ${displayName(name)} to a group`;
+    setUiText(els.personGroupTitle, `Add ${displayName(name)} to a group`);
     els.personGroupSelect.replaceChildren();
     for (const group of state.groups.filter(group => !group.members.includes(name))) {
       const option = document.createElement("option");
-      option.value = group.id; option.textContent = group.name;
+      option.value = group.id; setUiText(option, group.name, false);
       els.personGroupSelect.append(option);
     }
     const hasOptions = els.personGroupSelect.options.length > 0;
     els.personGroupField.hidden = !hasOptions;
     els.personGroupEmpty.hidden = hasOptions;
-    els.personGroupEmpty.textContent = state.groups.length ? "This person already belongs to every group." : "Create a group in Manage groups first.";
+    setUiText(els.personGroupEmpty, state.groups.length ? "This person already belongs to every group." : "Create a group in Manage groups first.");
     els.savePersonGroup.disabled = !hasOptions;
     els.personGroupModal.hidden = false;
     document.body.style.overflow = "hidden";
@@ -4393,14 +4418,14 @@ const SYNC_URL = 'https://youfree.ca';
     const personName = document.createElement("button");
     personName.type = "button";
     personName.className = "person-name person-select-button";
-    personName.setAttribute("aria-label", `View details for ${displayName(name)}`);
+    setUiAttribute(personName, "aria-label", `View details for ${displayName(name)}`);
     personName.setAttribute("aria-pressed", String(selected));
     personName.setAttribute("aria-describedby", "personOrderHelp");
-    personName.textContent = displayName(name);
+    setUiText(personName, displayName(name), false);
     if (pinned) {
       const pinMark = document.createElement("span");
       pinMark.className = "person-pin-mark";
-      pinMark.textContent = "📌";
+      setUiText(pinMark, "📌");
       pinMark.setAttribute("aria-hidden", "true");
       personName.append(" ", pinMark);
     }
@@ -4408,20 +4433,20 @@ const SYNC_URL = 'https://youfree.ca';
     const detail = document.createElement("span");
     detail.className = "person-detail";
     if (busyClass) {
-      detail.textContent = classLabel(busyClass);
+      setUiParts(detail, classUiParts(busyClass));
     } else if (busy) {
       const next = nextClassToday(name, day, minute);
-      detail.textContent = `Class Soon · next class at ${formatTime(next.start)}`;
+      setUiText(detail, `Class Soon · next class at ${formatTime(next.start)}`);
     } else {
       const next = nextClassToday(name, day, minute);
-      detail.textContent = next ? `Next ${formatTime(next.start)} · ${classLabel(next)}` : "No more classes today";
+      setUiText(detail, next ? `Next ${formatTime(next.start)} · ${classLabel(next)}` : "No more classes today");
     }
 
     copy.append(personName, detail);
     if (semesterIsOlder(peopleMap()[name].semester)) {
       const label = document.createElement("span");
       label.className = `schedule-semester${semesterIsOlder(peopleMap()[name].semester) ? " semester-older" : ""}`;
-      label.textContent = scheduleLabel(peopleMap()[name]);
+      setUiText(label, scheduleLabel(peopleMap()[name]));
       copy.append(label);
     }
     if (busy) {
@@ -4429,13 +4454,13 @@ const SYNC_URL = 'https://youfree.ca';
       times.className = "person-availability";
       const upcoming = window.WhosFreeAvailability.nextFreePeriod(classesForDay(name, day), minute);
       const nextLabel = upcoming.afterClasses ? "Free after classes at" : "Next break starts at";
-      times.textContent = `${busyClass ? `This class ends at ${formatTime(busyClass.end)}\n` : ""}${nextLabel} ${formatTime(minuteTime(upcoming.start))}`;
+      setUiText(times, `${busyClass ? `This class ends at ${formatTime(busyClass.end)}\n` : ""}${nextLabel} ${formatTime(minuteTime(upcoming.start))}`);
       copy.append(times);
     }
 
     const badge = document.createElement("span");
     badge.className = `status-badge ${busy ? "busy" : "free"}`;
-    badge.textContent = busyClass ? "IN CLASS" : busy ? "Class Soon" : "FREE";
+    setUiText(badge, busyClass ? "IN CLASS" : busy ? "Class Soon" : "FREE");
     badge.style.whiteSpace = "pre-line";
 
     button.append(dot, copy, badge);
@@ -4459,32 +4484,33 @@ const SYNC_URL = 'https://youfree.ca';
 
   function renderEmptyDetail() {
     state.lastDetailPerson = null;
-    els.detailPanel.innerHTML = `
+    setUiHtml(els.detailPanel, `
       <div class="empty-detail">
         <div class="empty-symbol" aria-hidden="true">◎</div>
         <h2>Select someone</h2>
         <p>Choose a person to see their day.</p>
-      </div>`;
+      </div>`);
   }
 
-  function detailCard(title, headline, detail, accent = "accent") {
+  function detailCard(title, headline, detail, accent = "accent", translateDetail = true) {
     const card = document.createElement("section");
     card.className = "detail-card";
 
     const label = document.createElement("div");
     label.className = `detail-label${accent === "busy" ? " busy" : ""}`;
-    label.textContent = title;
+    setUiText(label, title);
 
     const headlineEl = document.createElement("div");
     headlineEl.className = "detail-headline";
-    headlineEl.textContent = headline;
+    setUiText(headlineEl, headline);
 
     card.append(label, headlineEl);
 
     if (detail) {
       const copy = document.createElement("div");
       copy.className = "detail-copy";
-      copy.textContent = detail;
+      if (Array.isArray(detail)) setUiParts(copy, detail);
+      else setUiText(copy, detail, translateDetail);
       card.append(copy);
     }
 
@@ -4498,13 +4524,13 @@ const SYNC_URL = 'https://youfree.ca';
 
     const label = document.createElement("div");
     label.className = "detail-label";
-    label.textContent = `${day} timeline`;
+    setUiText(label, `${day} timeline`);
     card.append(label);
 
     if (classes.length === 0) {
       const copy = document.createElement("div");
       copy.className = "detail-copy";
-      copy.textContent = "No classes this day.";
+      setUiText(copy, "No classes this day.");
       card.append(copy);
       return card;
     }
@@ -4533,14 +4559,14 @@ const SYNC_URL = 'https://youfree.ca';
       block.className = `timeline-class ${timingClass}`;
       block.style.left = `${left}%`;
       block.style.width = `${width}%`;
-      block.title = `${formatTime(c.start)}–${formatTime(c.end)} · ${classLabel(c)}`;
-      if (width >= 15) block.textContent = shortClassLabel(c);
+      setUiAttribute(block, "title", `${formatTime(c.start)}–${formatTime(c.end)} · ${classLabel(c)}`, false);
+      if (width >= 15) setUiText(block, shortClassLabel(c), false);
       timeline.append(block);
 
       const timeLabel = document.createElement("div");
       timeLabel.className = `timeline-time${index === 0 ? " start" : ""}`;
       timeLabel.style.left = `${left}%`;
-      timeLabel.textContent = shortTime(c.start);
+      setUiText(timeLabel, shortTime(c.start));
       timeline.append(timeLabel);
     });
 
@@ -4548,7 +4574,7 @@ const SYNC_URL = 'https://youfree.ca';
     const endLabel = document.createElement("div");
     endLabel.className = "timeline-time end";
     endLabel.style.left = `${Math.max(0, Math.min(100, pos(toMinutes(lastClass.end))))}%`;
-    endLabel.textContent = shortTime(lastClass.end);
+    setUiText(endLabel, shortTime(lastClass.end));
     timeline.append(endLabel);
 
     if (minute >= rangeStart && minute <= rangeEnd) {
@@ -4560,7 +4586,7 @@ const SYNC_URL = 'https://youfree.ca';
       markerLabel.className = "timeline-marker-label";
       markerLabel.style.left = `${markerLeft}%`;
       markerLabel.dataset.edge = markerLeft < 12 ? "start" : markerLeft > 88 ? "end" : "center";
-      markerLabel.textContent = state.useLiveTime ? "now" : formatTime(state.selectedTime);
+      setUiText(markerLabel, state.useLiveTime ? "now" : formatTime(state.selectedTime));
       timeline.append(marker, markerLabel);
     }
 
@@ -4571,8 +4597,8 @@ const SYNC_URL = 'https://youfree.ca';
   function openPersonWeek(name) {
     const person = peopleMap()[name];
     if (!person) return;
-    els.personWeekTitle.textContent = displayName(name);
-    els.personWeekSemester.textContent = scheduleLabel(person, true);
+    setUiText(els.personWeekTitle, displayName(name), false);
+    setUiText(els.personWeekSemester, scheduleLabel(person, true));
     const classes = ALL_DAYS.flatMap(day => classesForDay(name, day)).filter(item => toMinutes(item.end) > toMinutes(item.start));
     const first = Math.min(480, ...classes.map(item => Math.floor(toMinutes(item.start) / 60) * 60));
     const last = Math.max(1200, ...classes.map(item => Math.ceil(toMinutes(item.end) / 60) * 60));
@@ -4582,7 +4608,7 @@ const SYNC_URL = 'https://youfree.ca';
     axis.className = "review-time-axis";
     for (let time = first; time <= last; time += 60) {
       const label = document.createElement("span");
-      label.textContent = minuteTime(time);
+      setUiText(label, minuteTime(time));
       label.style.top = `${time - first + 48}px`;
       axis.append(label);
     }
@@ -4592,7 +4618,7 @@ const SYNC_URL = 'https://youfree.ca';
       column.className = "review-day";
       const heading = document.createElement("div");
       heading.className = "review-day-heading group-day-heading";
-      heading.textContent = day;
+      setUiText(heading, day);
       const track = document.createElement("div");
       track.className = "review-day-track";
       track.style.height = `${last - first}px`;
@@ -4604,8 +4630,8 @@ const SYNC_URL = 'https://youfree.ca';
         block.dataset.end = item.end;
         block.style.top = `${toMinutes(item.start) - first}px`;
         block.style.height = `${toMinutes(item.end) - toMinutes(item.start)}px`;
-        block.textContent = `${item.start}–${item.end}\n${classLabel(item)}${item.instructor ? `\n${item.instructor}` : ""}`;
-        block.title = `${day} ${block.textContent}`;
+        setUiParts(block, [{ text: `${item.start}–${item.end}\n`, translate: false }, ...classUiParts(item), { text: item.instructor ? `\n${item.instructor}` : "", translate: false }]);
+        setUiParts(block, [{ text: day, translate: true }, { text: ` ${sourceUiText(block)}`, translate: false }], "", "title");
         track.append(block);
       }
       column.append(heading, track);
@@ -4643,14 +4669,14 @@ const SYNC_URL = 'https://youfree.ca';
     const header = document.createElement("div");
     header.className = "detail-header";
     const nameEl = document.createElement("h2");
-    nameEl.textContent = displayName(name);
+    setUiText(nameEl, displayName(name), false);
     const nameRow = document.createElement("div");
     nameRow.className = "detail-name-row";
     const fullSchedule = iconAction(`View full schedule for ${displayName(name)}`, "M5 5h14a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2ZM7 3v4M17 3v4M3 11h18", "full-schedule-button");
     fullSchedule.id = "fullScheduleButton";
     const fullScheduleLabel = document.createElement("span");
     fullScheduleLabel.className = "nav-button-label";
-    fullScheduleLabel.textContent = "Full schedule";
+    setUiText(fullScheduleLabel, "Full schedule");
     fullSchedule.append(fullScheduleLabel);
     fullSchedule.setAttribute("aria-haspopup", "dialog");
     fullSchedule.addEventListener("click", () => openPersonWeek(name));
@@ -4671,19 +4697,19 @@ const SYNC_URL = 'https://youfree.ca';
     nameRow.append(nameEl, actions);
     const semesterLabel = document.createElement("p");
     semesterLabel.className = `schedule-semester${semesterIsOlder(peopleMap()[name].semester) ? " semester-older" : ""}`;
-    semesterLabel.textContent = scheduleLabel(peopleMap()[name], true);
+    setUiText(semesterLabel, scheduleLabel(peopleMap()[name], true));
     const statusRow = document.createElement("div");
     statusRow.className = "detail-status-row";
 
     const badge = document.createElement("span");
     badge.className = `status-badge ${busy ? "busy" : "free"}`;
-    badge.textContent = current ? "IN CLASS" : busy ? "Class Soon" : "FREE";
+    setUiText(badge, current ? "IN CLASS" : busy ? "Class Soon" : "FREE");
     statusRow.append(badge);
 
     if (current) {
       const until = document.createElement("span");
       until.className = "until-copy";
-      until.textContent = `This class ends at ${formatTime(current.end)}`;
+      setUiText(until, `This class ends at ${formatTime(current.end)}`);
       statusRow.append(until);
     }
 
@@ -4695,8 +4721,8 @@ const SYNC_URL = 'https://youfree.ca';
       els.detailPanel.append(detailCard(
         "Current class",
         `${formatTime(current.start)}–${formatTime(current.end)}`,
-        classLabel(current),
-        "busy"
+        classUiParts(current),
+        "busy", false
       ));
     }
 
@@ -4780,11 +4806,11 @@ const SYNC_URL = 'https://youfree.ca';
     const oldScroll = els.peopleList.scrollTop;
     const openMenus = [...els.peopleList.querySelectorAll(".group-options[open]")].map(menu => menu.closest(".people-group").dataset.groupId);
     const activeMenu = document.activeElement?.closest?.(".group-options");
-    const menuFocusLabel = activeMenu ? document.activeElement.getAttribute("aria-label") : null;
+    const menuFocusLabel = activeMenu ? sourceUiAttribute(document.activeElement, "aria-label") : null;
 
-    els.peopleHeading.textContent = state.showGroups ? "Groups" : state.showEveryone ? "Everyone" : state.useLiveTime ? "Free now" : "Free";
+    setUiText(els.peopleHeading, state.showGroups ? "Groups" : state.showEveryone ? "Everyone" : state.useLiveTime ? "Free now" : "Free");
     setViewToggle(els.viewToggleButton, state.showEveryone ? "Show only free" : "Show everyone", state.showEveryone);
-    els.viewToggleButton.querySelector("[data-mode-label]").textContent = state.showEveryone ? "Free" : "All";
+    setUiText(els.viewToggleButton.querySelector("[data-mode-label]"), state.showEveryone ? "Free" : "All");
     els.peopleList.replaceChildren();
 
     updatePeopleSearchStatus(visible);
@@ -4812,7 +4838,7 @@ const SYNC_URL = 'https://youfree.ca';
     for (const section of els.peopleList.querySelectorAll(".people-group")) {
       if (openMenus.includes(section.dataset.groupId)) section.querySelector(".group-options").open = true;
     }
-    if (menuFocusLabel) [...els.peopleList.querySelectorAll(".group-options summary, .group-options button")].find(item => item.getAttribute("aria-label") === menuFocusLabel && !item.disabled)?.focus({ preventScroll: true });
+    if (menuFocusLabel) [...els.peopleList.querySelectorAll(".group-options summary, .group-options button")].find(item => sourceUiAttribute(item, "aria-label") === menuFocusLabel && !item.disabled)?.focus({ preventScroll: true });
 
     if (state.selectedPerson && !displayed.includes(state.selectedPerson)) {
       state.selectedPerson = null;
@@ -5279,7 +5305,7 @@ const SYNC_URL = 'https://youfree.ca';
     if (!("serviceWorker" in navigator)) return;
     if (location.protocol !== "https:" && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") return;
 
-    navigator.serviceWorker.register("./service-worker.js?v=126", { updateViaCache: "none" })
+    navigator.serviceWorker.register("./service-worker.js?v=127", { updateViaCache: "none" })
       .then(registration => registration.update())
       .catch(() => {
         // The app works normally even if PWA caching isn't available.
@@ -5350,6 +5376,7 @@ const SYNC_URL = 'https://youfree.ca';
 
   init();
 })();
+
 
 
 

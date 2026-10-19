@@ -2976,3 +2976,11 @@ button:disabled { cursor: not-allowed; }
 .navigation-fallback .home-header-controls .header-data-button { width: auto; }
 
 
+
+
+/* The language action stays visible in the shared phone/desktop sidebar. */
+.language-toggle-button { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 48px; margin-top: 12px; padding: 10px 14px; border: 1px solid var(--border); }
+.language-toggle-button img { display: block; width: 36px; height: 24px; object-fit: cover; border-radius: 3px; box-shadow: 0 0 0 1px rgba(128,128,128,.35); flex-shrink: 0; }
+.language-toggle-button span { display: inline; font-size: 14px; font-weight: 600; }
+html[lang="fr"] .header-actions button, html[lang="fr"] .modal-actions button { white-space: normal; }
+html[lang="fr"] .nav-extra-label, html[lang="fr"] .nav-button-label { min-width: 0; }

@@ -510,3 +510,39 @@ isolated contexts. See [WebKit's storage isolation explanation](https://webkit.o
 Focused checks: `node --test tests/cache-sync.test.mjs tests/offline-cache.test.cjs
  tests/first-schedule-onboarding.test.mjs tests/person-order-ui.test.mjs`.
 
+
+
+## English / French interface
+
+The shared sidebar has a visible flag and language action. In English, its French
+flag offers **Français**; in French, its UK flag offers **English**. The selected
+language is stored locally under `ufree-language-v1`; English remains the default.
+The document's `lang`, labels, Help, privacy notice, settings, modal content,
+progress messages, validation errors, accessibility text and notifications switch
+through `i18n.js` and the local `i18n-fr.js` catalogue. Both scripts and flag SVGs
+are included in the offline app shell. No translation service or network API is used.
+
+Translation applies to presentation only. Names, nicknames, group names, course
+content, input values, weekday/semester data, JSON records, codes and QR/link
+payloads retain their original values. Text/attribute bindings retain their
+canonical source so switching language does not rebuild forms or lose drafts.
+UI fragments with user content use explicit untranslated parts. Parser errors
+remain canonical internally and are translated when displayed, preserving the
+existing error handling and fallback detection. New interface copy needs a matching
+catalogue entry; unknown browser-specific diagnostics stay visible as received.
+Native browser/OS controls, such as file pickers and permission-dialog buttons,
+follow the device language.
+
+Run `node --test tests/bilingual-ui.test.mjs` for language coverage and focused
+interaction checks. Existing sharing, onboarding, ordering and offline tests also
+remain applicable. Physical iPhone layout and VoiceOver need device verification.
+
+### Reverting the bilingual feature
+
+The pre-change code is preserved on `backup/pre-bilingual-2026-10-19`, pointing at
+`612b564d4592df67815292f303a53254357acbae`. Revert the single commit titled
+"Add reversible English/French interface and sidebar flag control" with `git revert`
+to restore the previous interface while preserving later history. No schedule data
+migration is involved, and an unused language preference is harmless. When shipping
+a rollback, bump app/stylesheet/service-worker cache references so installed clients
+receive the restored version.
