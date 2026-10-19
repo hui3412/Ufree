@@ -1,4 +1,4 @@
-const CACHE_NAME = "whos-free-shell-v127";
+const CACHE_NAME = "whos-free-shell-v128";
 const OCR_CACHE_NAME = "whos-free-ocr-v1";
 const APP_SHELL = [
   "./",
