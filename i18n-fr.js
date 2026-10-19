@@ -610,12 +610,11 @@ window.UFreeFrench = {
     "Example of a clear weekly timetable with all weekday headings, times, and class blocks visible.": "Exemple d’un horaire hebdomadaire net où tous les jours, les heures et les blocs de cours sont visibles.",
     "Example screenshot: include the complete timetable.": "Exemple de capture d’écran : incluez l’horaire en entier.",
     "Before your first screenshot": "Avant votre première capture d’écran",
-    "Take a moment to look at this example. The picture picker unlocks after you view it for three seconds. You will only need to do this once on this device.": "Prenez un moment pour regarder cet exemple. Vous pourrez choisir votre image après l’avoir regardé pendant trois secondes. Cette étape n’est nécessaire qu’une seule fois sur cet appareil.",
+    "Take a moment to look at this example before choosing your screenshot. You will only need to do this once on this device.": "Prenez un moment pour regarder cet exemple avant de choisir votre capture d’écran. Cette étape n’est nécessaire qu’une seule fois sur cet appareil.",
     "Loading the screenshot example…": "Chargement de l’exemple de capture d’écran…",
     "Choose screenshot": "Choisir une capture d’écran",
-    "You can now choose your screenshot.": "Vous pouvez maintenant choisir votre capture d’écran.",
-    "Keep the example visible to continue the countdown.": "Gardez l’exemple visible pour poursuivre le compte à rebours.",
-    "Open the example to continue the countdown.": "Ouvrez l’exemple pour poursuivre le compte à rebours.",
+    "Keep the example visible to continue.": "Gardez l’exemple visible pour continuer.",
+    "Open the example to continue.": "Ouvrez l’exemple pour continuer.",
     "The example could not load. Connect to the internet and choose Try again.": "Impossible de charger l’exemple. Connectez-vous à Internet, puis choisissez Réessayer."
   },
   "templates": [
@@ -2027,14 +2026,6 @@ window.UFreeFrench = {
       "fr": "{0} Les noms similaires sont numérotés dans ce partage : {1}.",
       "translateSlots": [
         0
-      ]
-    },
-    {
-      "en": "Look at the example. Choose your screenshot in {0} seconds.",
-      "fr": "Regardez l’exemple. Vous pourrez choisir votre capture d’écran dans {0} seconde{p0}.",
-      "translateSlots": [],
-      "slotPatterns": [
-        "[1-3]"
       ]
     }
   ]

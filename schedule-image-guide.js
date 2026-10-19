@@ -16,7 +16,7 @@
   const retry = document.getElementById('screenshotGuideRetry');
   const status = document.getElementById('screenshotGuideStatus');
   let acknowledged = false, request = null, timer = null, statusSource = '';
-  let remaining = 3000, lastTick = 0, loaded = false, failed = false;
+  let remaining = 2000, lastTick = 0, loaded = false, failed = false;
   try { acknowledged = localStorage.getItem(SEEN_KEY) === '1'; } catch { /* Session-only acknowledgement still works. */ }
 
   function exampleVisible() {
@@ -32,10 +32,11 @@
     retry.hidden = !failed;
     const message = failed ? 'The example could not load. Connect to the internet and choose Try again.'
       : !loaded ? 'Loading the screenshot example…'
-      : remaining <= 0 ? 'You can now choose your screenshot.'
-      : !details.open ? 'Open the example to continue the countdown.'
-      : !exampleVisible() ? 'Keep the example visible to continue the countdown.'
-      : `Look at the example. Choose your screenshot in ${Math.ceil(remaining / 1000)} seconds.`;
+      : remaining <= 0 ? ''
+      : !details.open ? 'Open the example to continue.'
+      : !exampleVisible() ? 'Keep the example visible to continue.'
+      : '';
+    status.hidden = !message;
     if (message !== statusSource) { statusSource = message; text(status, message); }
   }
 
@@ -81,7 +82,7 @@
         .map(element => ({ element, inert: element.hasAttribute('inert'), ariaHidden: element.getAttribute('aria-hidden') })),
     };
     for (const item of request.background) { item.element.setAttribute('inert', ''); item.element.setAttribute('aria-hidden', 'true'); }
-    loaded = false; failed = false; remaining = 3000;
+    loaded = false; failed = false; remaining = 2000;
     details.open = true;
     modal.hidden = false;
     modal.querySelector('.screenshot-guide-card').scrollTop = 0;
@@ -97,7 +98,7 @@
   image.addEventListener('load', startTimer);
   image.addEventListener('error', () => {
     if (!request) return;
-    failed = true; loaded = false; remaining = 3000;
+    failed = true; loaded = false; remaining = 2000;
     if (timer !== null) clearInterval(timer);
     timer = null; render();
   });

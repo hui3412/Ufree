@@ -3,7 +3,7 @@
 ### Screenshot example and first-picture introduction
 
 - The supplied timetable image is bundled at `assets/examples/schedule-screenshot.jpg`. A collapsible example is available beside the Schedules and Import picture buttons, and is the first item after the Help header. The example includes practical framing guidance and English/French text.
-- Before someone with no schedule history opens their first picture picker, a prominent introduction expands the example. The chooser remains disabled until the image has loaded and at least three seconds of viewing time have elapsed. Hidden tabs, a collapsed example, or scrolling the image out of view pause the countdown. Failed image loads offer Retry instead of counting unseen time.
+- Before someone with no schedule history opens their first picture picker, a prominent introduction expands the example. The chooser remains disabled until the image has loaded and at least two seconds of viewing time have elapsed. Hidden tabs, a collapsed example, or scrolling the image out of view pause the silent delay. Failed image loads offer Retry instead of counting unseen time.
 - Continue opens the native picture picker synchronously from the user's click, preserving iOS gesture requirements. Cancel and Escape restore the previous dialog/focus without saving an acknowledgement. Completed acknowledgement is remembered under `ufree-screenshot-guide-seen-v1`; blocked storage still remembers it for the session. Existing schedules or prior schedule history bypass the forced introduction.
 - Both the guide script and the original JPEG are included in the offline shell. Recognition, manual entry, PDF/JSON/code import and saved schedule data remain unchanged.
 

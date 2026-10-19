@@ -67,7 +67,7 @@ test('the attached example is collapsible beside both picture buttons and first 
   } finally { await a.close(); }
 });
 
-test('the first picture picker waits for the image and three seconds, then opens synchronously once', async () => {
+test('the first picture picker waits for the image and two seconds, then opens synchronously once', async () => {
   const a = await app();
   try {
     a.open();
@@ -76,7 +76,7 @@ test('the first picture picker waits for the image and three seconds, then opens
     assert.equal(a.pickerCalls(), 0);
     a.advance(10000);
     assert.equal(a.el('screenshotGuideContinue').disabled, true, 'loading time is not viewing time');
-    a.load(); a.advance(2999);
+    a.load(); a.advance(1999);
     a.el('screenshotGuideContinue').click();
     assert.equal(a.pickerCalls(), 0);
     a.advance(1);
@@ -99,13 +99,13 @@ test('Import and the empty-home picture entry use the same first-use guide', asy
       if (entry === 'import') { a.el('homeImportButton').click(); a.el('importScheduleImageButton').click(); }
       else a.el('peopleList').querySelector('.add-picture').click();
       assert.equal(a.el('screenshotGuideModal').hidden, false);
-      a.load(); a.advance(3000); a.el('screenshotGuideContinue').click();
+      a.load(); a.advance(2000); a.el('screenshotGuideContinue').click();
       assert.equal(a.pickerCalls(), 1);
     } finally { await a.close(); }
   }
 });
 
-test('hidden pages and collapsed examples do not consume the three-second viewing time', async () => {
+test('hidden pages and collapsed examples do not consume the two-second viewing time', async () => {
   const a = await app();
   try {
     a.open(); a.load(); a.advance(1000);
@@ -117,7 +117,7 @@ test('hidden pages and collapsed examples do not consume the three-second viewin
     details.open = false; details.dispatchEvent(new a.w.Event('toggle')); a.advance(10000);
     assert.equal(a.el('screenshotGuideContinue').disabled, true);
     details.open = true; details.dispatchEvent(new a.w.Event('toggle'));
-    a.advance(1999); assert.equal(a.el('screenshotGuideContinue').disabled, true);
+    a.advance(999); assert.equal(a.el('screenshotGuideContinue').disabled, true);
     a.advance(1); assert.equal(a.el('screenshotGuideContinue').disabled, false);
   } finally { await a.close(); }
 });
@@ -149,17 +149,19 @@ for (const options of [
   finally { await a.close(); }
 });
 
-test('a failed example stays locked, can retry, and localizes its countdown and controls', async () => {
+test('a failed example stays locked, can retry, and keeps its delay silent and localizes controls', async () => {
   const a = await app();
   try {
-    a.open(); a.image.dispatchEvent(new a.w.Event('error')); a.advance(3000);
+    a.open(); a.image.dispatchEvent(new a.w.Event('error')); a.advance(2000);
     assert.equal(a.el('screenshotGuideContinue').disabled, true);
     assert.equal(a.el('screenshotGuideRetry').hidden, false);
     a.el('screenshotGuideRetry').click(); a.load(); a.advance(1000);
     a.w.UFreeI18n.setLanguage('fr');
-    assert.match(a.el('screenshotGuideStatus').textContent, /dans 2 secondes/);
+    assert.equal(a.el('screenshotGuideStatus').hidden, true);
+    assert.equal(a.el('screenshotGuideStatus').textContent, '');
     assert.equal(a.el('screenshotGuideContinue').textContent, 'Choisir une capture d’écran');
-    a.advance(1000); assert.match(a.el('screenshotGuideStatus').textContent, /dans 1 seconde\./);
+    a.advance(1000); assert.equal(a.el('screenshotGuideStatus').hidden, true);
+    assert.equal(a.el('screenshotGuideStatus').textContent, '');
     a.advance(1000); a.el('screenshotGuideContinue').click();
     assert.equal(a.pickerCalls(), 1);
   } finally { await a.close(); }
@@ -168,7 +170,7 @@ test('a failed example stays locked, can retry, and localizes its countdown and 
 test('blocked preference writes keep the acknowledgement for the current session', async () => {
   const a = await app({ blocked: true });
   try {
-    a.open(); a.load(); a.advance(3000); a.el('screenshotGuideContinue').click();
+    a.open(); a.load(); a.advance(2000); a.el('screenshotGuideContinue').click();
     a.el('addScheduleImageButton').click();
     assert.equal(a.pickerCalls(), 2);
   } finally { await a.close(); }
@@ -176,7 +178,7 @@ test('blocked preference writes keep the acknowledgement for the current session
 
 test('the guide script and the original attached JPEG are in the offline shell', () => {
   const worker = read('service-worker.js');
-  assert.ok(worker.includes('./schedule-image-guide.js?v=131'));
+  assert.ok(worker.includes('./schedule-image-guide.js?v=132'));
   assert.ok(worker.includes('./assets/examples/schedule-screenshot.jpg'));
   const jpeg = fs.readFileSync(new URL('../assets/examples/schedule-screenshot.jpg', import.meta.url));
   assert.equal(jpeg[0], 0xff); assert.equal(jpeg[1], 0xd8);
