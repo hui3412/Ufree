@@ -156,5 +156,5 @@ test('offline navigation never reads the JSON backup cache', async () => {
   let response;
   listeners.fetch({ request: { method: 'GET', url: 'https://youfree.ca/', mode: 'navigate' }, respondWith(value) { response = value; } });
   assert.match(await (await response).text(), /<html>/);
-  assert.deepEqual(requestedCaches, ['whos-free-shell-v125']);
+  assert.deepEqual(requestedCaches, [read('service-worker.js').match(/const CACHE_NAME = "([^"]+)"/)[1]]);
 });

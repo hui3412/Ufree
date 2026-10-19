@@ -1,14 +1,14 @@
-const CACHE_NAME = "whos-free-shell-v128";
+const CACHE_NAME = "whos-free-main-shell-v129";
 const OCR_CACHE_NAME = "whos-free-ocr-v1";
 const APP_SHELL = [
   "./",
   "./index.html",
-  "./i18n-fr.js?v=127",
+  "./i18n-fr.js?v=129",
   "./i18n.js?v=127",
   "./assets/flag-fr.svg",
   "./assets/flag-uk.svg",
-  "./styles.css?v=127",
-  "./app.js?v=127",
+  "./styles.css?v=129",
+  "./app.js?v=129",
   "./schedule-qr-batches.js?v=126",
   "./schedule-share-code.js?v=120",
   "./assets/qr/qrcodegen.js?v=90",
@@ -40,7 +40,7 @@ self.addEventListener("install", event => {
 self.addEventListener("activate", event => {
   event.waitUntil(
     caches.keys().then(keys => Promise.all(
-      keys.filter(key => key.startsWith("whos-free-") && key !== CACHE_NAME && key !== OCR_CACHE_NAME).map(key => caches.delete(key))
+      keys.filter(key => key.startsWith("whos-free-main-shell-") && key !== CACHE_NAME && key !== OCR_CACHE_NAME).map(key => caches.delete(key))
     ))
   );
   self.clients.claim();

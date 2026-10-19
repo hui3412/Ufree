@@ -13,9 +13,10 @@ async function app(data) {
   let copied;
   Object.defineProperty(window.navigator, "clipboard", { value: { writeText: async text => { copied = text; } }, configurable: true });
   if (data) window.localStorage.setItem("whos-free-local-schedules", JSON.stringify({ data, meta: {} }));
-  for (const name of ["schedule-availability.js", "schedule-share-code.js", "app.js"]) window.eval(fs.readFileSync(new URL("../" + name, import.meta.url), "utf8"));
+  for (const name of ["schedule-availability.js", "schedule-groups.js", "schedule-share-code.js", "app.js"]) window.eval(fs.readFileSync(new URL("../" + name, import.meta.url), "utf8"));
   const wait = async () => { for (let i = 0; i < 50; i++) { await new Promise(resolve => setTimeout(resolve, 20)); if (!window.document.getElementById("decodeCodeButton").disabled) return; } throw Error("operation did not finish"); };
   await wait();
+  window.document.getElementById("closeFirstScheduleWelcome").click();
   const el = id => window.document.getElementById(id);
   const prompt = async () => {
     for (let i = 0; i < 50; i++) {

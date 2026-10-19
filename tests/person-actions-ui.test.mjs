@@ -57,7 +57,7 @@ async function app(initial = data, groups = [{ id: "team", name: "Team", members
   window.localStorage.setItem("whos-free-notification-settings-v1", JSON.stringify({ enabled: false, mutedPeople: ["Alice"] }));
   const scrolls = [];
   window.HTMLElement.prototype.scrollIntoView = function() { scrolls.push(this.id); };
-  for (const filename of ["schedule-availability.js", "schedule-groups.js", "schedule-share-code.js", "assets/qr/qrcodegen.js", "app.js"]) {
+  for (const filename of ["schedule-availability.js", "schedule-groups.js", "schedule-share-code.js", "assets/qr/qrcodegen.js", "schedule-qr-batches.js", "app.js"]) {
     window.eval(fs.readFileSync(new URL("../" + filename, import.meta.url), "utf8"));
   }
   const el = id => window.document.getElementById(id);
@@ -299,7 +299,7 @@ test("Class Soon, collapsed people, removed summary/forecast, UFree identity, an
       const dialog = a.el(id).querySelector('[role="dialog"]');
       const footer = dialog.querySelector("footer");
       assert.equal(id === "helpModal" ? dialog.lastElementChild.id : dialog.lastElementChild.tagName, id === "helpModal" ? "iosShortcutGuide" : "FOOTER");
-      assert.equal(footer.textContent.replace(/\s+/g, " ").trim(), "App by David Dajbog and Hui En Quan. Inspiration from Xander Vatch.");
+      assert.equal(footer.textContent.replace(/\s+/g, " ").trim(), "App by David Dajbog and Hui En Qian. Inspiration from Xander Vatch.");
     }
   } finally { await a.window.happyDOM.abort(); }
 });
@@ -485,7 +485,7 @@ for (const mobile of [false, true]) test(`${mobile ? "mobile" : "desktop"} menu 
     assert.equal(a.window.document.activeElement.id, "closeMobileMenuButton");
     const sendKey = (key, shiftKey = false) => a.window.document.activeElement.dispatchEvent(new a.window.KeyboardEvent("keydown", { key, shiftKey, bubbles: true, cancelable: true }));
     sendKey("Tab", true);
-    assert.equal(a.window.document.activeElement.id, "homeImportButton", "disabled Undo is skipped");
+    assert.equal(a.window.document.activeElement.id, "languageToggleButton", "the last enabled sidebar action includes the language control");
     sendKey("Tab");
     assert.equal(a.window.document.activeElement.id, "closeMobileMenuButton");
     sendKey("Escape");
@@ -661,7 +661,7 @@ test('published shell keeps the header siblings and release asset versions consi
     const worker = fs.readFileSync(new URL('../service-worker.js', import.meta.url), 'utf8');
     const cached = new Set([...worker.matchAll(/"\.\/([^"]+)"/g)].map(match => match[1]));
     const version = new URL(doc.querySelector('script[src^="app.js"]').getAttribute('src'), base).searchParams.get('v');
-    assert.ok(worker.includes(`const CACHE_NAME = "whos-free-shell-v${version}"`));
+    assert.ok(worker.includes(`const CACHE_NAME = "whos-free-main-shell-v${version}"`));
     assert.ok(fs.readFileSync(new URL('../app.js', import.meta.url), 'utf8').includes(`service-worker.js?v=${version}`));
     for (const element of doc.querySelectorAll('script[src], link[href], .brand-logo')) {
       const url = element.getAttribute('src') || element.getAttribute('href');

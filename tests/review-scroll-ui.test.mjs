@@ -39,7 +39,7 @@ async function timetable(view) {
   await tick();
   const grid = window.document.getElementById(view === "picture review" ? "reviewGrid" : view === "group schedule" ? "groupWeekGrid" : "personWeekGrid").parentElement;
   const container = window.document.getElementById(view === "picture review" ? "imageReview" : view === "group schedule" ? "groupWeekModal" : "personWeekModal");
-  const actionButton = window.document.getElementById(view === "picture review" ? "saveImageScheduleButton" : view === "group schedule" ? "closeGroupWeekModal" : "exportPersonScheduleButton");
+  const actionButton = window.document.getElementById(view === "picture review" ? "saveImageScheduleButton" : view === "group schedule" ? "closeGroupWeekModal" : "closePersonWeekModal");
   const dialog = grid.closest(".schedule-modal");
   Object.defineProperties(grid, { scrollHeight: { value: 700 }, clientHeight: { value: 300, configurable: true }, scrollWidth: { value: 1300 }, clientWidth: { value: 300 } });
   Object.defineProperties(dialog, { scrollHeight: { value: 2000 }, clientHeight: { value: 600 } });

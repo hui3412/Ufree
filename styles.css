@@ -2652,6 +2652,9 @@ button:disabled { cursor: not-allowed; }
 }
 .group-options:not([open]) .group-options-panel { display: none; }
 .group-options-panel button { text-align: left; font-size: .82rem; }
+.people-group:has(.group-options[open]) .people-group-header {
+  padding-bottom: 146px;
+}
 .people-group.group-collapsed { margin-bottom: 16px; }
 @media (max-width: 600px) {
   .review-semester-fields:has(#useCurrentSemesterButton:not([hidden])) { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }

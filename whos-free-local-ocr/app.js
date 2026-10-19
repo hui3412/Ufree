@@ -9,6 +9,8 @@
     hasData: false,
     scheduleMeta: null,
     storageBackend: "checking",
+    storageReadError: false,
+    deviceReady: false,
     useLiveTime: true,
     selectedDay: "Monday",
     selectedTime: "12:00",
@@ -940,12 +942,14 @@
   }
 
   function chooseScheduleFile() {
+    if (!schedulesWritable() || state.isParsing || state.pendingImage) return;
     // Clearing the value allows choosing the same file again after replacing it.
     els.scheduleFileInput.value = "";
     els.scheduleFileInput.click();
   }
 
   function chooseSchedulePdf() {
+    if (!schedulesWritable() || state.isParsing || state.pendingImage) return;
     // A real file picker must be opened directly from the user's click/tap.
     // showPicker() is more reliable in Safari/iOS PWAs; click() remains the fallback.
     els.schedulePdfInput.value = "";
@@ -961,7 +965,7 @@
   }
 
   function chooseScheduleImage() {
-    if (state.isParsing || state.pendingImage) return;
+    if (!schedulesWritable() || state.isParsing || state.pendingImage) return;
     els.scheduleImageInput.value = "";
     els.scheduleImageInput.click();
   }
@@ -1080,7 +1084,7 @@
   }
 
   function openManualSchedule(name = "", person = { source_file: "manual", classes: [] }) {
-    if (state.isParsing || state.pendingImage) return;
+    if (!schedulesWritable() || state.isParsing || state.pendingImage) return;
     state.pendingImage = { name, person };
     els.imageReviewName.value = name;
     els.imageReviewClasses.replaceChildren();
@@ -1107,7 +1111,7 @@
 
   async function handleScheduleImage(event) {
     const file = event.target.files?.[0];
-    if (!file || state.isParsing || state.pendingImage) return;
+    if (!schedulesWritable() || !file || state.isParsing || state.pendingImage) return;
     if (els.scheduleModal.hidden) openScheduleModal();
     state.isParsing = true;
     updateScheduleModal();
@@ -1138,7 +1142,7 @@
   }
 
   async function saveImageSchedule() {
-    if (!state.pendingImage || state.isParsing) return;
+    if (!schedulesWritable() || !state.pendingImage || state.isParsing) return;
     els.imageReviewError.textContent = "";
     const name = els.imageReviewName.value.trim();
     if (!name) { els.imageReviewError.textContent = "Enter the person's name before saving."; els.imageReviewName.focus(); return; }
@@ -1242,33 +1246,50 @@
     localStorage.removeItem(LOCAL_STORAGE_FALLBACK_KEY);
   }
 
+  let scheduleStorageRevision = 0;
+  const recordRevision = record => Number.isSafeInteger(record?.storageRevision) && record.storageRevision > 0 ? record.storageRevision : 0;
+
   async function readLocalScheduleRecord() {
-    try {
-      const record = await idbGet(LOCAL_SCHEDULE_KEY);
-      state.storageBackend = "indexeddb";
-      return record || null;
-    } catch {
-      try {
-        const record = fallbackRead();
-        state.storageBackend = "localstorage";
-        return record;
-      } catch {
-        state.storageBackend = "memory";
-        return null;
-      }
+    let primary = null, fallback = null, primaryError = null, fallbackError = null;
+    if ("indexedDB" in window) {
+      try { primary = await idbGet(LOCAL_SCHEDULE_KEY); }
+      catch (error) { primaryError = error; }
     }
+    try { fallback = fallbackRead(); }
+    catch (error) { fallbackError = error; }
+    // Old, unversioned records retain IndexedDB priority. New writes carry a
+    // monotonic revision so an outage cannot make an older copy authoritative.
+    scheduleStorageRevision = Math.max(scheduleStorageRevision, recordRevision(primary), recordRevision(fallback));
+    const useFallback = fallback && (!primary || recordRevision(fallback) > recordRevision(primary));
+    const record = useFallback ? fallback : primary;
+    if (record) {
+      state.storageBackend = useFallback ? "localstorage" : "indexeddb";
+      return record;
+    }
+    if (primaryError || fallbackError) {
+      state.storageBackend = "memory";
+      throw new Error("Local storage could not be read. Reload UFree when storage is available; your saved copy has not been replaced.");
+    }
+    state.storageBackend = "indexedDB" in window ? "indexeddb" : "localstorage";
+    return null;
   }
 
   async function saveLocalScheduleRecord(record) {
+    const saved = { ...record, storageRevision: Math.max(Date.now(), scheduleStorageRevision + 1) };
+    scheduleStorageRevision = saved.storageRevision;
     try {
-      await idbSet(LOCAL_SCHEDULE_KEY, record);
+      await idbSet(LOCAL_SCHEDULE_KEY, saved);
       state.storageBackend = "indexeddb";
-      return;
+      // Keep a current fallback when space permits. If it cannot be refreshed,
+      // remove the old fallback so it cannot resurrect removed people later.
+      try { fallbackWrite(saved); }
+      catch { try { fallbackDelete(); } catch { /* IndexedDB remains saved. */ } }
+      return saved;
     } catch {
       try {
-        fallbackWrite(record);
+        fallbackWrite(saved);
         state.storageBackend = "localstorage";
-        return;
+        return saved;
       } catch {
         state.storageBackend = "memory";
         throw new Error("This browser would not allow the app to save a local copy. The schedules will work until the page is closed, but may need to be selected again later.");
@@ -1277,20 +1298,28 @@
   }
 
   async function deleteLocalScheduleRecord() {
-    let removed = false;
-    try {
-      await idbDelete(LOCAL_SCHEDULE_KEY);
-      removed = true;
-    } catch {
-      // Try fallback storage too.
+    const recordToRestore = state.hasData ? { data: state.data, meta: state.scheduleMeta, storageRevision: scheduleStorageRevision } : null;
+    let primaryRemoved = !("indexedDB" in window), fallbackRemoved = false;
+    if ("indexedDB" in window) {
+      try { await idbDelete(LOCAL_SCHEDULE_KEY); primaryRemoved = true; }
+      catch { return false; } // Keep the fallback intact when the primary survives.
     }
     try {
       fallbackDelete();
-      removed = true;
+      fallbackRemoved = true;
     } catch {
-      // Nothing else to remove.
+      // Preserve the latest collection after a partial deletion where possible.
+      // The displayed collection remains intact when deletion fails.
+      if (primaryRemoved && "indexedDB" in window && recordToRestore) {
+        try { await idbSet(LOCAL_SCHEDULE_KEY, recordToRestore); } catch { /* Report failure below. */ }
+      }
     }
+    const removed = primaryRemoved && fallbackRemoved;
     return removed;
+  }
+
+  function schedulesWritable() {
+    return state.deviceReady && !state.storageReadError;
   }
 
   function validateData(data) {
@@ -1382,6 +1411,7 @@
   }
 
   async function handleSchedulePdfs(event) {
+    if (!schedulesWritable() || state.isParsing || state.pendingImage) return;
     const files = Array.from(event.target.files || []);
     if (!files.length) return;
     if (els.scheduleModal.hidden) openScheduleModal();
@@ -1498,6 +1528,7 @@
   }
 
   async function handleLocalScheduleFile(event) {
+    if (!schedulesWritable() || state.isParsing || state.pendingImage) return;
     const [file] = event.target.files || [];
     if (!file) return;
     const hadData = state.hasData;
@@ -1552,6 +1583,7 @@
   }
 
   async function loadSchedulesFromDevice() {
+    state.storageReadError = false;
     els.statusLine.textContent = "Checking this device for schedule data…";
     try {
       const record = await readLocalScheduleRecord();
@@ -1580,6 +1612,7 @@
       state.hasData = false;
       state.data = { people: {} };
       state.scheduleMeta = null;
+      state.storageReadError = true;
       state.loadError = `The saved local copy could not be read: ${error.message}`;
       renderDataSetup();
       updateScheduleModal();
@@ -1594,10 +1627,15 @@
   }
 
   async function removePerson(name) {
+    if (!schedulesWritable() || state.isParsing || state.pendingImage) return;
     if (!state.hasData || !Object.prototype.hasOwnProperty.call(state.data.people || {}, name)) return;
     const confirmed = window.confirm(`Remove ${displayName(name)} from this device?`);
     if (!confirmed) return;
 
+    if (Object.keys(peopleMap()).length === 1 && !await deleteLocalScheduleRecord()) {
+      showToast("The saved schedules could not be fully removed. Reload and try again when storage is available.");
+      return;
+    }
     delete state.data.people[name];
     state.mutedPeople.delete(name);
     state.pinnedPeople.delete(name);
@@ -1608,7 +1646,6 @@
 
     const remaining = Object.keys(state.data.people || {}).length;
     if (remaining === 0) {
-      await deleteLocalScheduleRecord();
       state.data = { people: {} };
       state.hasData = false;
       state.scheduleMeta = null;
@@ -1678,14 +1715,14 @@
   function updateScheduleModal() {
     const peopleCount = Object.keys(peopleMap()).length;
     renderPeopleManager();
-    const importBusy = state.isParsing || Boolean(state.pendingImage);
+    const importBusy = !schedulesWritable() || state.isParsing || Boolean(state.pendingImage);
     els.addSchedulePdfButton.disabled = importBusy;
     els.addScheduleImageButton.disabled = importBusy;
     els.manualScheduleButton.disabled = importBusy;
     els.importSchedulesButton.disabled = importBusy;
     els.shareSchedulesButton.disabled = importBusy || !state.hasData || peopleCount === 0;
     els.removeSchedulesButton.disabled = importBusy || !state.hasData;
-    els.saveImageScheduleButton.disabled = state.isParsing;
+    els.saveImageScheduleButton.disabled = !schedulesWritable() || state.isParsing;
     els.cancelImageScheduleButton.disabled = state.isParsing;
 
     if (state.hasData) {
@@ -1732,11 +1769,15 @@
   }
 
   async function removeSchedules() {
+    if (!schedulesWritable() || state.isParsing || state.pendingImage) return;
     if (!state.hasData) return;
     const confirmed = window.confirm("Remove the schedules stored in this browser? You can add the JSON file again later.");
     if (!confirmed) return;
 
-    await deleteLocalScheduleRecord();
+    if (!await deleteLocalScheduleRecord()) {
+      showToast("The saved schedules could not be fully removed. Reload and try again when storage is available.");
+      return;
+    }
     state.data = { people: {} };
     state.hasData = false;
     state.scheduleMeta = null;
@@ -2159,7 +2200,7 @@
     if (!("serviceWorker" in navigator)) return;
     if (location.protocol !== "https:" && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") return;
 
-    navigator.serviceWorker.register("./service-worker.js?v=84", { updateViaCache: "none" })
+    navigator.serviceWorker.register("./service-worker.js?v=85", { updateViaCache: "none" })
       .then(registration => registration.update())
       .catch(() => {
         // The app works normally even if PWA caching isn't available.
@@ -2192,8 +2233,9 @@
     requestAnimationFrame(animateAppEntrance);
 
     loadSchedulesFromDevice().then(() => {
-      cleanPeoplePreferences();
-      updateSettingsModal();
+      state.deviceReady = true;
+      if (state.hasData) cleanPeoplePreferences();
+      updateScheduleModal();
       checkBreakNotifications();
     });
 

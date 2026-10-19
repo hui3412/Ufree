@@ -1,10 +1,10 @@
-const CACHE_NAME = "whos-free-shell-v84";
+const CACHE_NAME = "whos-free-legacy-shell-v85";
 const OCR_CACHE_NAME = "whos-free-ocr-v1";
 const APP_SHELL = [
   "./",
   "./index.html",
   "./styles.css?v=84",
-  "./app.js?v=84",
+  "./app.js?v=85",
   "./schedule-parser.js?v=84",
   "./schedule-image-parser.js?v=84",
   "./manifest.webmanifest?v=84",
@@ -27,7 +27,7 @@ self.addEventListener("install", event => {
 self.addEventListener("activate", event => {
   event.waitUntil(
     caches.keys().then(keys => Promise.all(
-      keys.filter(key => key.startsWith("whos-free-") && key !== CACHE_NAME && key !== OCR_CACHE_NAME).map(key => caches.delete(key))
+      keys.filter(key => key.startsWith("whos-free-legacy-shell-") && key !== CACHE_NAME && key !== OCR_CACHE_NAME).map(key => caches.delete(key))
     ))
   );
   self.clients.claim();
@@ -66,9 +66,10 @@ self.addEventListener("fetch", event => {
         return response;
       })
       .catch(async () => {
-        const cached = await caches.match(request);
+        const cache = await caches.open(CACHE_NAME);
+        const cached = await cache.match(request);
         if (cached) return cached;
-        if (request.mode === "navigate") return caches.match("./index.html");
+        if (request.mode === "navigate") return cache.match("./index.html");
         return Response.error();
       })
   );

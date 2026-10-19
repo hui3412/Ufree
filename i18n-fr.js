@@ -600,7 +600,9 @@ window.UFreeFrench = {
     "orange": "orange",
     "Hide stored people": "Masquer les personnes enregistrées",
     "Free:": "Libres :",
-    "Busy:": "Occupés :"
+    "Busy:": "Occupés :",
+    "Local storage could not be read. Reload UFree when storage is available; your saved copy has not been replaced.": "Impossible de lire le stockage local. Rechargez UFree lorsque le stockage sera accessible; votre copie enregistrée n’a pas été remplacée.",
+    "The saved schedules could not be fully removed. Nothing was removed from this view. Reload and try again when storage is available.": "Impossible de supprimer complètement les horaires enregistrés. Rien n’a été retiré de cet affichage. Rechargez l’application et réessayez lorsque le stockage sera accessible."
   },
   "templates": [
     {
@@ -2005,6 +2007,13 @@ window.UFreeFrench = {
       "en": "{0} classes recognized. Check the schedule below before saving.",
       "fr": "{0} cours reconnus. Vérifiez l’horaire ci-dessous avant d’enregistrer.",
       "translateSlots": []
+    },
+    {
+      "en": "{0} Similar names are numbered in this share: {1}.",
+      "fr": "{0} Les noms similaires sont numérotés dans ce partage : {1}.",
+      "translateSlots": [
+        0
+      ]
     }
   ]
 };

@@ -33,9 +33,7 @@ test("compact day/time controls preview edits immediately and restore live time"
     assert.equal(el("daySelect").value, originalDay);
     el("daySelect").value = "Monday";
     change("daySelect");
-    assert.equal(el("freeCount").textContent, "0 of 1 free");
-    assert.equal(el("freeCount").parentElement, el("statusLine").parentElement);
-    assert.match(el("statusLine").textContent, /1 in class/);
+    assert.equal(el("peopleList").querySelectorAll(".person-card").length, 0, "a busy student is excluded from Free");
     liveTick();
     assert.equal(el("timeInput").value, "08:30", "manual selection survives live ticks");
     el("liveToggle").checked = true;
@@ -47,8 +45,8 @@ test("compact day/time controls preview edits immediately and restore live time"
     el("daySelect").value = "Sunday";
     change("daySelect");
     assert.equal(el("liveToggle").checked, false, "weekday edits also leave live mode");
-    assert.equal(el("freeCount").textContent, "1 of 1 free");
-    assert.match(el("statusLine").textContent, /0 in class/);
+    assert.equal(el("peopleList").querySelectorAll(".person-card").length, 1);
+    assert.equal(el("peopleList").querySelector(".status-badge").textContent, "FREE");
     el("timeInput").value = "10:00";
     change("timeInput");
     assert.equal(el("timeInput").value, "10:00", "native change events remain supported");

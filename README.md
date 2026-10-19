@@ -1,5 +1,15 @@
 # UFree
 
+### Storage recovery and sharing reliability
+
+- Schedule records now carry a monotonic `storageRevision`. Both entry points select the newer IndexedDB/localStorage record; unversioned records retain the previous IndexedDB priority. Successful IndexedDB saves refresh the fallback, or remove an outdated fallback if the mirror exceeds its quota.
+- Schedule-writing controls wait for startup storage reads. Corrupt JSON and failed reads remain visible errors and block imports/edits from replacing an unreadable saved collection. A valid fallback remains usable when IndexedDB is unavailable.
+- Removing all schedules or the final person reports incomplete deletion and keeps the displayed collection, preferences and recovery backup. A failed primary deletion leaves the fallback intact; a failed fallback deletion attempts to restore the primary copy.
+- Names that differ only by case, spacing or Unicode normalization receive collision-free numeric suffixes in code/link/QR transport copies. Saved names stay unchanged. The same full-collection name mapping is used for person shares, groups and independently scanned QR batches; export status explains changed names.
+- Main and legacy service workers now clean only their own shell-cache namespace and search only their own shell for offline pages. OCR and user-recovery caches remain intact. Previously unscoped caches are retained because their ownership is ambiguous.
+- The group options menu reserves space for all three actions when open, including collapsed groups. GitHub Pages exports continue using GitHub Pages; custom-domain exports continue using the custom domain.
+- Regression coverage includes storage outages/recovery, clock rollback, corrupt records, startup gating, incomplete deletions, legacy compatibility, ambiguous-name exports and service-worker isolation. Existing UI tests use current controls and load the required application modules.
+
 ### Dated weekly screenshot fallback
 
 - Keep every existing reader and decoding function unchanged. Only after the complete existing image reader fails, try the separate `schedule-dated-image-parser.js` reader. Successful existing reads return immediately and never invoke it.

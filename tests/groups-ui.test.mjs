@@ -54,16 +54,13 @@ test("multiple groups keep pins, individual visibility and a flat-list toggle wi
     finish();
     assert.equal(el("showGroupsToggle").getAttribute("aria-label"), "Hide groups");
     assert.deepEqual(cards(), ["Bob", "Alice", "Bob", "Cara"]);
-    assert.equal(el("freeCount").textContent, "1 of 3 free", "overlapping memberships must not count twice");
-    assert.equal(el("freeCount").parentElement, el("statusLine").parentElement);
-    assert.equal(el("statusLine").nextElementSibling, el("freeCount"));
-    assert.equal(el("freeCount").closest(".people-actions"), null);
-    assert.match(el("statusLine").textContent, /2 in class/);
-    assert.match(el("peopleList").textContent, /Next everyone free: 12:05 PM/);
+    assert.equal(new Set(cards()).size, 3, "overlapping memberships retain the same three people");
+    assert.equal(el("freeCount"), null, "the retired summary stays removed");
+    assert.match(el("peopleList").querySelector('[data-group-id] h3').textContent, /Lunch/);
     window.document.querySelector('[aria-label="Hide group Lunch"]').click();
     assert.deepEqual(cards(), ["Bob", "Cara"]);
-    assert.equal(el("freeCount").textContent, "1 of 2 free");
-    assert.match(el("statusLine").textContent, /1 in class/);
+    assert.equal(new Set(cards()).size, 2);
+    assert.match(el("peopleList").querySelector('[data-person="Bob"] .status-badge').textContent, /IN CLASS/);
     el("showGroupsToggle").click();
     assert.equal(el("showGroupsToggle").getAttribute("aria-label"), "Show groups");
     assert.deepEqual(cards(), ["Bob", "Cara", "Alice"]);
@@ -114,7 +111,7 @@ test("group edits, saved visibility, empty groups and deleted people do not eras
     window.document.querySelector('[aria-label="View weekly availability for Lunch"]').click();
     el("closeGroupWeekModal").click(); manage();
     window.document.querySelector('[aria-label="Edit group Lunch"]').click(); el("groupNameInput").value = "New lunch";
-    for (const input of el("groupMembersList").querySelectorAll("input")) input.checked = input.dataset.person === "Bob";
+    el("groupMembersList").querySelector('[aria-label="Remove Alice from group"]').click();
     el("groupForm").dispatchEvent(new window.Event("submit", { cancelable: true }));
     assert.equal(prefs().groups[0].name, "New lunch"); assert.deepEqual(prefs().groups[0].members, ["Bob"]);
     finish(); el("scheduleDataButton").click();
@@ -123,7 +120,7 @@ test("group edits, saved visibility, empty groups and deleted people do not eras
     const stored = JSON.parse(window.localStorage.getItem("whos-free-local-schedules")).data.people;
     assert.deepEqual(Object.keys(stored).sort(), ["Alice", "Cara"]);
     el("closeScheduleModal").click();
-    assert.match(el("peopleList").textContent, /Add people to find a shared break/);
+    assert.match(el("peopleList").textContent, /No people in this group. Edit it to add members./);
     manage(); window.document.querySelector('[aria-label="Delete group New lunch"]').click();
     assert.equal(prefs().groups.length, 1);
     assert.deepEqual(Object.keys(JSON.parse(window.localStorage.getItem("whos-free-local-schedules")).data.people).sort(), ["Alice", "Cara"]);
@@ -155,8 +152,10 @@ test("Manage sits beside the main group toggle and appears only in group view", 
       assert.ok(el(id).getAttribute("aria-label"));
     }
     assert.equal(el("scheduleModal").contains(el("manageGroupsButton")), false);
-    assert.equal(el("showGroupsToggle").nextElementSibling, el("manageGroupsButton"));
-    assert.equal(el("manageGroupsButton").textContent, "Manage");
+    assert.equal(el("showGroupsToggle").nextElementSibling.id, "peopleSearchButton");
+    assert.equal(el("peopleSearchButton").nextElementSibling.id, "manageGroupsButton");
+    assert.equal(el("manageGroupsButton").getAttribute("aria-label"), "Manage groups");
+    assert.ok(el("manageGroupsButton").querySelector("svg"));
     assert.equal(el("manageGroupsButton").hidden, true);
     assert.equal(el("groupVisibility"), null);
     assert.equal(el("viewToggleButton").nextElementSibling, el("showGroupsToggle").parentElement);
@@ -227,10 +226,10 @@ test("open menus reserve header space even when every group is collapsed", async
     assert.equal(a.el("peopleList").querySelectorAll(".person-card").length, 0);
     const menu = a.el("peopleList").querySelector('[data-group-id="two"] .group-options');
     menu.open = true;
-    assert.equal(menu.querySelectorAll("button").length, 2);
+    assert.equal(menu.querySelectorAll("button").length, 3);
     assert.ok(menu.closest(".people-group-header"));
     const css = fs.readFileSync(new URL("../styles.css", import.meta.url), "utf8");
-    assert.match(css, /\.people-group:has\(\.group-options\[open\]\) \.people-group-header\s*\{\s*padding-bottom:\s*110px;/,
+    assert.match(css, /\.people-group:has\(\.group-options\[open\]\) \.people-group-header\s*\{\s*padding-bottom:\s*146px;/,
       "the absolutely positioned menu needs a footprint inside its overflow-clipped ancestors");
     menu.open = false;
     assert.equal(a.el("peopleList").querySelector(".group-options[open]"), null);
@@ -243,13 +242,13 @@ test("a merged ten-minute overlap is filled by the five-free neighbor, with exac
   const { window, el, manage, finish, create } = await app(null, schedules);
   try {
     manage(); create("Seven", names); finish();
-    assert.match(el("peopleList").textContent, /Next everyone free: 11:05 AM/);
     window.document.querySelector('[aria-label="View weekly availability for Seven"]').click();
     const blocks = [...el("groupWeekGrid").querySelectorAll('.group-time-block[data-day="Monday"]')];
     assert.ok(blocks.every(block => {
       const minute = t => Number(t.slice(0,2))*60 + Number(t.slice(3));
       return minute(block.dataset.end) - minute(block.dataset.start) > 10;
     }));
+    assert.equal(blocks.find(block => block.dataset.start === "11:05").dataset.available, "7");
     const filled = blocks.find(block => block.dataset.start === "08:15");
     assert.equal(filled.dataset.end, "09:45"); assert.equal(filled.dataset.available, "5");
     assert.equal(blocks.find(block => block.dataset.start === "09:45").dataset.available, "4");

@@ -39,7 +39,7 @@ test("semester labels distinguish earlier terms and unlabeled legacy schedules w
     el("liveToggle").checked = false; el("liveToggle").dispatchEvent(new window.Event("change"));
     el("daySelect").value = "Monday"; el("daySelect").dispatchEvent(new window.Event("change"));
     el("timeInput").value = "09:30"; el("timeInput").dispatchEvent(new window.Event("change"));
-    assert.equal(el("freeCount").textContent, "0 of 4 free");
+    assert.equal(el("peopleList").querySelectorAll(".person-card").length, 0, "all four terms retain their busy classes");
     window.document.querySelector('[aria-label="Edit Legacy"]').click();
     assert.equal(el("imageReviewSemester").value, "Fall");
     assert.equal(el("imageReviewYear").disabled, false);

@@ -74,7 +74,9 @@ test("empty schedules remain viewable, focus stays in the dialog, and backdrop c
     assert.equal(el("personWeekEmpty").hidden, false);
     assert.equal(window.document.activeElement, el("closePersonWeekModal"));
     window.document.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Tab", shiftKey: true, bubbles: true, cancelable: true }));
-    assert.equal(window.document.activeElement, el("closePersonWeekModal"));
+    assert.equal(window.document.activeElement, el("personWeekGrid").parentElement, "Shift+Tab reaches the scrollable timetable");
+    window.document.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true }));
+    assert.equal(window.document.activeElement.id, "closePersonWeekModal");
     el("personWeekModal").click();
     assert.equal(el("personWeekModal").hidden, true);
   } finally { await window.happyDOM.abort(); }

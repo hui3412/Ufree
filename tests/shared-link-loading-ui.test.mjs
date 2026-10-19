@@ -55,8 +55,14 @@ test("spinner covers slow local storage and decoding, then saves automatically",
     assert.match(a.el("importProgressMessage").textContent, /Loading your saved schedules/);
     assert.equal(called, false);
     assert.equal(a.window.document.documentElement.classList.contains("shared-link-starting"), false);
-    storage.onerror();
-    Object.defineProperty(a.window, "indexedDB", { configurable: true, value: undefined });
+    let resolveRead;
+    storage.result = { close() {}, transaction() { return { objectStore() { return { get() {
+      const request = {}; resolveRead = () => { request.result = undefined; request.onsuccess(); }; return request;
+    } }; } }; } };
+    storage.onsuccess();
+    await wait(() => Boolean(resolveRead));
+    resolveRead();
+    delete a.window.indexedDB;
     await wait(() => called);
     assert.equal(a.el("importProgressOverlay").hidden, false);
     assert.match(a.el("importProgressMessage").textContent, /Adding the shared schedules/);

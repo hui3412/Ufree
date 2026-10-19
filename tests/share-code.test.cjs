@@ -190,12 +190,12 @@ test("arbitrary minute times and unfamiliar course labels survive compact packin
   assert.ok(code.length < 180, "a representative week stays short without dropping course labels or minutes");
 });
 
-test("compact payload rejects invalid flags, fractions, labels and oversized collections", async () => {
+test("compact payload rejects invalid flags, fractions, labels and duplicate person names", async () => {
   for (const row of [[7,540,60], [15,540,60], [-1,540,60], [0,540.5,60], [0,540,60.5], [0,1430,10], [0,540,0], [0,540,60,123], [0,540,60,"x".repeat(201)]]) {
     await assert.rejects(api.decode(crafted(JSON.stringify([["Bad",[row]]]))), /valid schedule data|label/);
   }
   await assert.rejects(api.decode(crafted(JSON.stringify([["Bad",Array(501).fill([0,540,60])]]))), /valid schedule data/);
-  await assert.rejects(api.decode(crafted(JSON.stringify(Array(251).fill(["Bad",[]])))), /valid schedule data/);
+  await assert.rejects(api.decode(crafted(JSON.stringify(Array(251).fill(["Bad",[]])))), /repeated person names/);
   await assert.rejects(api.decode(api.__test.wrap(deflateSync(Buffer.from("not JSON")), "D")), /could not be opened/);
 });
 

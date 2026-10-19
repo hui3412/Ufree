@@ -62,15 +62,15 @@ test("picture review validates, saves corrections and preserves data on cancel",
     el("daySelect").dispatchEvent(new window.Event("change"));
     el("timeInput").value = "11:30";
     el("timeInput").dispatchEvent(new window.Event("change"));
-    assert.equal(el("freeCount").textContent, "0 of 1 free", "Saturday class must count as occupied");
+    assert.equal(el("peopleList").querySelectorAll(".person-card").length, 0, "Saturday class must count as occupied");
     el("daySelect").value = "Monday";
     el("daySelect").dispatchEvent(new window.Event("change"));
     el("timeInput").value = "14:25";
     el("timeInput").dispatchEvent(new window.Event("change"));
-    assert.equal(el("freeCount").textContent, "0 of 1 free", "Conflict block must count as occupied");
+    assert.equal(el("peopleList").querySelectorAll(".person-card").length, 0, "Conflict block must count as occupied");
     el("timeInput").value = "14:40";
     el("timeInput").dispatchEvent(new window.Event("change"));
-    assert.equal(el("freeCount").textContent, "1 of 1 free", "Ended conflict must no longer count as occupied");
+    assert.equal(el("peopleList").querySelectorAll(".person-card").length, 1, "Ended conflict must no longer count as occupied");
     const before = JSON.stringify(stored());
     el("scheduleImageInput").dispatchEvent(new window.Event("change"));
     await tick();

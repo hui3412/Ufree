@@ -33,6 +33,7 @@ const SYNC_URL = 'https://youfree.ca';
     hasData: false,
     scheduleMeta: null,
     storageBackend: "checking",
+    storageReadError: false,
     useLiveTime: true,
     selectedDay: "Monday",
     selectedTime: "12:00",
@@ -2299,12 +2300,14 @@ const SYNC_URL = 'https://youfree.ca';
   }
 
   function chooseScheduleFile() {
+    if (!schedulesWritable()) return;
     // Clearing the value allows choosing the same file again after replacing it.
     els.scheduleFileInput.value = "";
     els.scheduleFileInput.click();
   }
 
   function chooseSchedulePdf() {
+    if (!schedulesWritable()) return;
     // A real file picker must be opened directly from the user's click/tap.
     // showPicker() is more reliable in Safari/iOS PWAs; click() remains the fallback.
     els.schedulePdfInput.value = "";
@@ -2320,7 +2323,7 @@ const SYNC_URL = 'https://youfree.ca';
   }
 
   function chooseScheduleImage() {
-    if (state.isParsing || state.pendingImage) return;
+    if (!schedulesWritable() || state.isParsing || state.pendingImage) return;
     els.scheduleImageInput.value = "";
     els.scheduleImageInput.click();
   }
@@ -2581,7 +2584,7 @@ const SYNC_URL = 'https://youfree.ca';
   }
 
   function openManualSchedule(name = "", person = { source_file: "manual", classes: [] }) {
-    if (state.isParsing || state.pendingImage) return;
+    if (!schedulesWritable() || state.isParsing || state.pendingImage) return;
     state.pendingImage = { name, person, editingName: name || null };
     els.imageReviewName.value = name;
     setReviewSemester(person.semester, !name);
@@ -2630,7 +2633,7 @@ const SYNC_URL = 'https://youfree.ca';
 
   async function handleScheduleImage(event) {
     const file = event.target.files?.[0];
-    if (!file || state.isParsing || state.pendingImage) return;
+    if (!schedulesWritable() || !file || state.isParsing || state.pendingImage) return;
     if (els.scheduleModal.hidden) openScheduleModal();
     state.isParsing = true;
     updateScheduleModal();
@@ -2665,7 +2668,7 @@ const SYNC_URL = 'https://youfree.ca';
   }
 
   async function saveImageSchedule(decision = null) {
-    if (!state.pendingImage || state.isParsing || state.duplicatePicture) return;
+    if (!schedulesWritable() || !state.pendingImage || state.isParsing || state.duplicatePicture) return;
     setUiText(els.imageReviewError, "");
     const requestedName = els.imageReviewName.value.trim();
     let name = requestedName;
@@ -2798,7 +2801,7 @@ const SYNC_URL = 'https://youfree.ca';
     els.firstScheduleWelcomeTitle.focus({ preventScroll: true });
     try {
       // Prepare before the click so clipboard writing retains the user's gesture on Safari.
-      const code = await window.WhosFreeShareCode.encode({ people: { [name]: peopleMap()[name] } }, { fields: [] });
+      const code = await window.WhosFreeShareCode.encode({ people: exportPeople([name]) }, { fields: [] });
       if (request !== firstScheduleWelcomeRequest) return;
       firstScheduleLink = window.WhosFreeShareCode.createLink(code, APP_URL);
       setUiText(els.firstScheduleWelcomeStatus, "");
@@ -2873,6 +2876,7 @@ const SYNC_URL = 'https://youfree.ca';
         const request = tx.objectStore(LOCAL_STORE_NAME).get(key);
         request.onsuccess = () => resolve(request.result);
         request.onerror = () => reject(request.error || new Error("Could not read local schedule data."));
+        tx.onabort = () => reject(tx.error || new Error("Could not read local schedule data."));
       });
     } finally {
       db.close();
@@ -2922,40 +2926,52 @@ const SYNC_URL = 'https://youfree.ca';
     localStorage.removeItem(LOCAL_STORAGE_FALLBACK_KEY);
   }
 
+  let scheduleStorageRevision = 0;
+  const recordRevision = record => Number.isSafeInteger(record?.storageRevision) && record.storageRevision > 0 ? record.storageRevision : 0;
+
   async function readLocalScheduleRecord() {
-    try {
-      const record = await idbGet(LOCAL_SCHEDULE_KEY);
-      state.storageBackend = "indexeddb";
-      if (record) return record;
-      // Older sessions may have used localStorage while IndexedDB was unavailable.
-      // An empty, newly available database must not hide that existing copy.
-      const fallback = fallbackRead();
-      if (fallback) state.storageBackend = "localstorage";
-      return fallback;
-    } catch {
-      try {
-        const record = fallbackRead();
-        state.storageBackend = "localstorage";
-        return record;
-      } catch {
-        state.storageBackend = "memory";
-        return null;
-      }
+    let primary = null, fallback = null, primaryError = null, fallbackError = null;
+    if ("indexedDB" in window) {
+      try { primary = await idbGet(LOCAL_SCHEDULE_KEY); }
+      catch (error) { primaryError = error; }
     }
+    try { fallback = fallbackRead(); }
+    catch (error) { fallbackError = error; }
+    // Old, unversioned records retain IndexedDB priority. New writes carry a
+    // monotonic revision so an outage cannot make an older copy authoritative.
+    scheduleStorageRevision = Math.max(scheduleStorageRevision, recordRevision(primary), recordRevision(fallback));
+    const useFallback = fallback && (!primary || recordRevision(fallback) > recordRevision(primary));
+    const record = useFallback ? fallback : primary;
+    if (record) {
+      state.storageBackend = useFallback ? "localstorage" : "indexeddb";
+      return record;
+    }
+    if (primaryError || fallbackError) {
+      state.storageBackend = "memory";
+      throw new Error("Local storage could not be read. Reload UFree when storage is available; your saved copy has not been replaced.");
+    }
+    state.storageBackend = "indexedDB" in window ? "indexeddb" : "localstorage";
+    return null;
   }
 
   async function saveLocalScheduleRecord(record) {
+    const saved = { ...record, storageRevision: Math.max(Date.now(), scheduleStorageRevision + 1) };
+    scheduleStorageRevision = saved.storageRevision;
     try {
-      await idbSet(LOCAL_SCHEDULE_KEY, record);
+      await idbSet(LOCAL_SCHEDULE_KEY, saved);
       state.storageBackend = "indexeddb";
-      backupSavedScheduleRecord(record);
-      return;
+      // Keep a current fallback when space permits. If it cannot be refreshed,
+      // remove the old fallback so it cannot resurrect removed people later.
+      try { fallbackWrite(saved); }
+      catch { try { fallbackDelete(); } catch { /* IndexedDB remains saved. */ } }
+      backupSavedScheduleRecord(saved);
+      return saved;
     } catch {
       try {
-        fallbackWrite(record);
+        fallbackWrite(saved);
         state.storageBackend = "localstorage";
-        backupSavedScheduleRecord(record);
-        return;
+        backupSavedScheduleRecord(saved);
+        return saved;
       } catch {
         state.storageBackend = "memory";
         throw new Error("This browser would not allow the app to save a local copy. The schedules will work until the page is closed, but may need to be selected again later.");
@@ -2964,21 +2980,28 @@ const SYNC_URL = 'https://youfree.ca';
   }
 
   async function deleteLocalScheduleRecord() {
-    let removed = false;
-    try {
-      await idbDelete(LOCAL_SCHEDULE_KEY);
-      removed = true;
-    } catch {
-      // Try fallback storage too.
+    let primaryRemoved = !("indexedDB" in window), fallbackRemoved = false;
+    if ("indexedDB" in window) {
+      try { await idbDelete(LOCAL_SCHEDULE_KEY); primaryRemoved = true; }
+      catch { return false; } // Keep the fallback intact when the primary survives.
     }
     try {
       fallbackDelete();
-      removed = true;
+      fallbackRemoved = true;
     } catch {
-      // Nothing else to remove.
+      // Preserve the latest collection after a partial deletion where possible.
+      // The unchanged cache backup also remains available; never clear it here.
+      if (primaryRemoved && "indexedDB" in window && cacheSyncRecord) {
+        try { await idbSet(LOCAL_SCHEDULE_KEY, cacheSyncRecord); } catch { /* Report failure below. */ }
+      }
     }
+    const removed = primaryRemoved && fallbackRemoved;
     if (removed) backupSavedScheduleRecord(null);
     return removed;
+  }
+
+  function schedulesWritable() {
+    return state.deviceReady && !state.storageReadError;
   }
 
   function validateData(data) {
@@ -3076,7 +3099,7 @@ const SYNC_URL = 'https://youfree.ca';
   }
 
   async function handleSchedulePdfs(event) {
-    if (state.isParsing || state.pendingImage || state.codeMode) return;
+    if (!schedulesWritable() || state.isParsing || state.pendingImage || state.codeMode) return;
     const files = Array.from(event.target.files || []);
     if (!files.length) return;
     if (els.scheduleModal.hidden) openScheduleModal();
@@ -3409,14 +3432,47 @@ const SYNC_URL = 'https://youfree.ca';
     options.querySelector("button").disabled = false;
   }
 
-  function encodeSchedules(names, options) {
-    const fields = [...options.querySelectorAll("input:checked")].map(input => input.dataset.exportField);
-    return window.WhosFreeShareCode.encode({ people: Object.fromEntries(names.map(name => [name, peopleMap()[name]])), ...(state.exportGroup ? { shared_group: state.exportGroup } : {}) }, { fields });
+  function exportNameMap(people = peopleMap()) {
+    const reserved = new Set(Object.keys(people).map(normalizedScheduleName));
+    const used = new Set(), aliases = new Map();
+    for (const name of Object.keys(people)) {
+      let alias = name;
+      if (used.has(normalizedScheduleName(alias))) {
+        for (let number = 2; ; number++) {
+          const suffix = ` ${number}`;
+          const candidate = name.trim().slice(0, 200 - suffix.length).trimEnd() + suffix;
+          if (!reserved.has(normalizedScheduleName(candidate)) && !used.has(normalizedScheduleName(candidate))) {
+            alias = candidate;
+            break;
+          }
+        }
+      }
+      used.add(normalizedScheduleName(alias));
+      aliases.set(name, alias);
+    }
+    return aliases;
   }
 
-  function shareCodeReadyMessage(count, code) {
+  function exportPeople(names, people = peopleMap(), aliases = exportNameMap(people)) {
+    // Resolve ambiguous names only in the transport copy. Use the full local
+    // collection so one person's alias is stable across separate QR batches.
+    return Object.fromEntries(names.map(name => [aliases.get(name), people[name]]));
+  }
+
+  function exportNameNote(names) {
+    const aliases = exportNameMap();
+    const changes = names.filter(name => aliases.get(name) !== name).map(name => `${name} → ${aliases.get(name)}`);
+    return changes.length ? ` Similar names are numbered in this share: ${changes.join(", ")}.` : "";
+  }
+
+  function encodeSchedules(names, options) {
+    const fields = [...options.querySelectorAll("input:checked")].map(input => input.dataset.exportField);
+    return window.WhosFreeShareCode.encode({ people: exportPeople(names), ...(state.exportGroup ? { shared_group: state.exportGroup } : {}) }, { fields });
+  }
+
+  function shareCodeReadyMessage(count, code, names = []) {
     const messageSize = code.length <= 1000 ? "Fits a 1,000-character message." : "Over 1,000 characters. Select fewer schedules for one Instagram message.";
-    return `Code ready for ${count} schedule${count === 1 ? "" : "s"} · ${code.length.toLocaleString()} characters. ${messageSize}`;
+    return `Code ready for ${count} schedule${count === 1 ? "" : "s"} · ${code.length.toLocaleString()} characters. ${messageSize}${exportNameNote(names)}`;
   }
 
   async function generateShareCode(action = "code") {
@@ -3439,7 +3495,7 @@ const SYNC_URL = 'https://youfree.ca';
       els.exportCodeOutput.value = code;
       populateShareLink(code, els.exportSharePanel);
       els.exportCodeField.hidden = action !== "code";
-      codeStatus(els.exportCodeStatus, shareCodeReadyMessage(names.length, code), "success");
+      codeStatus(els.exportCodeStatus, shareCodeReadyMessage(names.length, code, names), "success");
       if (action === "link") {
         if (!els.exportSharePanel.querySelector("textarea").value) throw new Error("This code cannot make a link. Use Export Code instead.");
         els.exportSharePanel.querySelector(".share-link-field").hidden = false;
@@ -3539,6 +3595,7 @@ const SYNC_URL = 'https://youfree.ca';
     const output = personal ? els.personQuickCode : els.exportCodeOutput;
     const codeOutputStatus = personal ? els.personQuickShareStatus : els.exportCodeStatus;
     const people = JSON.parse(JSON.stringify(Object.fromEntries(names.map(name => [name, peopleMap()[name]]))));
+    const aliases = exportNameMap();
     const fields = [...options.querySelectorAll("input:checked")].map(input => input.dataset.exportField);
     const sharedGroup = group ? { ...group } : null;
     state.qrBatchBusy = true;
@@ -3559,7 +3616,7 @@ const SYNC_URL = 'https://youfree.ca';
     codeStatus(codeOutputStatus, "Creating QR codes on this device…");
     const makeLink = async members => {
       try {
-        const code = await window.WhosFreeShareCode.encode({ people: Object.fromEntries(members.map(name => [name, people[name]])), ...(sharedGroup ? { shared_group: sharedGroup } : {}) }, { fields });
+        const code = await window.WhosFreeShareCode.encode({ people: exportPeople(members, people, aliases), ...(sharedGroup ? { shared_group: sharedGroup } : {}) }, { fields });
         return { code, link: window.WhosFreeShareCode.createLink(code, APP_URL) };
       } catch (error) {
         if (/too large|too much|export fewer/i.test(error.message || "")) return null;
@@ -3574,7 +3631,7 @@ const SYNC_URL = 'https://youfree.ca';
       if (!current()) return;
       output.value = full?.code || "";
       panel.querySelector("textarea").value = full?.link || "";
-      codeStatus(codeOutputStatus, full ? shareCodeReadyMessage(names.length, full.code) : "This selection needs separate QR codes.", full ? "success" : "");
+      codeStatus(codeOutputStatus, full ? shareCodeReadyMessage(names.length, full.code, names) : "This selection needs separate QR codes.", full ? "success" : "");
       const result = await window.WhosFreeQrBatches.pack(names, async members => (await makeLink(members))?.link || null, {
         // An empty string records an oversized full encoding without retrying it.
         fullLink: full?.link ?? "",
@@ -3608,7 +3665,7 @@ const SYNC_URL = 'https://youfree.ca';
         card.className = "qr-batch-card";
         const heading = document.createElement("h4");
         setUiText(heading, `QR ${i + 1} of ${result.groups.length} · ${item.names.length} ${item.names.length === 1 ? "person" : "people"}`);
-        const list = document.createElement("p"); setUiText(list, item.names.map(displayName).join(", "), false);
+        const list = document.createElement("p"); setUiText(list, item.names.map(name => aliases.get(name) === name ? displayName(name) : aliases.get(name)).join(", "), false);
         const qr = document.createElement("div"); qr.className = "share-qr";
         qr.append(scheduleQrSvg(item.link, `${sourceUiText(heading)}: ${sourceUiText(list)}`).svg);
         card.append(heading, list, qr); fragment.append(card);
@@ -3798,7 +3855,7 @@ const SYNC_URL = 'https://youfree.ca';
   }
 
   async function importShareCode({ automatic = false, groupChoice = null } = {}) {
-    if (state.isParsing || state.codeMode !== "import") return;
+    if (!state.deviceReady || state.isParsing || state.codeMode !== "import") return;
     if (!automatic && !state.sharedImport && /^(?:https?:\/\/|WFL[567])/i.test(els.importCodeInput.value.trim())) { await previewSharedImport(els.importCodeInput.value); return; }
     const selected = state.sharedImport && !state.sharedImport.shared_group ? [...els.sharedImportPeople.querySelectorAll("input:checked")].map(input => input.dataset.person) : null;
     if (selected && !selected.length) return;
@@ -3809,7 +3866,7 @@ const SYNC_URL = 'https://youfree.ca';
     startImportProgress(automatic ? "Adding the shared schedules on this device…" : "Opening the code on this device…");
     let automaticMessage = null;
     try {
-      if (automatic && state.loadError) throw new Error("Your saved schedules could not be loaded. Nothing was imported. Resolve the storage error before opening this link again.");
+      if (state.storageReadError || automatic && state.loadError) throw new Error("Your saved schedules could not be loaded. Nothing was imported. Resolve the storage error before opening this link again.");
       // Let the loading popup paint before decoding a potentially large QR link.
       if (automatic) await new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 0)));
       const imported = state.sharedImport ? selected ? { ...state.sharedImport, people: Object.fromEntries(selected.map(name => [name, state.sharedImport.people[name]])) } : state.sharedImport : await window.WhosFreeShareCode.decode(els.importCodeInput.value);
@@ -3872,7 +3929,7 @@ const SYNC_URL = 'https://youfree.ca';
   }
 
   async function handleLocalScheduleFile(event) {
-    if (state.isParsing || state.pendingImage || state.codeMode) return;
+    if (!schedulesWritable() || state.isParsing || state.pendingImage || state.codeMode) return;
     const [file] = event.target.files || [];
     if (!file) return;
     const hadData = state.hasData;
@@ -3932,8 +3989,9 @@ const SYNC_URL = 'https://youfree.ca';
   }
 
   async function loadSchedulesFromDevice() {
+    state.storageReadError = false;
     try {
-      const record = await readLocalScheduleRecord();
+      let record = await readLocalScheduleRecord();
       if (!record?.data) {
         state.hasData = false;
         state.data = { people: {} };
@@ -3950,7 +4008,7 @@ const SYNC_URL = 'https://youfree.ca';
       // Persist the first assigned term so it stays attached after future rollovers.
       let migrationWarning = null;
       if (needsSemesterMigration) {
-        try { await saveLocalScheduleRecord(record); }
+        try { record = await saveLocalScheduleRecord(record); }
         catch (error) { migrationWarning = error.message; }
       }
       cacheSyncRecord = JSON.parse(JSON.stringify(record));
@@ -3967,6 +4025,7 @@ const SYNC_URL = 'https://youfree.ca';
       updateScheduleModal();
       if (migrationWarning) showToast(`Semester labels assigned, but could not be saved: ${migrationWarning}`);
     } catch (error) {
+      state.storageReadError = true;
       state.hasData = false;
       state.data = { people: {} };
       state.scheduleMeta = null;
@@ -3984,7 +4043,7 @@ const SYNC_URL = 'https://youfree.ca';
   }
 
   async function removePerson(name) {
-    if (state.isParsing || state.pendingImage || state.codeMode) return;
+    if (!schedulesWritable() || state.isParsing || state.pendingImage || state.codeMode) return;
     if (!state.hasData || !Object.prototype.hasOwnProperty.call(state.data.people || {}, name)) return;
     const confirmed = window.confirm(translateUi(`Remove ${displayName(name)} from this device?`));
     if (!confirmed) return;
@@ -3993,6 +4052,12 @@ const SYNC_URL = 'https://youfree.ca';
     const label = `Removed ${displayName(name)}`;
     state.isParsing = true;
     updateScheduleModal();
+    if (Object.keys(peopleMap()).length === 1 && !await deleteLocalScheduleRecord()) {
+      state.isParsing = false;
+      updateScheduleModal();
+      showToast("The saved schedules could not be fully removed. Nothing was removed from this view. Reload and try again when storage is available.");
+      return;
+    }
     delete state.data.people[name];
     state.mutedPeople.delete(name);
     state.pinnedPeople.delete(name);
@@ -4004,7 +4069,6 @@ const SYNC_URL = 'https://youfree.ca';
 
     const remaining = Object.keys(state.data.people || {}).length;
     if (remaining === 0) {
-      await deleteLocalScheduleRecord();
       state.data = { people: {} };
       state.hasData = false;
       state.scheduleMeta = null;
@@ -4122,16 +4186,17 @@ const SYNC_URL = 'https://youfree.ca';
     updateGroupToolbar();
     const peopleCount = Object.keys(peopleMap()).length;
     renderPeopleManager();
-    const importBusy = state.isParsing || Boolean(state.pendingImage) || Boolean(state.codeMode);
+    const importBusy = !state.deviceReady || state.isParsing || Boolean(state.pendingImage) || Boolean(state.codeMode);
+    const writeBlocked = !schedulesWritable();
     els.exportSchedulesButton.disabled = importBusy || peopleCount === 0;
     els.homeExportButton.disabled = importBusy || peopleCount === 0;
     if (els.homeImportButton) els.homeImportButton.disabled = importBusy;
     els.importCodeButton.disabled = importBusy;
-    els.importScheduleImageButton.disabled = state.isParsing || Boolean(state.pendingImage) || Boolean(state.sharedImport);
+    els.importScheduleImageButton.disabled = writeBlocked || state.isParsing || Boolean(state.pendingImage) || Boolean(state.sharedImport);
     els.generateCodeButton.disabled = state.isParsing || state.qrBatchBusy;
     els.exportQrButton.disabled = state.isParsing || state.qrBatchBusy;
     els.copyExportLinkButton.disabled = state.isParsing || state.qrBatchBusy;
-    els.decodeCodeButton.disabled = state.isParsing || Boolean(state.sharedImport && !els.sharedImportPeople.querySelector("input:checked"));
+    els.decodeCodeButton.disabled = !state.deviceReady || state.isParsing || Boolean(state.sharedImport && !els.sharedImportPeople.querySelector("input:checked"));
     els.closeImportButton.disabled = state.isParsing;
     els.importCodeInput.disabled = state.isParsing;
     els.sharedGroupName.disabled = state.isParsing;
@@ -4145,13 +4210,13 @@ const SYNC_URL = 'https://youfree.ca';
     els.exportPeopleList.querySelectorAll("input").forEach(input => { input.disabled = state.isParsing; });
     els.exportFieldOptions.querySelectorAll("input, button").forEach(input => { input.disabled = state.isParsing; });
     els.sharedImportPeople.querySelectorAll("input").forEach(input => { input.disabled = state.isParsing; });
-    els.addSchedulePdfButton.disabled = importBusy;
-    els.addScheduleImageButton.disabled = importBusy;
-    els.manualScheduleButton.disabled = importBusy;
-    els.importSchedulesButton.disabled = importBusy;
+    els.addSchedulePdfButton.disabled = writeBlocked || importBusy;
+    els.addScheduleImageButton.disabled = writeBlocked || importBusy;
+    els.manualScheduleButton.disabled = writeBlocked || importBusy;
+    els.importSchedulesButton.disabled = writeBlocked || importBusy;
     els.shareSchedulesButton.disabled = importBusy || !state.hasData || peopleCount === 0;
     els.removeSchedulesButton.disabled = importBusy || !state.hasData;
-    els.saveImageScheduleButton.disabled = state.isParsing || Boolean(state.duplicatePicture);
+    els.saveImageScheduleButton.disabled = writeBlocked || state.isParsing || Boolean(state.duplicatePicture);
     els.cancelImageScheduleButton.disabled = state.isParsing;
 
     if (state.hasData) {
@@ -4213,7 +4278,7 @@ const SYNC_URL = 'https://youfree.ca';
   }
 
   async function removeSchedules() {
-    if (state.isParsing || state.pendingImage || state.codeMode) return;
+    if (!schedulesWritable() || state.isParsing || state.pendingImage || state.codeMode) return;
     if (!state.hasData) return;
     const confirmed = window.confirm(translateUi("Remove the schedules stored in this browser? You can add the JSON file again later."));
     if (!confirmed) return;
@@ -4221,7 +4286,12 @@ const SYNC_URL = 'https://youfree.ca';
     const before = captureScheduleChange();
     state.isParsing = true;
     updateScheduleModal();
-    await deleteLocalScheduleRecord();
+    if (!await deleteLocalScheduleRecord()) {
+      state.isParsing = false;
+      updateScheduleModal();
+      showToast("The saved schedules could not be fully removed. Nothing was removed from this view. Reload and try again when storage is available.");
+      return;
+    }
     state.data = { people: {} };
     state.hasData = false;
     state.scheduleMeta = null;
@@ -4331,7 +4401,7 @@ const SYNC_URL = 'https://youfree.ca';
       if (request !== state.personShareRequest) return;
       els.personQuickCode.value = code;
       populateShareLink(code, els.personQuickSharePanel);
-      codeStatus(els.personQuickShareStatus, shareCodeReadyMessage(1, code), "success");
+      codeStatus(els.personQuickShareStatus, shareCodeReadyMessage(1, code, [name]), "success");
       if (action === "code") {
         els.personQuickSharePanel.hidden = true;
         els.personQuickCodeField.hidden = false;
@@ -5305,7 +5375,7 @@ const SYNC_URL = 'https://youfree.ca';
     if (!("serviceWorker" in navigator)) return;
     if (location.protocol !== "https:" && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") return;
 
-    navigator.serviceWorker.register("./service-worker.js?v=127", { updateViaCache: "none" })
+    navigator.serviceWorker.register("./service-worker.js?v=129", { updateViaCache: "none" })
       .then(registration => registration.update())
       .catch(() => {
         // The app works normally even if PWA caching isn't available.
@@ -5349,6 +5419,7 @@ const SYNC_URL = 'https://youfree.ca';
     openSharedLink();
 
     loadSchedulesFromDevice().then(async () => {
+      state.deviceReady = true;
       cacheSyncReady = !state.loadError && state.storageBackend !== "memory";
       if (cacheSyncRecord) backupStateToSharedCache();
       if (state.hasData) {
@@ -5356,9 +5427,8 @@ const SYNC_URL = 'https://youfree.ca';
         cleanGroupPreferences();
       }
       refresh({ preserveScroll: true });
-      updateSettingsModal();
+      updateScheduleModal();
       checkBreakNotifications();
-      state.deviceReady = true;
       state.singleScheduleReminderPending = state.hasData && Object.keys(peopleMap()).length === 1;
       if (state.sharedLinkStartup && !location.hash.startsWith("#import=")) endImportProgress();
       state.sharedLinkStartup = false;

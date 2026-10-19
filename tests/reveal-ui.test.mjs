@@ -26,6 +26,7 @@ for (const reducedMotion of [true, false]) {
     try {
       for (const file of ["schedule-availability.js", "schedule-groups.js", "app.js"]) window.eval(fs.readFileSync(new URL("../" + file, import.meta.url), "utf8"));
       await tick();
+      el("closeFirstScheduleWelcome").click();
       el("scheduleDataButton").click();
       el("manualScheduleButton").click();
       await tick();
@@ -37,11 +38,13 @@ for (const reducedMotion of [true, false]) {
       Object.defineProperty(el("scheduleImageInput"), "files", { value: [{ name: "schedule.png" }], configurable: true });
       el("scheduleImageInput").dispatchEvent(new window.Event("change"));
       await tick();
-      assert.equal(window.document.activeElement, el("imageReviewTitle"), "recognition must land on its review");
+      el("importPictureNameForm").dispatchEvent(new window.Event("submit", { cancelable: true }));
+      await tick();
+      assert.equal(window.document.activeElement.id, "imageReviewTitle", "recognition must land on its review");
       el("cancelImageScheduleButton").click();
       el("exportSchedulesButton").click();
       await tick();
-      assert.equal(window.document.activeElement, el("selectAllSchedules"));
+      assert.equal(window.document.activeElement, el("exportSelection").querySelector("summary"));
       el("selectAllSchedules").checked = true;
       el("selectAllSchedules").dispatchEvent(new window.Event("change"));
       el("generateCodeButton").click();
@@ -51,7 +54,7 @@ for (const reducedMotion of [true, false]) {
       el("scheduleDataButton").click();
       el("importCodeButton").click();
       await tick();
-      assert.equal(window.document.activeElement, el("importCodeInput"));
+      assert.equal(window.document.activeElement.id, "importScheduleImageButton");
       el("closeImportButton").click();
       el("closeScheduleModal").click();
       el("showGroupsToggle").click();
