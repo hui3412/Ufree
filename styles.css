@@ -2952,7 +2952,7 @@ button:disabled { cursor: not-allowed; }
 .home-header-controls.is-open { transform: translateX(0); visibility: visible; pointer-events: auto; transition: transform .24s ease, visibility 0s; }
 .mobile-nav-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .mobile-nav-heading h2 { font-size: 1.1rem; }
-.home-header-controls .header-actions { flex-direction: column; align-items: stretch; gap: 8px; width: 100%; }
+.home-header-controls .header-actions { flex-direction: column; align-items: stretch; flex-shrink: 0; gap: 8px; width: 100%; }
 .home-header-controls .header-data-button, .home-header-controls .nav-icon-button, .home-header-controls .compact-label { width: 100%; min-width: 0; min-height: 48px; height: auto; padding: 12px 14px; justify-content: flex-start; gap: 12px; font-size: .95rem; }
 .home-header-controls .header-data-button svg { width: 20px; height: 20px; }
 .home-header-controls .nav-button-label, .home-header-controls .nav-extra-label { display: inline; }
@@ -2981,9 +2981,8 @@ button:disabled { cursor: not-allowed; }
 
 
 
-/* The language action stays visible in the shared phone/desktop sidebar. */
-.language-toggle-button { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 48px; margin-top: 12px; padding: 10px 14px; border: 1px solid var(--border); }
+/* Flag-only language action at the bottom-left of the shared sidebar. */
+.home-header-controls .language-toggle-button { display: flex; align-items: center; justify-content: center; align-self: flex-start; flex: 0 0 48px; width: 56px; min-height: 48px; height: 48px; margin-top: auto; padding: 10px; border: 0; background: transparent; box-shadow: none; }
 .language-toggle-button img { display: block; width: 36px; height: 24px; object-fit: cover; border-radius: 3px; box-shadow: 0 0 0 1px rgba(128,128,128,.35); flex-shrink: 0; }
-.language-toggle-button span { display: inline; font-size: 14px; font-weight: 600; }
 html[lang="fr"] .header-actions button, html[lang="fr"] .modal-actions button { white-space: normal; }
 html[lang="fr"] .nav-extra-label, html[lang="fr"] .nav-button-label { min-width: 0; }
