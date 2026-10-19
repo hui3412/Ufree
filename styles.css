@@ -3024,3 +3024,5 @@ html[lang="fr"] .nav-extra-label, html[lang="fr"] .nav-button-label { min-width:
   font-size: 2rem;
   line-height: 1;
 }
+
+.people-list-import[hidden] { display: none; }

@@ -1752,6 +1752,7 @@ const SYNC_URL = 'https://youfree.ca';
     els.showGroupsToggle.disabled = !state.hasData;
     const busy = state.isParsing || Boolean(state.pendingImage) || Boolean(state.codeMode);
     els.manageGroupsButton.hidden = !state.showGroups;
+    if (els.bottomImportButton) els.bottomImportButton.parentElement.hidden = state.showGroups;
     els.manageGroupsButton.disabled = !state.hasData || busy;
     for (const button of els.peopleList.querySelectorAll("[data-share-group]")) {
       const group = state.groups.find(item => item.id === button.dataset.shareGroup);
@@ -5387,7 +5388,7 @@ const SYNC_URL = 'https://youfree.ca';
     if (!("serviceWorker" in navigator)) return;
     if (location.protocol !== "https:" && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") return;
 
-    navigator.serviceWorker.register("./service-worker.js?v=134", { updateViaCache: "none" })
+    navigator.serviceWorker.register("./service-worker.js?v=135", { updateViaCache: "none" })
       .then(registration => registration.update())
       .catch(() => {
         // The app works normally even if PWA caching isn't available.
