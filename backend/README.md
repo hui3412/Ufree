@@ -13,7 +13,7 @@ npx wrangler deploy
 
 The migration creates account tables alongside existing D1 infrastructure. It does not access, migrate, delete, or rename the browser's existing Local database. Confirm the Wrangler account and `DB` binding match `dff58bbe-1cc3-4850-8a58-4532fc9aed4b` before running. No browser/API token should be committed. Wrangler will use its normal authenticated deployment credentials. There are no application secrets to distribute to the browser.
 
-The supplied Git integration deploy command `npx wrangler deploy` bundles the backend but **does not apply D1 migrations**. Run the migration once manually before testing account flows. Keep preview builds off. The same `DB` binding is declared in Wrangler. Cloudflare deployment logs and dashboard settings require access to the test Cloudflare account; repository checks cannot establish those settings.
+The supplied Git integration deploy command `npx wrangler deploy` now invokes `backend/prepare-deploy.mjs` through the Wrangler custom build hook. Only inside Workers Builds on main, after verifying the exact test Worker and database IDs, it applies pending additive D1 migrations before deployment. Local development and local dry runs skip remote migration. If the connected build token lacks D1 permission, deployment stops and the manual migration command above remains necessary. Keep preview builds off. The same `DB` binding is declared in Wrangler. Cloudflare deployment logs and dashboard settings require access to the test Cloudflare account; repository checks cannot establish those settings.
 
 `GET /health` should return `features: accounts-test-v1` after migration and deployment. Before migration it reports `migration-required`. The pre-implementation live health check returned status ok, database connected, and features not-installed. Do not treat a healthy database as proof authentication routes deployed.
 
@@ -40,7 +40,7 @@ Cloud snapshots use random 256-bit identifiers, expire exactly 48 hours after th
 ## Launch blockers
 
 1. **Inactivity deletion is intentionally disabled.** The requirement says warning method and grace period must be decided before launch. No such decision or Google Doc URL was supplied. Authenticated requests update `last_active`, including activity in an existing session, with writes coalesced to once/hour. The daily cron cleans expired sessions, shares and old request counters only. It never deletes accounts. Implement and test the agreed warning/grace policy before enabling a 12-month account purge.
-2. Real Cloudflare deployment/migration, CPU budget and log verification need authenticated test-account access. Local schema application, backend tests and bundling do not establish live readiness.
+2. The connected Workers Builds check verifies deployment status; the build hook attempts the remote migration with its existing credentials. Direct dashboard logs, token permissions and CPU-budget verification still need authenticated test-account access. Local schema application, backend tests and bundling do not establish live readiness.
 3. Real iOS Safari/Home Screen tests are still required. Automated DOM and cookie-independent request tests do not establish iOS behavior.
 4. The requested Google Doc was not linked. Check its current contents before launch.
 
