@@ -9,7 +9,13 @@
     {
       "binding": "DB",
       "database_name": "ufree-test-db",
-      "database_id": "dff58bbe-1cc3-4850-8a58-4532fc9aed4b"
+      "database_id": "dff58bbe-1cc3-4850-8a58-4532fc9aed4b",
+      "migrations_dir": "backend/migrations"
     }
-  ]
+  ],
+  "triggers": {
+    "crons": [
+      "17 3 * * *"
+    ]
+  }
 }

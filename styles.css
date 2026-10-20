@@ -3026,3 +3026,15 @@ html[lang="fr"] .nav-extra-label, html[lang="fr"] .nav-button-label { min-width:
 }
 
 .people-list-import[hidden] { display: none; }
+
+.account-nav-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: auto; width: 100%; }
+.home-header-controls .account-nav-footer .language-toggle-button { margin-top: 0; }
+#accountMenuButton { margin-left: auto; max-width: 190px; font-size: .9rem; }
+.account-dialog { color: var(--text); background: var(--panel, #232428); border: 1px solid var(--border, #555); border-radius: 18px; width: min(560px, calc(100vw - 32px)); max-height: 88dvh; overflow: auto; padding: 22px; }
+.account-dialog::backdrop { background: rgb(0 0 0 / .65); }
+.account-dialog label { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.account-dialog input:not([type=checkbox]), .account-dialog select, .account-dialog textarea { width: 100%; max-width: 100%; min-height: 44px; color: inherit; background: var(--bg); border: 1px solid var(--border, #555); border-radius: 8px; padding: 10px; }
+.account-dialog button { margin: 5px; min-height: 44px; }
+.account-dialog p { white-space: pre-line; overflow-wrap: anywhere; }
+.account-actions { display: flex; flex-wrap: wrap; }
+.account-collection-label { margin: 0 0 12px; color: var(--muted); }

@@ -1,3 +1,7 @@
+# Account test work
+
+The test account, sync and cloud-sharing implementation is documented in [backend/README.md](backend/README.md). Existing Local schedules retain their original storage keys. Account features run only on the hui3412 GitHub Pages test site. Remote database migration, Cloudflare CPU/runtime verification, real iOS tests and the inactivity-warning decision are required before launch.
+
 # UFree
 
 ### Screenshot example and first-picture introduction

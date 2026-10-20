@@ -93,14 +93,14 @@ const SYNC_URL = 'https://youfree.ca';
   const LOCAL_STORE_NAME = "app";
   const LOCAL_SCHEDULE_KEY = "schedules";
   const LOCAL_STORAGE_FALLBACK_KEY = "whos-free-local-schedules";
-  const SCHEDULE_HISTORY_KEY = "ufree-has-had-schedules-v1";
-  const NOTIFICATION_SETTINGS_KEY = "whos-free-notification-settings-v1";
-  const NOTIFICATION_HISTORY_KEY = "whos-free-notification-history-v1";
-  const PEOPLE_PREFERENCES_KEY = "whos-free-people-preferences-v1";
-  const VIEW_PREFERENCE_KEY = "whos-free-view-mode-v1";
-  const PERSON_ORDER_KEY = "whos-free-person-order-v1";
-  const GROUP_PREFERENCES_KEY = "whos-free-groups-v1";
-  const ACCENT_THEME_KEY = "whos-free-accent-theme-v1";
+  const SCHEDULE_HISTORY_KEY = (window.UFreeAccounts?.prefix() || "") + "ufree-has-had-schedules-v1";
+  const NOTIFICATION_SETTINGS_KEY = (window.UFreeAccounts?.prefix() || "") + "whos-free-notification-settings-v1";
+  const NOTIFICATION_HISTORY_KEY = (window.UFreeAccounts?.prefix() || "") + "whos-free-notification-history-v1";
+  const PEOPLE_PREFERENCES_KEY = (window.UFreeAccounts?.prefix() || "") + "whos-free-people-preferences-v1";
+  const VIEW_PREFERENCE_KEY = (window.UFreeAccounts?.prefix() || "") + "whos-free-view-mode-v1";
+  const PERSON_ORDER_KEY = (window.UFreeAccounts?.prefix() || "") + "whos-free-person-order-v1";
+  const GROUP_PREFERENCES_KEY = (window.UFreeAccounts?.prefix() || "") + "whos-free-groups-v1";
+  const ACCENT_THEME_KEY = (window.UFreeAccounts?.prefix() || "") + "whos-free-accent-theme-v1";
   // Cache Storage is a best-effort backup within this origin/storage partition.
   // iOS isolates Safari and Home Screen website data; this cannot bridge that boundary.
   const CACHE_SYNC_STORAGE_KEYS = [
@@ -129,6 +129,7 @@ const SYNC_URL = 'https://youfree.ca';
   }
 
   function backupStateToSharedCache() {
+    if (window.UFreeAccounts?.active()) { window.UFreeAccounts.preferences(); return; }
     if (!cacheSyncReady) return;
     try {
       const storage = {};
@@ -149,6 +150,7 @@ const SYNC_URL = 'https://youfree.ca';
   }
 
   async function loadStateFromSharedCache() {
+    if (window.UFreeAccounts?.active()) return false;
     if (!("caches" in window)) return false;
     const written = [];
     try {
@@ -370,7 +372,7 @@ const SYNC_URL = 'https://youfree.ca';
 
   function loadTheme() {
     try {
-      const saved = localStorage.getItem("whos-free-theme");
+      const saved = localStorage.getItem((window.UFreeAccounts?.prefix() || "") + "whos-free-theme");
       return saved === "light" || saved === "dark" ? saved : "dark";
     } catch {
       return "dark";
@@ -379,7 +381,7 @@ const SYNC_URL = 'https://youfree.ca';
 
   function saveTheme(theme) {
     try {
-      localStorage.setItem("whos-free-theme", theme); backupStateToSharedCache();
+      localStorage.setItem((window.UFreeAccounts?.prefix() || "") + "whos-free-theme", theme); backupStateToSharedCache();
     } catch {
       // Theme persistence is optional.
     }
@@ -2941,6 +2943,11 @@ const SYNC_URL = 'https://youfree.ca';
   const recordRevision = record => Number.isSafeInteger(record?.storageRevision) && record.storageRevision > 0 ? record.storageRevision : 0;
 
   async function readLocalScheduleRecord() {
+    if (window.UFreeAccounts?.active()) { state.storageBackend = "account-local"; return window.UFreeAccounts.read(); }
+    return readLegacyLocalScheduleRecord();
+  }
+
+  async function readLegacyLocalScheduleRecord() {
     let primary = null, fallback = null, primaryError = null, fallbackError = null;
     if ("indexedDB" in window) {
       try { primary = await idbGet(LOCAL_SCHEDULE_KEY); }
@@ -2966,6 +2973,7 @@ const SYNC_URL = 'https://youfree.ca';
   }
 
   async function saveLocalScheduleRecord(record) {
+    if (window.UFreeAccounts?.active()) return window.UFreeAccounts.save(record);
     const saved = { ...record, storageRevision: Math.max(Date.now(), scheduleStorageRevision + 1) };
     scheduleStorageRevision = saved.storageRevision;
     try {
@@ -2991,6 +2999,7 @@ const SYNC_URL = 'https://youfree.ca';
   }
 
   async function deleteLocalScheduleRecord() {
+    if (window.UFreeAccounts?.active()) return window.UFreeAccounts.clear();
     let primaryRemoved = !("indexedDB" in window), fallbackRemoved = false;
     if ("indexedDB" in window) {
       try { await idbDelete(LOCAL_SCHEDULE_KEY); primaryRemoved = true; }
@@ -3867,6 +3876,11 @@ const SYNC_URL = 'https://youfree.ca';
 
   async function importShareCode({ automatic = false, groupChoice = null } = {}) {
     if (!state.deviceReady || state.isParsing || state.codeMode !== "import") return;
+    if (!automatic && !state.sharedImport && window.UFreeAccounts?.isCloudInput(els.importCodeInput.value)) {
+      try { await window.UFreeAccounts.receive(els.importCodeInput.value); }
+      catch (error) { codeStatus(els.importCodeStatus, error.message, "error"); }
+      return;
+    }
     if (!automatic && !state.sharedImport && /^(?:https?:\/\/|WFL[567])/i.test(els.importCodeInput.value.trim())) { await previewSharedImport(els.importCodeInput.value); return; }
     const selected = state.sharedImport && !state.sharedImport.shared_group ? [...els.sharedImportPeople.querySelectorAll("input:checked")].map(input => input.dataset.person) : null;
     if (selected && !selected.length) return;
@@ -4193,6 +4207,7 @@ const SYNC_URL = 'https://youfree.ca';
   }
 
   function updateScheduleModal() {
+    window.UFreeAccounts?.uiIdle();
     updateUndoControls();
     updateGroupToolbar();
     const peopleCount = Object.keys(peopleMap()).length;
@@ -5388,7 +5403,7 @@ const SYNC_URL = 'https://youfree.ca';
     if (!("serviceWorker" in navigator)) return;
     if (location.protocol !== "https:" && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") return;
 
-    navigator.serviceWorker.register("./service-worker.js?v=135", { updateViaCache: "none" })
+    navigator.serviceWorker.register("./service-worker.js?v=136", { updateViaCache: "none" })
       .then(registration => registration.update())
       .catch(() => {
         // The app works normally even if PWA caching isn't available.
@@ -5446,6 +5461,29 @@ const SYNC_URL = 'https://youfree.ca';
       if (state.sharedLinkStartup && !location.hash.startsWith("#import=")) endImportProgress();
       state.sharedLinkStartup = false;
       await openSharedLink();
+      window.UFreeAccounts?.ready({
+        snapshot: () => ({ data: JSON.parse(JSON.stringify(state.data || { people: {} })) }),
+        localSnapshot: readLegacyLocalScheduleRecord,
+        isBusy: () => state.isParsing || Boolean(state.pendingImage) || Boolean(state.codeMode),
+        openImport: () => openQuickCodePanel("import"),
+        reload: async () => {
+          if (state.isParsing || state.pendingImage || state.codeMode) return;
+          const saved = loadPeoplePreferences();
+          state.nicknames = { ...saved.nicknames }; state.pinnedPeople = new Set(saved.pinnedPeople);
+          Object.assign(state, loadGroupPreferences()); loadPersonOrders();
+          await loadSchedulesFromDevice();
+        },
+        importPeople: async people => {
+          if (!schedulesWritable() || state.isParsing || state.pendingImage) throw new Error("Finish the current import or export first.");
+          const incoming = { people: JSON.parse(JSON.stringify(people)) }; validateData(incoming); applyAutomaticSemester(incoming);
+          const merged = await window.WhosFreeShareCode.merge(state.hasData ? state.data : null, incoming, () => "both");
+          const before = captureScheduleChange(); state.data = merged.data;
+          const warning = await persistCurrentDatabase("Imported cloud snapshot");
+          if (warning) throw new Error(warning);
+          rememberScheduleChange(before, "Imported cloud snapshot");
+          showToast("Imported cloud snapshot");
+        },
+      });
       maybeShowSingleScheduleReminder();
     });
 

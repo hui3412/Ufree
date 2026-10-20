@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; worker-src 'self' blob: https://cdn.jsdelivr.net; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://youfreetest.huien3412.workers.dev; worker-src 'self' blob: https://cdn.jsdelivr.net; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
   <meta name="referrer" content="no-referrer">
   <meta name="theme-color" content="#232428">
   <meta name="description" content="See who's free now and compare Omnivox schedules. Schedule data stays on your device.">
@@ -32,7 +32,7 @@
   <link rel="icon" type="image/png" href="assets/icon-192.png" sizes="192x192">
   <link rel="icon" type="image/x-icon" href="favicon.ico" sizes="16x16 32x32 48x48">
   <link rel="apple-touch-icon" href="assets/apple-touch-icon.png" sizes="180x180">
-  <link rel="stylesheet" href="styles.css?v=135">
+  <link rel="stylesheet" href="styles.css?v=136">
 </head>
 <body>
   <div id="mobileNavBackdrop" class="mobile-nav-backdrop" aria-hidden="true" hidden></div>
@@ -615,7 +615,7 @@
     }
   </script>
   <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js" defer></script>
-  <script src="i18n-fr.js?v=133" defer></script>
+  <script src="i18n-fr.js?v=136" defer></script>
   <script src="i18n.js?v=127" defer></script>
   <script src="schedule-image-guide.js?v=132" defer></script>
   <script src="schedule-parser.js?v=112" defer></script>
@@ -626,7 +626,9 @@
   <script src="assets/qr/qrcodegen.js?v=90" defer></script>
   <script src="schedule-groups.js?v=90" defer></script>
   <script src="schedule-qr-batches.js?v=126" defer></script>
-  <script src="app.js?v=135" defer></script>
+  <script src="account-sync.js?v=136" defer></script>
+  <script src="accounts.js?v=136" defer></script>
+  <script src="app.js?v=136" defer></script>
 </body>
 </html>
 
