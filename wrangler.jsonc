@@ -1,0 +1,15 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "youfreetest",
+  "main": "backend/worker.mjs",
+  "compatibility_date": "2026-10-20",
+  "workers_dev": true,
+  "preview_urls": false,
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "ufree-test-db",
+      "database_id": "dff58bbe-1cc3-4850-8a58-4532fc9aed4b"
+    }
+  ]
+}
