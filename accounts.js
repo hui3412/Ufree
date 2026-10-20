@@ -213,7 +213,7 @@
     focusBefore?.focus?.();
   }
   function open() {
-    focusBefore = document.activeElement;
+    focusBefore = bridge.prepareDialog();
     render();
     panel.showModal();
   }
@@ -359,6 +359,7 @@
         event.preventDefault();
         finish();
       });
+      bridge.prepareDialog();
       dialog.showModal();
     });
   }
@@ -707,6 +708,7 @@
         event.preventDefault();
         done(false);
       });
+      bridge.prepareDialog();
       dialog.showModal();
     });
   }
@@ -725,7 +727,7 @@
       return;
     }
     if (!panel.open) {
-      focusBefore = document.activeElement;
+      focusBefore = bridge.prepareDialog();
       panel.showModal();
     }
     clear();

@@ -101,7 +101,10 @@ test("signed-out introduction adds only an account entry and preserves saved Loc
     );
     assert.equal(a.calls.length, 0);
     assert.equal(a.w.document.querySelector(".account-collection-label"), null);
+    a.el("mobileMenuButton").click();
     a.el("accountMenuButton").click();
+    assert.equal(a.w.document.querySelector(".account-dialog").hasAttribute("inert"), false);
+    assert.equal(a.el("mobileMenuButton").getAttribute("aria-expanded"), "false");
     assert.match(
       a.w.document.querySelector(".account-dialog").textContent,
       /Sign in/,

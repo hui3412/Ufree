@@ -5403,7 +5403,7 @@ const SYNC_URL = 'https://youfree.ca';
     if (!("serviceWorker" in navigator)) return;
     if (location.protocol !== "https:" && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") return;
 
-    navigator.serviceWorker.register("./service-worker.js?v=136", { updateViaCache: "none" })
+    navigator.serviceWorker.register("./service-worker.js?v=137", { updateViaCache: "none" })
       .then(registration => registration.update())
       .catch(() => {
         // The app works normally even if PWA caching isn't available.
@@ -5464,6 +5464,11 @@ const SYNC_URL = 'https://youfree.ca';
       window.UFreeAccounts?.ready({
         snapshot: () => ({ data: JSON.parse(JSON.stringify(state.data || { people: {} })) }),
         localSnapshot: readLegacyLocalScheduleRecord,
+        prepareDialog: () => {
+          const target = usesDrawerNavigation() ? mobileMenuButton : document.activeElement;
+          closeMobileNavigation(false);
+          return target;
+        },
         isBusy: () => state.isParsing || Boolean(state.pendingImage) || Boolean(state.codeMode),
         openImport: () => openQuickCodePanel("import"),
         reload: async () => {
