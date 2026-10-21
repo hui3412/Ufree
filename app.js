@@ -2597,6 +2597,7 @@ const SYNC_URL = 'https://youfree.ca';
   }
 
   function openManualSchedule(name = "", person = { source_file: "manual", classes: [] }) {
+    if (window.UFreeAccounts?.isLive(name)) { showToast("Live personal schedules are read-only. Manage following in Account."); return; }
     if (!schedulesWritable() || state.isParsing || state.pendingImage) return;
     state.pendingImage = { name, person, editingName: name || null };
     els.imageReviewName.value = name;
@@ -2706,6 +2707,7 @@ const SYNC_URL = 'https://youfree.ca';
     }
     const editingName = state.pendingImage.editingName;
     const renamed = editingName && editingName !== name;
+    if (window.UFreeAccounts?.isLive(name) || window.UFreeAccounts?.isLive(editingName)) { setUiText(els.imageReviewError,"Live personal schedules are read-only. Save a separate copy instead."); return; }
     const replacement = Object.prototype.hasOwnProperty.call(workingData.people, name);
     // Define an own property safely even if a person's name is __proto__.
     Object.defineProperty(workingData.people, name, { value: { ...state.pendingImage.person, source_file: state.pendingImage.person.source_file, semester, classes }, writable: true, enumerable: true, configurable: true });
@@ -2752,6 +2754,7 @@ const SYNC_URL = 'https://youfree.ca';
       }
       state.selectedPerson = name;
       const warning = await persistCurrentDatabase("Local schedule collection");
+      if (renamed && !warning) window.UFreeAccounts?.renamed(editingName, name);
       if (firstCreation && !warning) welcomeName = name;
       const changed = rememberScheduleChange(before, `${editingName ? "Edited" : replacement ? "Replaced" : "Added"} ${name}'s schedule`);
       clearImageReview();
@@ -3086,7 +3089,8 @@ const SYNC_URL = 'https://youfree.ca';
     const record = { data: state.data, meta };
     let storageWarning = null;
     try {
-      await saveLocalScheduleRecord(record);
+      const saved = await saveLocalScheduleRecord(record);
+      if (window.UFreeAccounts?.active()) state.data = saved.data;
       await requestPersistentStorage();
       if (Object.keys(peopleMap()).length) rememberScheduleHistory();
     } catch (error) {
@@ -4068,6 +4072,7 @@ const SYNC_URL = 'https://youfree.ca';
   }
 
   async function removePerson(name) {
+    if (window.UFreeAccounts?.isLive(name)) { showToast("Live personal schedules are read-only. Manage following in Account."); return; }
     if (!schedulesWritable() || state.isParsing || state.pendingImage || state.codeMode) return;
     if (!state.hasData || !Object.prototype.hasOwnProperty.call(state.data.people || {}, name)) return;
     const confirmed = window.confirm(translateUi(`Remove ${displayName(name)} from this device?`));
@@ -4159,7 +4164,8 @@ const SYNC_URL = 'https://youfree.ca';
       removeButton.type = "button";
       removeButton.className = "mini-danger-button";
       setUiText(removeButton, "Remove");
-      removeButton.disabled = state.isParsing || Boolean(state.pendingImage) || Boolean(state.codeMode);
+      removeButton.disabled = Boolean(window.UFreeAccounts?.isLive(name)) || state.isParsing || Boolean(state.pendingImage) || Boolean(state.codeMode);
+      if (window.UFreeAccounts?.isLive(name)) setUiAttribute(removeButton,"title","Manage following in Account.");
       setUiAttribute(removeButton, "aria-label", `Remove ${displayName(name)}`);
       removeButton.addEventListener("click", () => removePerson(name));
 
@@ -4167,7 +4173,7 @@ const SYNC_URL = 'https://youfree.ca';
       editButton.type = "button";
       editButton.className = "secondary-button";
       setUiText(editButton, "Edit");
-      editButton.disabled = state.isParsing || Boolean(state.pendingImage) || Boolean(state.codeMode);
+      editButton.disabled = Boolean(window.UFreeAccounts?.isLive(name)) || state.isParsing || Boolean(state.pendingImage) || Boolean(state.codeMode);
       setUiAttribute(editButton, "aria-label", `Edit ${displayName(name)}`);
       editButton.addEventListener("click", () => openManualSchedule(name, JSON.parse(JSON.stringify(person))));
       row.append(copy, editButton, removeButton);
@@ -4319,8 +4325,8 @@ const SYNC_URL = 'https://youfree.ca';
       showToast("The saved schedules could not be fully removed. Nothing was removed from this view. Reload and try again when storage is available.");
       return;
     }
-    state.data = { people: {} };
-    state.hasData = false;
+    state.data = window.UFreeAccounts?.active() ? window.UFreeAccounts.read().data : { people: {} };
+    state.hasData = Object.keys(state.data.people).length > 0;
     state.scheduleMeta = null;
     state.selectedPerson = null;
     state.loadError = null;
@@ -4328,10 +4334,10 @@ const SYNC_URL = 'https://youfree.ca';
     rememberScheduleChange(before, "Removed all local schedules");
     state.isParsing = false;
     closeScheduleModal();
-    renderDataSetup();
+    if (state.hasData) refresh(); else renderDataSetup();
     updateScheduleModal();
     updateSettingsModal();
-    showToast("All local schedules removed");
+    showToast(window.UFreeAccounts?.active() && state.hasData ? "Your own schedules were removed. Live schedules remain until you stop following." : "All local schedules removed");
   }
 
   function iconAction(label, path, extraClass = "") {
@@ -4540,6 +4546,7 @@ const SYNC_URL = 'https://youfree.ca';
     }
 
     copy.append(personName, detail);
+    if (window.UFreeAccounts?.isLive(name)) { const live = document.createElement("span"); live.className = "live-personal-label"; setUiText(live,"Live personal schedule"); copy.append(live); }
     if (semesterIsOlder(peopleMap()[name].semester)) {
       const label = document.createElement("span");
       label.className = `schedule-semester${semesterIsOlder(peopleMap()[name].semester) ? " semester-older" : ""}`;
@@ -5403,7 +5410,7 @@ const SYNC_URL = 'https://youfree.ca';
     if (!("serviceWorker" in navigator)) return;
     if (location.protocol !== "https:" && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") return;
 
-    navigator.serviceWorker.register("./service-worker.js?v=137", { updateViaCache: "none" })
+    navigator.serviceWorker.register("./service-worker.js?v=138", { updateViaCache: "none" })
       .then(registration => registration.update())
       .catch(() => {
         // The app works normally even if PWA caching isn't available.
@@ -5470,6 +5477,7 @@ const SYNC_URL = 'https://youfree.ca';
           return target;
         },
         isBusy: () => state.isParsing || Boolean(state.pendingImage) || Boolean(state.codeMode),
+        canNotify: () => ![...document.querySelectorAll(".modal-backdrop")].some(modal=>!modal.hidden),
         openImport: () => openQuickCodePanel("import"),
         reload: async () => {
           if (state.isParsing || state.pendingImage || state.codeMode) return;

@@ -14,7 +14,13 @@ const user = {
   school: "Fictional",
   personalSchedule: "Account person",
 };
-async function app({ account = false, session = false, cloud = false } = {}) {
+async function app({
+  account = false,
+  session = false,
+  cloud = false,
+  extraRecords = {},
+  handler,
+} = {}) {
   const w = new Window({
     url:
       "https://hui3412.github.io/Ufree/" +
@@ -47,8 +53,14 @@ async function app({ account = false, session = false, cloud = false } = {}) {
       "ufree-test-account-v1:test-user",
       JSON.stringify({
         revision: 1,
-        base: { "p:Account person": { semester: "Fall 2026", classes: [] } },
-        records: { "p:Account person": { semester: "Fall 2026", classes: [] } },
+        base: {
+          "p:Account person": { semester: "Fall 2026", classes: [] },
+          ...extraRecords,
+        },
+        records: {
+          "p:Account person": { semester: "Fall 2026", classes: [] },
+          ...extraRecords,
+        },
         initialized: true,
         conflicts: [],
       }),
@@ -58,6 +70,8 @@ async function app({ account = false, session = false, cloud = false } = {}) {
   w.fetch = async (url, options) => {
     calls.push({ url, options });
     const path = new URL(url).pathname;
+    const custom = handler?.(path, options);
+    if (custom !== undefined) return { ok: true, json: async () => custom };
     return {
       ok: true,
       json: async () =>
@@ -103,8 +117,14 @@ test("signed-out introduction adds only an account entry and preserves saved Loc
     assert.equal(a.w.document.querySelector(".account-collection-label"), null);
     a.el("mobileMenuButton").click();
     a.el("accountMenuButton").click();
-    assert.equal(a.w.document.querySelector(".account-dialog").hasAttribute("inert"), false);
-    assert.equal(a.el("mobileMenuButton").getAttribute("aria-expanded"), "false");
+    assert.equal(
+      a.w.document.querySelector(".account-dialog").hasAttribute("inert"),
+      false,
+    );
+    assert.equal(
+      a.el("mobileMenuButton").getAttribute("aria-expanded"),
+      "false",
+    );
     assert.match(
       a.w.document.querySelector(".account-dialog").textContent,
       /Sign in/,
@@ -169,6 +189,145 @@ test("a guest cloud snapshot waits for the dismissible account prompt, then impo
     assert.match(a.el("peopleList").textContent, /Original/);
     assert.equal(a.w.localStorage.getItem("ufree-test-session-v1"), null);
     assert.equal(a.calls.length, 1);
+  } finally {
+    await a.close();
+  }
+});
+
+const settle = async (predicate) => {
+  for (let i = 0; i < 100; i++) {
+    if (predicate()) return;
+    await new Promise((r) => setTimeout(r, 10));
+  }
+  assert.ok(predicate(), "expected UI update");
+};
+const buttonWith = (w, label) =>
+  [...w.document.querySelectorAll("button")].find(
+    (b) => b.textContent === label,
+  );
+test("account search caps results and sends no follow request before explicit consent", async () => {
+  const a = await app({
+    account: true,
+    handler: (path) =>
+      path === "/users/search"
+        ? {
+            users: Array.from({ length: 15 }, (_, i) => ({
+              username: "fictional_" + i,
+            })),
+          }
+        : path === "/connections/request"
+          ? { ok: true }
+          : path === "/sync"
+            ? { revision: 1 }
+            : undefined,
+  });
+  try {
+    a.el("mobileMenuButton").click();
+    a.el("accountMenuButton").click();
+    buttonWith(a.w, "Find accounts").click();
+    a.w.document.querySelector(".account-dialog input").value = "fictional";
+    buttonWith(a.w, "Search accounts").click();
+    await settle(
+      () => a.w.document.querySelectorAll(".follow-result").length === 10,
+    );
+    buttonWith(a.w, "Follow").click();
+    assert.equal(
+      a.calls.filter((c) => c.url.endsWith("/connections/request")).length,
+      0,
+    );
+    assert.match(
+      a.w.document.querySelector("dialog[open]:last-of-type").textContent,
+      /only see their personal schedule after they agree/,
+    );
+    buttonWith(a.w, "Confirm").click();
+    await settle(() =>
+      a.calls.some((c) => c.url.endsWith("/connections/request")),
+    );
+    const request = a.calls.find((c) => c.url.endsWith("/connections/request"));
+    assert.equal(JSON.parse(request.options.body).sharePersonal, true);
+    assert.equal(
+      a.w.localStorage.getItem("whos-free-local-schedules"),
+      a.original,
+    );
+    a.w.UFreeI18n.setLanguage("fr");
+    assert.ok(buttonWith(a.w, "Rechercher des comptes"));
+  } finally {
+    await a.close();
+  }
+});
+test("cached followed schedules remain read-only and separate from own records and Local data", async () => {
+  const payload = {
+    username: "fictional_friend",
+    person: { semester: "Fall 2026", classes: [] },
+  };
+  const a = await app({ account: true, extraRecords: { "f:peer": payload } });
+  try {
+    assert.equal(a.w.UFreeAccounts.isLive("@fictional_friend"), true);
+    const saved = a.w.UFreeAccounts.save({
+      data: {
+        people: {
+          "@fictional_friend": { semester: "tampered", classes: [] },
+          Own: { semester: "Fall 2026", classes: [] },
+        },
+      },
+      meta: {},
+    });
+    assert.equal(saved.data.people["@fictional_friend"].semester, "Fall 2026");
+    const state = JSON.parse(
+      a.w.localStorage.getItem("ufree-test-account-v1:test-user"),
+    );
+    assert.equal(state.records["p:@fictional_friend"], undefined);
+    assert.equal(state.records["f:peer"].person.semester, "Fall 2026");
+    a.w.UFreeAccounts.clear();
+    assert.equal(a.w.UFreeAccounts.read().data.people.Own, undefined);
+    assert.ok(a.w.UFreeAccounts.read().data.people["@fictional_friend"]);
+    assert.equal(
+      a.w.localStorage.getItem("whos-free-local-schedules"),
+      a.original,
+    );
+  } finally {
+    await a.close();
+  }
+});
+test("follow inbox acceptance requires a second consent confirmation and preserves Local schedules", async () => {
+  const a = await app({
+    account: true,
+    handler: (path) =>
+      path === "/deliveries"
+        ? {
+            deliveries: [],
+            followRequests: [{ id: "request-id", sender: "fictional_friend" }],
+          }
+        : path === "/connections/respond"
+          ? { ok: true }
+          : path === "/sync"
+            ? { revision: 1 }
+            : undefined,
+  });
+  try {
+    a.el("mobileMenuButton").click();
+    a.el("accountMenuButton").click();
+    buttonWith(a.w, "Inbox").click();
+    await settle(() => buttonWith(a.w, "Follow back and share"));
+    buttonWith(a.w, "Follow back and share").click();
+    assert.equal(
+      a.calls.filter((c) => c.url.endsWith("/connections/respond")).length,
+      0,
+    );
+    buttonWith(a.w, "Confirm").click();
+    await settle(() =>
+      a.calls.some((c) => c.url.endsWith("/connections/respond")),
+    );
+    const payload = JSON.parse(
+      a.calls.find((c) => c.url.endsWith("/connections/respond")).options.body,
+    );
+    assert.equal(payload.id, "request-id");
+    assert.equal(payload.decision, "accepted");
+    assert.equal(payload.sharePersonal, true);
+    assert.equal(
+      a.w.localStorage.getItem("whos-free-local-schedules"),
+      a.original,
+    );
   } finally {
     await a.close();
   }

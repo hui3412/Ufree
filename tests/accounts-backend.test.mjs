@@ -6,12 +6,15 @@ import worker from "../backend/worker.mjs";
 const origin = "https://hui3412.github.io";
 function database() {
   const sql = new DatabaseSync(":memory:");
-  sql.exec(
-    fs.readFileSync(
-      new URL("../backend/migrations/0001_accounts.sql", import.meta.url),
-      "utf8",
-    ),
-  );
+  for (const name of fs
+    .readdirSync(new URL("../backend/migrations/", import.meta.url))
+    .sort())
+    sql.exec(
+      fs.readFileSync(
+        new URL("../backend/migrations/" + name, import.meta.url),
+        "utf8",
+      ),
+    );
   const db = {
     prepare(query) {
       let args = [];

@@ -153,3 +153,26 @@ test("edits made during an upload remain queued after the older upload is acknow
   assert.equal(sync.state.base.Alex.note, "newer");
   assert.equal(updates, 2);
 });
+
+test("live records always follow server updates and tombstones without uploading private edits", () => {
+  const { differences } = require("../account-sync.js");
+  const base = { "f:peer": person("old"), "p:own": person("old") };
+  const local = {
+    "f:peer": person("tampered"),
+    "p:own": person("offline edit"),
+  };
+  let merged = reconcile(base, local, {
+    "f:peer": person("new"),
+    "p:own": person("old"),
+  });
+  assert.equal(merged.records["f:peer"].note, "new");
+  assert.equal(merged.records["p:own"].note, "offline edit");
+  assert.equal(merged.conflicts.length, 0);
+  assert.deepEqual(
+    differences(base, local).map((r) => r.name),
+    ["p:own"],
+  );
+  merged = reconcile(base, local, { "p:own": person("old") });
+  assert.equal(merged.records["f:peer"], undefined);
+  assert.equal(merged.records["p:own"].note, "offline edit");
+});

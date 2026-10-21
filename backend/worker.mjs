@@ -1,3 +1,4 @@
+import { following, followRequests } from "./following.mjs";
 import { scryptAsync } from "@noble/hashes/scrypt";
 import { bytesToHex, hexToBytes } from "@noble/hashes/utils";
 
@@ -249,6 +250,10 @@ export default {
           database: "connected",
           features: ready ? "accounts-test-v1" : "migration-required",
           inactivityDeletion: "disabled-pending-warning-policy",
+          following: !!(await one(
+            env.DB,
+            "SELECT name FROM sqlite_master WHERE name='connections'",
+          )),
         });
       }
       const db = env.DB;
@@ -374,6 +379,15 @@ export default {
         });
       }
       const user = await authenticate(request, db);
+      const followed = await following(request, db, user, input, {
+        one,
+        rows,
+        run,
+        statement,
+        throttle,
+        fail,
+      });
+      if (followed !== null) return respond(followed);
       if (path === "/auth/session" && request.method === "GET")
         return respond({ user: profile(user), revision: user.revision });
       if (path === "/auth/logout" && input) {
@@ -430,12 +444,14 @@ export default {
         // A single read snapshot pairs the revision with its rows, even during concurrent writes.
         const result = await rows(
           db,
-          "SELECT u.revision AS current_revision,r.name,r.payload,r.revision FROM users u LEFT JOIN records r ON r.user_id=u.id AND r.revision>? WHERE u.id=?",
+          "SELECT u.revision AS current_revision,u.personal_schedule,r.name,r.payload,r.revision FROM users u LEFT JOIN records r ON r.user_id=u.id AND r.revision>? WHERE u.id=?",
           since,
           user.id,
         );
         return respond({
           revision: result[0]?.current_revision ?? user.revision,
+          personalSchedule:
+            result[0]?.personal_schedule ?? user.personal_schedule,
           changes: result
             .filter((x) => x.name !== null)
             .map((x) => ({
@@ -446,7 +462,10 @@ export default {
         });
       }
       if (path === "/revision" && request.method === "GET")
-        return respond({ revision: user.revision });
+        return respond({
+          revision: user.revision,
+          personalSchedule: user.personal_schedule,
+        });
       if (path === "/sync" && input) {
         if (
           !Number.isSafeInteger(input.baseRevision) ||
@@ -486,7 +505,7 @@ export default {
         }
         const size = await one(
           db,
-          "SELECT COALESCE(SUM(length(CAST(payload AS BLOB))),0) AS size FROM records WHERE user_id=?",
+          "SELECT COALESCE(SUM(length(CAST(payload AS BLOB))),0) AS size FROM records WHERE user_id=? AND name NOT LIKE 'f:%'",
           user.id,
         );
         const existing = await rows(
@@ -570,6 +589,7 @@ export default {
           user.id,
         );
         return respond({
+          followRequests: await followRequests(db, user.id, rows),
           deliveries: inbox.map((x) => ({
             id: x.id,
             sender: x.sender_name,

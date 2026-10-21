@@ -3038,3 +3038,8 @@ html[lang="fr"] .nav-extra-label, html[lang="fr"] .nav-button-label { min-width:
 .account-dialog p { white-space: pre-line; overflow-wrap: anywhere; }
 .account-actions { display: flex; flex-wrap: wrap; }
 .account-collection-label { margin: 0 0 12px; color: var(--muted); }
+
+.follow-results { display: grid; gap: 12px; margin-top: 16px; }
+.follow-result { border: 1px solid var(--border, #555); border-radius: 12px; padding: 12px; }
+.follow-result p { margin: 6px 0 10px; }
+.live-personal-label { display: block; font-size: .75rem; color: var(--muted); }

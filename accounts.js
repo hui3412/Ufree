@@ -14,6 +14,8 @@
   const SESSION = "ufree-test-session-v1",
     VIEW = "ufree-test-view-v1",
     PREFIX = "ufree-test-account-v1:";
+  const liveNames = new Map();
+  let personalChangeTask = null;
   const PREFS = [
     "whos-free-people-preferences-v1",
     "whos-free-person-order-v1",
@@ -84,10 +86,51 @@
       if (person.classes === undefined) person.classes = [];
     return {
       ...Object.fromEntries(
-        Object.entries(people).map(([name, value]) => ["p:" + name, value]),
+        Object.entries(people)
+          .filter(([name]) => !liveNames.has(name))
+          .map(([name, value]) => ["p:" + name, value]),
       ),
+      ...linkedRecords(),
       "@preferences": preferences,
     };
+  }
+  function linkedRecords() {
+    return Object.fromEntries(
+      Object.entries(engine?.state.records || {}).filter(([name]) =>
+        name.startsWith("f:"),
+      ),
+    );
+  }
+  function pendingPersonal() {
+    const raw = localStorage.getItem(key() + ":personal-change");
+    return raw ? JSON.parse(raw) : null;
+  }
+  async function flushPersonalChange() {
+    if (!session || !engine) return;
+    if (personalChangeTask) return personalChangeTask;
+    personalChangeTask = (async () => {
+      const pending = pendingPersonal();
+      if (!pending || !engine.state.base["p:" + pending.to]) return;
+      const current =
+        engine.state.personalSchedule ?? session.user.personalSchedule;
+      if (current !== pending.to) {
+        if (current !== pending.from)
+          throw Error(
+            "Your personal schedule selection changed on another device. Choose it again.",
+          );
+        await request("/profile/personal-schedule", {
+          name: pending.to,
+          expected: pending.from,
+        });
+      }
+      session.user.personalSchedule = pending.to;
+      localStorage.setItem(SESSION, JSON.stringify(session));
+      engine.persist({ ...engine.state, personalSchedule: pending.to });
+      localStorage.removeItem(key() + ":personal-change");
+    })().finally(() => {
+      personalChangeTask = null;
+    });
+    return personalChangeTask;
   }
   function peopleFromRecords(values) {
     return Object.fromEntries(
@@ -107,6 +150,23 @@
   }
   function accountRecord() {
     const people = peopleFromRecords(engine.state.records);
+    liveNames.clear();
+    for (const [name, value] of Object.entries(linkedRecords()).sort(
+      ([a], [b]) => a.localeCompare(b),
+    )) {
+      if (
+        !value?.person ||
+        !Array.isArray(value.person.classes) ||
+        typeof value.username !== "string"
+      )
+        continue;
+      let label = "@" + value.username,
+        index = 2;
+      while (Object.hasOwn(people, label))
+        label = `@${value.username} (${index++})`;
+      people[label] = copy(value.person);
+      liveNames.set(label, { id: name.slice(2), username: value.username });
+    }
     return {
       data: { people },
       meta: { filename: "Account", peopleCount: Object.keys(people).length },
@@ -123,7 +183,9 @@
       },
       onSynced: () => {
         needsReload = true;
-        queueMicrotask(applySync);
+        queueMicrotask(() =>
+          flushPersonalChange().then(applySync).catch(showError),
+        );
       },
     });
     hydrate();
@@ -132,16 +194,31 @@
   window.UFreeAccounts = {
     active,
     prefix,
+    isLive: (name) => active() && liveNames.has(name),
+    renamed: (from, to) => {
+      if (!active()) return;
+      const pending = pendingPersonal();
+      const selected =
+        pending?.to ??
+        engine.state.personalSchedule ??
+        session.user.personalSchedule;
+      if (selected !== from) return;
+      localStorage.setItem(
+        key() + ":personal-change",
+        JSON.stringify({ from: pending?.from ?? from, to }),
+      );
+      engine.check(true).then(flushPersonalChange).catch(showError);
+    },
     uiIdle: () => {
       if (needsReload) queueMicrotask(applySync);
     },
     read: () => accountRecord(),
     save: (record) => {
       engine.save(records(record));
-      return record;
+      return { ...record, data: accountRecord().data };
     },
     clear: () => {
-      engine.save({ "@preferences": prefs() });
+      engine.save({ ...linkedRecords(), "@preferences": prefs() });
       return true;
     },
     preferences: () => {
@@ -260,7 +337,9 @@
       active() ? "Import destination: Account" : "Import destination: Local",
     ];
     if (engine) {
-      parts.push(`${tr("Pending changes")}: ${engine.pending()}`);
+      parts.push(
+        `${tr("Pending changes")}: ${engine.pending() + (pendingPersonal() ? 1 : 0)}`,
+      );
       parts.push(
         `${tr("Last sync")}: ${engine.state.lastSync ? new Date(engine.state.lastSync).toLocaleString() : tr("Not synced")}`,
       );
@@ -382,6 +461,9 @@
     action("Account view", controls, () => switchView("account"));
     action("Refresh sync", controls, () => sync(true));
     action("Copy Local to Account", controls, copyLocal);
+    action("Find accounts", controls, searchAccounts);
+    action("Following", controls, followingForm);
+    action("Your personal schedule", controls, personalForm);
     action("Cloud sharing", controls, sharing);
     action("Inbox", controls, () => inbox(true));
     action("Change password", controls, passwordForm);
@@ -408,6 +490,10 @@
     renderStatus();
   }
   function authForm(signup) {
+    if (signup && session) {
+      text(status, "Sign out before creating another account.");
+      return;
+    }
     clear();
     element("h3", signup ? "Create account" : "Sign in", main);
     const username = field("Username"),
@@ -495,17 +581,15 @@
           false,
         );
         // Save identity and initial queued upload before changing view. Never touch legacy Local keys.
+        ready = false; // Reload before applying a different identity to the current collection bridge.
         session = result;
         localStorage.setItem(SESSION, JSON.stringify(result));
         setupEngine();
         if (signup) engine.save(records(snapshot, prefs(true)));
         await engine.check(true);
         if (!engine.state.initialized && !signup) {
-          text(
-            status,
-            engine.error ||
-              "Cloud unavailable. Retry sign-in to download the Account collection.",
-          );
+          localStorage.setItem(VIEW, "local");
+          location.reload();
           return;
         }
         localStorage.setItem(VIEW, "account");
@@ -569,6 +653,7 @@
   async function sync(force) {
     if (!session || !engine) return;
     await engine.check(force);
+    await flushPersonalChange();
     await applySync();
     renderStatus();
   }
@@ -597,6 +682,7 @@
     const name = field("Username");
     action("Block", main, async () => {
       await request("/blocks", { username: name.value, blocked: true });
+      await sync(true);
       text(status, "User blocked.");
     });
     action("Unblock", main, async () => {
@@ -606,7 +692,7 @@
   }
   const warning =
     "Recipients can save, screenshot, or reshare their copy. Deleting your account does not delete their copy. Get permission before sharing someone else's schedule.";
-  function sharing() {
+  function sharing(recipientUsername = "") {
     clear();
     element("h3", "Cloud sharing", main);
     element("p", warning, main);
@@ -659,7 +745,7 @@
         main,
       );
     });
-    const recipient = field("Recipient username");
+    const recipient = field("Recipient username", "text", recipientUsername);
     recipient.addEventListener("input", () => {
       verified = "";
     });
@@ -717,12 +803,16 @@
       !session ||
       !ready ||
       busy ||
-      (!force && Date.now() - lastInbox < 60000)
+      (!force &&
+        (Date.now() - lastInbox < 60000 ||
+          panel?.open ||
+          bridge.isBusy() ||
+          bridge.canNotify?.() === false))
     )
       return;
     lastInbox = Date.now();
     const result = await request("/deliveries");
-    if (!result.deliveries.length) {
+    if (!result.deliveries.length && !(result.followRequests || []).length) {
       if (force) text(status, "No pending deliveries.");
       return;
     }
@@ -737,6 +827,44 @@
       active() ? "Import destination: Account" : "Import destination: Local",
       main,
     );
+    for (const item of result.followRequests || []) {
+      const box = element("section", "", main, { class: "follow-result" });
+      element("h4", "Follow request", box);
+      element("p", "@" + item.sender, box, { "data-no-translate": "" });
+      element("p", followConsent, box);
+      action("Follow back and share", box, async () => {
+        if (
+          !(await confirmDialog(
+            "@" + item.sender + "\n" + tr(followConsent) + "\n" + tr(warning),
+          ))
+        )
+          return;
+        await ensureSynced();
+        await request("/connections/respond", {
+          id: item.id,
+          decision: "accepted",
+          sharePersonal: true,
+        });
+        box.remove();
+        await sync(true);
+        text(
+          status,
+          "You now follow each other. Personal schedules will stay updated in Account view.",
+        );
+      });
+      action("Decline", box, async () => {
+        await request("/connections/respond", {
+          id: item.id,
+          decision: "declined",
+        });
+        box.remove();
+      });
+      action("Block sender", box, async () => {
+        await request("/blocks", { username: item.sender, blocked: true });
+        box.remove();
+        await sync(true);
+      });
+    }
     for (const item of result.deliveries) {
       const box = element("section", "", main);
       element("p", `${tr("From")}: @${item.sender}`, box);
@@ -764,9 +892,229 @@
       action("Block sender", box, async () => {
         await request("/blocks", { username: item.sender, blocked: true });
         box.remove();
+        await sync(true);
       });
     }
   }
+  const followConsent =
+    "Following back shares both selected Account personal schedules, including courses, rooms and teachers, and keeps future changes updated in both directions. Other schedules and school information stay private. Either person can stop following.";
+  const requestConsent =
+    "If this person follows back, your selected Account personal schedule, including courses, rooms and teachers, will be shared with them and kept updated. You will only see their personal schedule after they agree. Other schedules and school information stay private.";
+  async function ensureSynced() {
+    await sync(true);
+    if (engine.error || engine.pending())
+      throw Error(
+        engine.error || "Connect and sync your pending changes first.",
+      );
+  }
+  function backToAccount() {
+    action("Back to account", main, render);
+  }
+  function searchAccounts() {
+    clear();
+    element("h3", "Find accounts", main);
+    element(
+      "p",
+      "Search usernames. Up to 10 matching accounts are shown. Private schedules and schools are never included in search results.",
+      main,
+    );
+    const query = field("Search username");
+    query.maxLength = 24;
+    query.autocomplete = "off";
+    const results = element("div", "", main, {
+      class: "follow-results",
+      role: "region",
+      "aria-label": "Account search results",
+      "aria-live": "polite",
+    });
+    formButton("Search accounts", async () => {
+      const response = await request("/users/search", { query: query.value });
+      if (!results.isConnected) return;
+      results.replaceChildren();
+      const users = (response.users || []).slice(0, 10);
+      if (!users.length) element("p", "No matching accounts.", results);
+      for (const match of users) {
+        const row = element("section", "", results, { class: "follow-result" });
+        element("p", "@" + match.username, row, { "data-no-translate": "" });
+        if (match.connection?.status === "accepted") {
+          element("p", "Following each other", row);
+          action("Share schedules", row, () => sharing(match.username));
+        } else if (match.connection?.status === "pending") {
+          element(
+            "p",
+            match.connection.direction === "incoming"
+              ? "This person wants to follow you."
+              : "Follow request pending.",
+            row,
+          );
+          if (match.connection.direction === "incoming")
+            action("Open inbox", row, () => inbox(true));
+        } else {
+          const follow = action("Follow", row, async () => {
+            if (
+              !(await confirmDialog(
+                "@" +
+                  match.username +
+                  "\n" +
+                  tr(requestConsent) +
+                  "\n" +
+                  tr(warning),
+              ))
+            )
+              return;
+            await ensureSynced();
+            await request("/connections/request", {
+              username: match.username,
+              sharePersonal: true,
+            });
+            follow.disabled = true;
+            text(follow, "Follow request pending.");
+            text(status, "Follow request sent.");
+          });
+        }
+      }
+    });
+    query.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        [...main.querySelectorAll("button")]
+          .find(
+            (node) =>
+              window.UFreeI18n?.sourceText(node) === "Search accounts" ||
+              node.textContent === "Search accounts",
+          )
+          ?.click();
+      }
+    });
+    backToAccount();
+  }
+  async function followingForm() {
+    clear();
+    element("h3", "Following", main);
+    element(
+      "p",
+      "Live personal schedules appear in Account view. They refresh when UFree opens, returns online, or you refresh sync. Offline copies may differ until synced.",
+      main,
+    );
+    const list = element("div", "", main, { class: "follow-results" });
+    backToAccount();
+    const result = await request("/connections");
+    if (!list.isConnected) return;
+    if (!result.connections.length)
+      element("p", "You are not following anyone yet.", list);
+    for (const connection of result.connections) {
+      const row = element("section", "", list, { class: "follow-result" });
+      element("p", "@" + connection.username, row, { "data-no-translate": "" });
+      element(
+        "p",
+        connection.status === "accepted"
+          ? "Following each other"
+          : connection.direction === "incoming"
+            ? "This person wants to follow you."
+            : "Follow request pending.",
+        row,
+      );
+      if (connection.status === "accepted")
+        action("Share schedules", row, () => sharing(connection.username));
+      if (
+        connection.direction === "incoming" &&
+        connection.status === "pending"
+      )
+        action("Open inbox", row, () => inbox(true));
+      else
+        action(
+          connection.status === "accepted"
+            ? "Stop following"
+            : "Cancel request",
+          row,
+          async () => {
+            if (
+              !(await confirmDialog(
+                "@" +
+                  connection.username +
+                  "\n" +
+                  tr(
+                    "Stop sharing live personal schedules in both directions? Previously saved or reshared copies cannot be erased.",
+                  ),
+              ))
+            )
+              return;
+            await request("/connections/remove", { id: connection.id });
+            row.remove();
+            await sync(true);
+          },
+        );
+      action("Block", row, async () => {
+        if (
+          !(await confirmDialog(
+            "@" +
+              connection.username +
+              "\n" +
+              tr(
+                "Block this account and stop sharing live personal schedules?",
+              ),
+          ))
+        )
+          return;
+        await request("/blocks", {
+          username: connection.username,
+          blocked: true,
+        });
+        row.remove();
+        await sync(true);
+      });
+    }
+  }
+  function personalForm() {
+    clear();
+    element("h3", "Your personal schedule", main);
+    element(
+      "p",
+      "Choose a schedule from your Account collection. Changes to this selection are automatically shared only with people you mutually follow.",
+      main,
+    );
+    const label = element("label", "Your personal schedule", main),
+      select = element("select", "", label, {
+        required: "",
+        "data-testid": "personal-schedule-select",
+      });
+    element("option", "Choose your personal schedule", select, { value: "" });
+    const current =
+      pendingPersonal()?.to ??
+      engine.state.personalSchedule ??
+      session.user.personalSchedule;
+    const names = Object.keys(engine.state.records)
+      .filter((name) => name.startsWith("p:"))
+      .map((name) => name.slice(2));
+    for (const name of names)
+      element("option", name, select, { value: name, "data-no-translate": "" });
+    select.value = names.includes(current) ? current : "";
+    if (!select.value)
+      element(
+        "p",
+        "Your selected personal schedule is missing. Choose and sync a replacement to keep sharing updates.",
+        main,
+      );
+    formButton("Use this personal schedule", async () => {
+      if (!select.value) throw Error("Select your personal schedule.");
+      // An explicit choice replaces any unresolved offline rename choice.
+      localStorage.removeItem(key() + ":personal-change");
+      await ensureSynced();
+      const expected =
+        engine.state.personalSchedule ?? session.user.personalSchedule;
+      await request("/profile/personal-schedule", {
+        name: select.value,
+        expected,
+      });
+      session.user.personalSchedule = select.value;
+      localStorage.setItem(SESSION, JSON.stringify(session));
+      engine.persist({ ...engine.state, personalSchedule: select.value });
+      await sync(true);
+      text(status, "Personal schedule updated.");
+    });
+    backToAccount();
+  }
+
   async function cloudHash() {
     if (!ready || !location.hash.startsWith("#cloud=")) return;
     try {

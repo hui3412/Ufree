@@ -21,6 +21,10 @@
       const b = base[name],
         l = local[name],
         r = cloud[name];
+      if (name.startsWith("f:")) {
+        put(name, r);
+        continue;
+      }
       if (same(l, b)) put(name, r);
       else if (same(r, b) || same(l, r)) put(name, l);
       else if (name === "@preferences") {
@@ -53,7 +57,9 @@
   }
   function differences(base, local) {
     return [...new Set([...Object.keys(base), ...Object.keys(local)])]
-      .filter((name) => !same(base[name], local[name]))
+      .filter(
+        (name) => !name.startsWith("f:") && !same(base[name], local[name]),
+      )
       .map((name) => ({ name, value: copy(local[name] ?? null) }));
   }
   class Sync {
@@ -163,12 +169,22 @@
           this.persist({
             ...this.state,
             revision: delta.revision,
+            personalSchedule:
+              delta.personalSchedule ?? this.state.personalSchedule,
             base: cloud,
             records: merge.records,
             initialized: true,
             conflicts: [...this.state.conflicts, ...merge.conflicts],
           });
         }
+        if (
+          check.personalSchedule !== undefined &&
+          check.revision === this.state.revision
+        )
+          this.persist({
+            ...this.state,
+            personalSchedule: check.personalSchedule,
+          });
         for (let batch = 0; batch < 100; batch++) {
           this.reload();
           const changes = differences(
