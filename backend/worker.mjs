@@ -8,7 +8,7 @@ const ORIGIN = "https://hui3412.github.io";
 const HOUR = 3600000,
   DAY = HOUR * 24;
 const encoder = new TextEncoder();
-const healthCache = new WeakMap();
+const RELEASE = "public-health-v2";
 const random = () => bytesToHex(crypto.getRandomValues(new Uint8Array(32)));
 const digest = async (value) =>
   bytesToHex(
@@ -249,43 +249,19 @@ export default {
       if (!["GET", "POST"].includes(request.method))
         fail("Method not allowed.", 405);
       if (requestRoute(path) === "unknown") fail("Not found.", 404);
-      if (request.method === "GET" && path === "/") return respond({service:"youfreetest", status:"ok", database:"not-checked", health:"/health"});
-      if (request.method === "GET" && path === "/health") {
-        const now = Date.now(),
-          cached = db && healthCache.get(env.DB);
-        if (cached && cached.until > now) return respond(cached.body);
-        if (!db || (await db.prepare("SELECT 1 AS ok").first())?.ok !== 1)
+      if (request.method === "GET" && ["/", "/health"].includes(path))
+        return respond({ service: "youfreetest", status: "ok", database: "not-checked", release: RELEASE });
+      if (path === "/admin/diagnostics") {
+        if (request.method !== "POST") fail("Method not allowed.", 405);
+        // A separate server-only secret grants diagnostics, never an ordinary account session.
+        const token = request.headers.get("authorization")?.match(/^Bearer (.{32,256})$/)?.[1];
+        if (!env.ADMIN_DIAGNOSTICS_TOKEN) fail("Admin diagnostics are disabled.", 503);
+        if (!token || !safeEqual(await digest(token), await digest(env.ADMIN_DIAGNOSTICS_TOKEN)))
+          fail("Admin authorization required.", 401);
+        if (!db || (await one(db, "SELECT 1 AS ok"))?.ok !== 1)
           fail("Database unavailable.", 503);
-        let schema;
-        try {
-          // Wrangler's migration ledger has an indexed integer primary key: read one row, not sqlite_master.
-          const migration=await one(db,"SELECT name FROM d1_migrations ORDER BY id DESC LIMIT 1");
-          const version=Number.parseInt(migration?.name || "0",10);
-          schema=new Set([...(version>=1?["users"]:[]),...(version>=2?["connections"]:[]),...(version>=3?["cloud_objects"]:[]),...(version>=4?["sessions_expiry"]:[])]);
-        } catch {
-          // Compatibility for databases installed outside Wrangler; cached per isolate as well.
-          schema=new Set((await rows(db,"SELECT name FROM sqlite_master WHERE name IN ('users','cloud_objects','connections','sessions_expiry')")).map(row=>row.name));
-        }
-        const body = {
-          service: "youfreetest",
-          status: "ok",
-          database: "connected",
-          features: schema.has("users")
-            ? "accounts-test-v1"
-            : "migration-required",
-          inactivityDeletion: "disabled-pending-warning-policy",
-          storage: schema.has("cloud_objects")
-            ? "lossless-deduplicated-v1"
-            : "legacy-json",
-          following: schema.has("connections"),
-          usage: schema.has("sessions_expiry")
-            ? "indexed-sync-v1"
-            : "legacy-checks",
-          checkedAt: new Date(now).toISOString(),
-          healthCacheSeconds: 30,
-        };
-        healthCache.set(env.DB, { until: now + 30000, body });
-        return respond(body);
+        const migration = await one(db, "SELECT name FROM d1_migrations ORDER BY id DESC LIMIT 1");
+        return respond({ service: "youfreetest", release: RELEASE, database: "connected", migration: migration?.name || null, checkedAt: new Date().toISOString() });
       }
       const storage = new CloudStorage(db);
       if (!db) fail("Database unavailable.", 503);
@@ -538,7 +514,13 @@ export default {
           } else if (change.value !== null)
             validatePeople({ [change.name.slice(2)]: change.value });
         }
-        const size = { size: user.storage_bytes };
+        // Rollout compatibility: health protection can deploy before quota-blocked migration 0004.
+        // Once the migration lands, ordinary saves always use the incremental counter.
+        const size = Number.isSafeInteger(user.storage_bytes) ? { size: user.storage_bytes } : await one(
+          db,
+          "SELECT COALESCE(SUM(CASE WHEN substr(r.payload,1,5)='@UF1:' THEN o.raw_bytes ELSE length(CAST(r.payload AS BLOB)) END),0) AS size FROM records r LEFT JOIN cloud_objects o ON o.id=substr(r.payload,6) WHERE r.user_id=? AND r.name NOT LIKE 'f:%'",
+          user.id,
+        );
         const existing = await rows(
           db,
           `SELECT r.name,CASE WHEN substr(r.payload,1,5)='@UF1:' THEN o.raw_bytes ELSE length(CAST(r.payload AS BLOB)) END AS size FROM records r LEFT JOIN cloud_objects o ON o.id=substr(r.payload,6) WHERE r.user_id=? AND r.name IN (${input.changes.map(() => "?").join(",")})`,
@@ -727,6 +709,12 @@ export default {
       }
       fail("Not found.", 404);
     } catch (error) {
+      // Daily quota failures must not become a rapid generic-503 retry loop.
+      if (/free tier daily row (read|write) limit|\b7500\b/i.test(error.message || "")) {
+        const now = new Date(), retryAt = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1);
+        headers["Retry-After"] = String(Math.ceil((retryAt - Date.now()) / 1000));
+        return respond({ error: "Cloud daily quota exhausted. Local data is preserved. Retry after the daily reset.", code: "DAILY_QUOTA_EXHAUSTED", retryAt }, 429);
+      }
       // Never return SQL, password hashes, session tokens or stack traces.
       return respond(
         {

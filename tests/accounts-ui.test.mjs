@@ -71,10 +71,8 @@ async function app({
     calls.push({ url, options });
     const path = new URL(url).pathname;
     const custom = handler?.(path, options);
-    if (custom !== undefined) return { ok: true, json: async () => custom };
-    return {
-      ok: true,
-      json: async () =>
+    if (custom !== undefined) { const resolved = await custom; return resolved instanceof Response ? resolved : new Response(JSON.stringify(resolved)); }
+    return new Response(JSON.stringify(
         path === "/revision"
           ? { revision: account ? 1 : 0 }
           : path === "/deliveries"
@@ -82,8 +80,8 @@ async function app({
             : {
                 people: { Received: { semester: "Fall 2026", classes: [] } },
                 expiresAt: Date.now() + 10000,
-              },
-    };
+              }
+    ));
   };
   for (const f of [
     "i18n-fr.js",
@@ -391,4 +389,19 @@ test("rapid Inbox clicks share one in-flight request", async () => {
     release({ deliveries: [], inboxRevision: 0 });
     await a.close();
   }
+});
+
+test('structured and edge HTML daily quota errors pause cloud requests across reload metadata',async()=>{
+ for (const html of [false,true]) {
+  const a=await app({account:true,handler:(path)=>path==='/revision'?new Response(html?'<!DOCTYPE html><h1>Error 1027</h1><p>The owner has reached their plan limits</p>':JSON.stringify({code:'DAILY_QUOTA_EXHAUSTED',retryAt:Date.now()+3600000}),{status:html?503:429}):undefined});
+  try {
+   await settle(()=>a.w.localStorage.getItem('ufree-test-api-pause-v1'));
+   const count=a.calls.length;
+   a.el('mobileMenuButton').click();a.el('accountMenuButton').click();
+   for(let i=0;i<10;i++){buttonWith(a.w, 'Inbox').click();await new Promise(r=>setTimeout(r,5));}
+   assert.equal(a.calls.length,count,'paused cloud requests never reach fetch');
+   assert.equal(a.w.localStorage.getItem('whos-free-local-schedules'),a.original);
+   assert.ok(a.w.localStorage.getItem('ufree-test-account-v1:test-user'));
+  } finally {await a.close();}
+ }
 });

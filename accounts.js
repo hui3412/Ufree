@@ -53,24 +53,36 @@
     window.UFreeI18n
       ? window.UFreeI18n.setText(node, s)
       : (node.textContent = s);
+  let apiPause = null;
+  const API_PAUSE = "ufree-test-api-pause-v1";
+  const quotaReset = () => { const n = new Date(); return Date.UTC(n.getUTCFullYear(), n.getUTCMonth(), n.getUTCDate() + 1); };
   async function request(path, data, auth = true) {
+    let pause = apiPause;
+    try { pause = JSON.parse(localStorage.getItem(API_PAUSE) || "null") || apiPause; } catch {}
+    if (pause?.retryAt > Date.now() && pause.retryAt <= Date.now() + 86400000)
+      throw Object.assign(Error("Cloud requests are paused until the daily quota resets. Local data is preserved."), {status: 429, code: "DAILY_QUOTA_EXHAUSTED", retryAt: pause.retryAt});
     const response = await fetch(API + path, {
       method: data === undefined ? "GET" : "POST",
       headers: {
         ...(data === undefined ? {} : { "Content-Type": "application/json" }),
-        ...(auth && session?.token
-          ? { Authorization: `Bearer ${session.token}` }
-          : {}),
+        ...(auth && session?.token ? { Authorization: `Bearer ${session.token}` } : {}),
       },
       body: data === undefined ? undefined : JSON.stringify(data),
-      credentials: "omit",
-      cache: "no-store",
+      credentials: "omit", cache: "no-store",
     });
-    const body = await response.json();
-    if (!response.ok)
-      throw Object.assign(Error(body.error || "Cloud request failed."), {
-        status: response.status,
-      });
+    const raw = await response.text();
+    let body;
+    try { body = JSON.parse(raw); } catch { body = {}; }
+    // Cloudflare can reject a request before the Worker runs, returning an HTML 1027 page.
+    const daily = body.code === "DAILY_QUOTA_EXHAUSTED" || (!response.ok && /free tier daily row (read|write) limit|Error 1027|owner has reached their plan limits/i.test(raw));
+    if (daily) {
+      const retryAt = Number(body.retryAt) > Date.now() && Number(body.retryAt) <= Date.now() + 86400000 ? Number(body.retryAt) : quotaReset();
+      apiPause = {retryAt};
+      try { localStorage.setItem(API_PAUSE, JSON.stringify({retryAt})); } catch {}
+      throw Object.assign(Error("Cloud daily quota exhausted. Local data is preserved. Retry after the daily reset."), {status:429, code:"DAILY_QUOTA_EXHAUSTED", retryAt});
+    }
+    if (!response.ok) throw Object.assign(Error(body.error || "Cloud request failed."), {status:response.status});
+    if (!raw || !Object.keys(body).length) throw Error("Invalid cloud response.");
     return body;
   }
   function prefs(isLocal = false) {

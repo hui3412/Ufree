@@ -90,7 +90,7 @@ test("accounts, access controls, revision conflicts, passwords, immutable snapsh
   const { db, sql } = database(),
     call = client(db);
   let r = await call("/health");
-  assert.equal(r.data.features, "accounts-test-v1");
+  assert.equal(r.data.database, "not-checked");
   assert.equal((await call("/revision", undefined, null)).status, 401);
   assert.equal(
     (await call("/health", undefined, null, "https://youfree.ca")).status,

@@ -22,7 +22,7 @@
   };
   const delayed = (state) => {
     const remaining = state.retryAt - Date.now();
-    return remaining > 0 && remaining <= 300000;
+    return remaining > 0 && remaining <= (state.quotaExhausted ? 86400000 : 300000);
   };
   const safe = (name) =>
     !["__proto__", "constructor", "prototype"].includes(name);
@@ -184,12 +184,16 @@
             300000,
             (error.status === 429 ? 60000 : 15000) * 2 ** (failures - 1),
           );
+          const quotaExhausted = error.code === "DAILY_QUOTA_EXHAUSTED";
+          const retryAt = quotaExhausted && error.retryAt > Date.now() && error.retryAt <= Date.now() + 86400000 ? error.retryAt : Date.now() + delay;
           this.persist({
             ...this.state,
             failures,
-            retryAt: Date.now() + delay,
+            quotaExhausted,
+            retryAt,
           });
           if (
+            !quotaExhausted &&
             !this.authBlocked &&
             this.pending() &&
             root.navigator?.onLine !== false &&
@@ -287,6 +291,7 @@
           lastSync: new Date().toISOString(),
           checkedAt: Date.now(),
           retryAt: 0,
+          quotaExhausted: false,
           failures: 0,
         });
         this.authBlocked = false;

@@ -11,15 +11,15 @@ const person = (course = "Fictional course") => ({
   classes: [{ day: "Monday", start: "09:00", end: "10:00", course }],
   unknown: { kept: true },
 });
-test("warm health checks and unknown routes do not repeatedly query the database", async () => {
+test("public status and unknown routes never query the database", async () => {
   const f = fixture();
   try {
     for (let i = 0; i < 100; i++)
       assert.equal((await f.call(null, "/health")).status, 200);
     assert.equal(
       f.db.queries,
-      2,
-      "only initial connectivity and indexed migration query",
+      0,
+      "public health never accesses D1, even on cold start",
     );
     f.db.queries = 0;
     for(let i=0;i<100;i++)assert.equal((await f.call(null,'/')).data.database,'not-checked');
@@ -305,4 +305,44 @@ test("completed collections skip migration scans; newly inserted legacy data is 
   } finally {
     f.sql.close();
   }
+});
+
+test("admin diagnostics reject guests and ordinary accounts before querying D1", async () => {
+ const f=fixture();
+ try {
+  const secret='fictional-admin-secret-for-local-testing-only';
+  const call=(token,enabled=true,method='POST')=>worker.fetch(new Request('https://api.test/admin/diagnostics',{method,headers:token?{Authorization:'Bearer '+token}:{}}),{DB:f.db,...(enabled?{ADMIN_DIAGNOSTICS_TOKEN:secret}:{})});
+  const user=await f.seed('not_an_admin'); f.db.queries=0;
+  assert.equal((await call()).status,401);
+  assert.equal((await call(user.token)).status,401);
+  assert.equal((await call(secret,false)).status,503);
+  assert.equal((await call(secret,true,'GET')).status,405);
+  assert.equal(f.db.queries,0);
+  const good=await call(secret); assert.equal(good.status,200);
+  assert.equal((await good.json()).migration,'0004_usage_efficiency.sql');
+  assert.equal(f.db.queries,2);
+  for (const path of ['/','/health']) {
+   const r=await worker.fetch(new Request('https://api.test'+path),{});
+   assert.equal(r.status,200); assert.equal((await r.json()).database,'not-checked');
+  }
+ } finally {f.sql.close();}
+});
+test("D1 daily quota errors return a structured pause until midnight UTC",async()=>{
+ let calls=0;
+ const db={prepare(){calls++;throw Error("Your account has exceeded D1's free tier daily row read limit. [code: 7500]");}};
+ const r=await worker.fetch(new Request('https://api.test/revision',{headers:{Authorization:'Bearer '+'a'.repeat(64)}}),{DB:db});
+ assert.equal(r.status,429);const data=await r.json();
+ assert.equal(data.code,'DAILY_QUOTA_EXHAUSTED');assert.ok(data.retryAt>Date.now());
+ assert.equal(new Date(data.retryAt).getUTCHours(),0); assert.equal(calls,1);
+ assert.ok(Number(r.headers.get('Retry-After'))>0);
+});
+
+test('health hotfix is compatible with migration 0003 while quota counters await deployment',async()=>{
+ const f=fixture({through:'0003_cloud_compression.sql'});
+ try{
+  const a=await f.seed('legacy_schema_hotfix');
+  assert.equal((await f.update(a,'Personal',person())).status,200);
+  assert.deepEqual((await f.call(a,'/sync?since=0')).data.changes.find(x=>x.name==='p:Personal').value,person());
+  f.db.queries=0;assert.equal((await f.call(null,'/health')).status,200);assert.equal(f.db.queries,0);
+ }finally{f.sql.close();}
 });

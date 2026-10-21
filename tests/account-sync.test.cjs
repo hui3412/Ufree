@@ -336,3 +336,14 @@ test("clock rollback does not make persisted freshness suppress checks indefinit
   await sync.check();
   assert.equal(calls, 1);
 });
+
+test('daily quota pauses survive reloads and foreground events without scheduling retries',async()=>{
+ const storage=make();let calls=0;
+ const retryAt=Date.now()+3600000;
+ const options={storage,key:'quota-paused',request:async()=>{calls++;throw Object.assign(Error('daily quota'),{status:429,code:'DAILY_QUOTA_EXHAUSTED',retryAt});}};
+ let sync=new Sync(options);sync.save({Alex:person('pending')});clearTimeout(sync.timer);sync.timer=null;
+ await sync.check('save');assert.equal(calls,1);assert.equal(sync.timer,null);
+ sync=new Sync(options);
+ for(let i=0;i<100;i++)await sync.check();
+ assert.equal(calls,1);assert.equal(sync.pending(),1);assert.equal(sync.state.retryAt,retryAt);
+});

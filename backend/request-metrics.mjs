@@ -52,6 +52,7 @@ export const requestRoute = (path) =>
     : new Set([
           "/",
           "/health",
+          "/admin/diagnostics",
           "/auth/signup",
           "/auth/login",
           "/auth/session",
