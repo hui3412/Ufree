@@ -1,8 +1,10 @@
 # UFree rights notice
 
-© 2026 UFree project contributors, for original material to which they hold rights.
+UFree is owned by David Dajbog and Hui En Qian.
 
-Original UFree code, design and branding remain with their respective rightsholders. This notice grants no additional licence and does not override any existing licence, contributor agreement, permission or statutory right. It is not an assignment of contributor rights or proof of exclusive ownership. The UFree name is not claimed here as a registered trademark. User-provided schedules remain subject to their owners’ rights.
+© 2026 David Dajbog and Hui En Qian, for original UFree material to which they hold rights.
+
+This ownership statement covers their rights in original UFree code, design and branding. Third-party and other contributors’ rights remain with their respective rightsholders. This notice grants no additional licence and does not override any existing licence, contributor agreement, permission or statutory right. It is not an assignment of contributor rights or proof of exclusive ownership. The UFree name is not claimed here as a registered trademark. User-provided schedules remain subject to their owners’ rights.
 
 Existing app credits to David Dajbog and Hui En Qian, and inspiration credit to Xander Vatch, remain unchanged. Credits do not establish a legal assignment.
 
