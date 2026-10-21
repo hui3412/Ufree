@@ -1,3 +1,4 @@
+import { CloudStorage } from "./cloud-storage.mjs";
 import { following, followRequests } from "./following.mjs";
 import { scryptAsync } from "@noble/hashes/scrypt";
 import { bytesToHex, hexToBytes } from "@noble/hashes/utils";
@@ -250,6 +251,12 @@ export default {
           database: "connected",
           features: ready ? "accounts-test-v1" : "migration-required",
           inactivityDeletion: "disabled-pending-warning-policy",
+          storage: (await one(
+            env.DB,
+            "SELECT name FROM sqlite_master WHERE name='cloud_objects'",
+          ))
+            ? "lossless-deduplicated-v1"
+            : "legacy-json",
           following: !!(await one(
             env.DB,
             "SELECT name FROM sqlite_master WHERE name='connections'",
@@ -257,6 +264,7 @@ export default {
         });
       }
       const db = env.DB;
+      const storage = new CloudStorage(db);
       if (!db) fail("Database unavailable.", 503);
       if (!["GET", "POST"].includes(request.method))
         fail("Method not allowed.", 405);
@@ -374,7 +382,7 @@ export default {
         );
         if (!share) fail("This snapshot expired or does not exist.", 404);
         return respond({
-          people: JSON.parse(share.payload),
+          people: await storage.people(share.payload),
           expiresAt: share.expires_at,
         });
       }
@@ -436,6 +444,7 @@ export default {
         return respond({ ok: true });
       }
       if (path === "/sync" && request.method === "GET") {
+        await storage.compact({ userId: user.id, limit: 5 });
         const since = Number(
           new URL(request.url).searchParams.get("since") || 0,
         );
@@ -452,13 +461,7 @@ export default {
           revision: result[0]?.current_revision ?? user.revision,
           personalSchedule:
             result[0]?.personal_schedule ?? user.personal_schedule,
-          changes: result
-            .filter((x) => x.name !== null)
-            .map((x) => ({
-              name: x.name,
-              value: x.payload === null ? null : JSON.parse(x.payload),
-              revision: x.revision,
-            })),
+          changes: await storage.records(result.filter((x) => x.name !== null)),
         });
       }
       if (path === "/revision" && request.method === "GET")
@@ -505,12 +508,12 @@ export default {
         }
         const size = await one(
           db,
-          "SELECT COALESCE(SUM(length(CAST(payload AS BLOB))),0) AS size FROM records WHERE user_id=? AND name NOT LIKE 'f:%'",
+          "SELECT COALESCE(SUM(CASE WHEN substr(r.payload,1,5)='@UF1:' THEN o.raw_bytes ELSE length(CAST(r.payload AS BLOB)) END),0) AS size FROM records r LEFT JOIN cloud_objects o ON o.id=substr(r.payload,6) WHERE r.user_id=? AND r.name NOT LIKE 'f:%'",
           user.id,
         );
         const existing = await rows(
           db,
-          `SELECT name,length(CAST(payload AS BLOB)) AS size FROM records WHERE user_id=? AND name IN (${input.changes.map(() => "?").join(",")})`,
+          `SELECT r.name,CASE WHEN substr(r.payload,1,5)='@UF1:' THEN o.raw_bytes ELSE length(CAST(r.payload AS BLOB)) END AS size FROM records r LEFT JOIN cloud_objects o ON o.id=substr(r.payload,6) WHERE r.user_id=? AND r.name IN (${input.changes.map(() => "?").join(",")})`,
           user.id,
           ...input.changes.map((change) => change.name),
         );
@@ -526,14 +529,24 @@ export default {
         );
         if (increase > 0 && size.size + increase > 10 * 1024 * 1024)
           fail("Account test storage limit reached.", 413);
+        const prepared = [];
+        for (const change of input.changes)
+          prepared.push(
+            change.value === null
+              ? null
+              : await storage.prepare(change.value, {
+                  schedule: change.name.startsWith("p:"),
+                }),
+          );
+        await storage.stage(prepared.filter(Boolean));
         const next = input.baseRevision + 1;
-        const batch = input.changes.map((change) =>
+        const batch = input.changes.map((change, index) =>
           statement(
             db,
             "INSERT INTO records(user_id,name,payload,revision) SELECT ?,?,?,? WHERE EXISTS(SELECT 1 FROM users WHERE id=? AND revision=?) ON CONFLICT(user_id,name) DO UPDATE SET payload=excluded.payload,revision=excluded.revision",
             user.id,
             change.name,
-            change.value === null ? null : JSON.stringify(change.value),
+            prepared[index]?.ref ?? null,
             next,
             user.id,
             input.baseRevision,
@@ -560,12 +573,14 @@ export default {
         const id = random(),
           createdAt = Date.now(),
           expiresAt = createdAt + 48 * HOUR;
+        const prepared = await storage.collection(input.people);
+        await storage.stage([prepared]);
         await run(
           db,
           "INSERT INTO shares(id,owner_id,payload,created_at,expires_at) VALUES(?,?,?,?,?)",
           id,
           user.id,
-          JSON.stringify(input.people),
+          prepared.ref,
           createdAt,
           expiresAt,
         );
@@ -585,17 +600,19 @@ export default {
       if (path === "/deliveries" && request.method === "GET") {
         const inbox = await rows(
           db,
-          "SELECT id,sender_name,payload,created_at FROM deliveries WHERE recipient_id=? AND status='pending' ORDER BY created_at LIMIT 50",
+          "SELECT id,sender_name,payload,created_at FROM deliveries WHERE recipient_id=? AND status='pending' ORDER BY created_at LIMIT 10",
           user.id,
         );
         return respond({
           followRequests: await followRequests(db, user.id, rows),
-          deliveries: inbox.map((x) => ({
-            id: x.id,
-            sender: x.sender_name,
-            people: JSON.parse(x.payload),
-            createdAt: x.created_at,
-          })),
+          deliveries: await Promise.all(
+            inbox.map(async (x) => ({
+              id: x.id,
+              sender: x.sender_name,
+              people: await storage.people(x.payload),
+              createdAt: x.created_at,
+            })),
+          ),
         });
       }
       if (path === "/deliveries" && input) {
@@ -622,6 +639,8 @@ export default {
         await throttle(db, `send:${user.id}`, 20, DAY);
         await throttle(db, `inbox:${recipient.id}`, 100, DAY);
         const id = crypto.randomUUID();
+        const prepared = await storage.collection(input.people);
+        await storage.stage([prepared]);
         await run(
           db,
           "INSERT INTO deliveries(id,sender_id,recipient_id,sender_name,payload,created_at) VALUES(?,?,?,?,?,?)",
@@ -629,7 +648,7 @@ export default {
           user.id,
           recipient.id,
           user.username,
-          JSON.stringify(input.people),
+          prepared.ref,
           Date.now(),
         );
         return respond({ ok: true }, 201);
@@ -693,6 +712,7 @@ export default {
   async scheduled(_event, env) {
     // No inactivity deletion until a warning channel and grace period are approved.
     const now = Date.now();
+    const storage = new CloudStorage(env.DB);
     await env.DB.batch([
       statement(env.DB, "DELETE FROM sessions WHERE expires_at<=?", now),
       statement(env.DB, "DELETE FROM shares WHERE expires_at<=?", now),
@@ -702,5 +722,7 @@ export default {
         now - 2 * DAY,
       ),
     ]);
+    await storage.compact({ limit: 100 });
+    await storage.collect(now);
   },
 };
