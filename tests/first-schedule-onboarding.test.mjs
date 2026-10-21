@@ -68,7 +68,7 @@ test("first manual save opens the exact welcome, traps focus, copies a valid lin
     assert.equal(a.el("firstScheduleWelcome").hidden, false);
     assert.equal(a.el("scheduleModal").hidden, true);
     assert.equal(a.el("firstScheduleWelcomeTitle").textContent, "Now, add your friends!");
-    assert.equal(a.el("firstScheduleWelcomeBody").textContent, "UFree runs entirely on your device, so it doesn't automatically sync with others. To see your group's availability, have your friends send you their timetable via a link, QR code, or text code.");
+    assert.equal(a.el("firstScheduleWelcomeBody").textContent, "Local schedules stay on this device. Friends can send their timetable by link, QR code or text code. Optional accounts add cloud sync and mutual personal-schedule sharing with explicit approval.");
     assert.equal(a.el("copyFirstScheduleLink").textContent, COPY_LABEL);
     assert.equal(a.el("closeFirstScheduleWelcome").textContent, "Got it / Close");
     assert.equal(a.window.document.activeElement, a.el("copyFirstScheduleLink"));

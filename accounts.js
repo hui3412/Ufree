@@ -496,6 +496,10 @@
     }
     clear();
     element("h3", signup ? "Create account" : "Sign in", main);
+    const legalLinks = element("p", "", main);
+    element("a", "Privacy notice", legalLinks, {href: "legal.html#privacy", target: "_blank", rel: "noopener noreferrer"});
+    element("span", " · ", legalLinks);
+    element("a", "Terms & ownership", legalLinks, {href: "legal.html#terms", target: "_blank", rel: "noopener noreferrer"});
     const username = field("Username"),
       password = field("Password", "password");
     username.autocomplete = "username";

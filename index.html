@@ -32,7 +32,7 @@
   <link rel="icon" type="image/png" href="assets/icon-192.png" sizes="192x192">
   <link rel="icon" type="image/x-icon" href="favicon.ico" sizes="16x16 32x32 48x48">
   <link rel="apple-touch-icon" href="assets/apple-touch-icon.png" sizes="180x180">
-  <link rel="stylesheet" href="styles.css?v=138">
+  <link rel="stylesheet" href="styles.css?v=139">
 </head>
 <body>
   <div id="mobileNavBackdrop" class="mobile-nav-backdrop" aria-hidden="true" hidden></div>
@@ -117,6 +117,7 @@
         </div>
       </section>
     </main>
+    <footer class="site-legal-footer"><p class="site-legal-links"><a href="legal.html#privacy">Privacy notice</a> · <a href="legal.html#terms">Terms &amp; ownership</a><br><small>© 2026 UFree project contributors. Third-party rights reserved.</small></p></footer>
 
   </div>
 
@@ -129,7 +130,7 @@
       <div class="modal-header">
         <div>
           <h2 id="scheduleModalTitle">Schedule data</h2>
-          <p>Add or share schedules. Everything stays on this device.</p>
+          <p>Add or share schedules. Local stays on this device; Account syncs to the cloud.</p>
         </div>
         <button id="closeScheduleModal" class="modal-close" type="button" aria-label="Close">×</button>
       </div>
@@ -303,7 +304,7 @@
 
           <button id="removeSchedulesButton" class="danger-button remove-all-button" type="button">Remove all local schedules</button>
 
-          <p class="privacy-footnote">Files and recognition stay on your device. OCR language files download once and are cached for offline use. Schedule files are never uploaded.</p>
+          <p class="privacy-footnote">Picture recognition runs on your device. OCR language files are cached for offline use. Account sync and cloud sharing upload schedule data only when you choose those features.</p>
 
           <div id="scheduleStorageStatus" class="storage-status"></div>
 
@@ -321,7 +322,7 @@
       <div class="modal-header">
         <div>
           <h2 id="settingsModalTitle">Settings</h2>
-          <p>Your preferences stay on this device.</p>
+          <p>Local preferences stay on this device. Account collection preferences sync to the cloud.</p>
         </div>
         <button id="closeSettingsModal" class="modal-close" type="button" aria-label="Close settings">×</button>
       </div>
@@ -392,6 +393,7 @@
         </div>
         </div>
       </details>
+      <p class="site-legal-links"><a href="legal.html#privacy">Privacy notice</a> · <a href="legal.html#terms">Terms &amp; ownership</a><br><small>© 2026 UFree project contributors. Third-party rights reserved.</small></p>
       <footer class="creator-credit settings-credit" aria-label="App credits">
         <p class="credit-team">App by David Dajbog and Hui En Qian.</p>
         <p class="credit-inspiration">Inspiration from Xander Vatch.</p>
@@ -457,16 +459,15 @@
         <details class="help-topic"><summary>Groups and shared availability</summary><p>Turn on GROUP and use the group management icon beside search to create or edit groups. Choose Edit beside a group to rename it and remove members with the red trash icons. A person can belong to several groups. Hide or show a group's members, and open its … menu to move the group to the top, view weekly availability, or Share Group. Share Group offers Code, QR and Link for all its members. The receiver can keep a named group or add everybody individually. Save group applies the changes; Cancel discards them. Removing a member preserves their schedule and other group memberships. Group preferences also let you control whether ungrouped people appear.</p></details>
         <details class="help-topic"><summary>Share and import</summary><p>The export icon opens quick sharing with Everyone selected. Search people or expand Show people to choose who to share. The Group button shares a saved group with its name and members. Export Code creates text you can copy; Export QR displays a scannable code; Copy Link creates a URL. Times, class names and rooms are included by default. Use … to include teachers, course codes, semesters and other saved details. Open a received link, scan a QR with your phone camera, or paste a text code in Schedules → Import. Opening an ordinary link or scanning an ordinary QR adds people automatically and shows how many were added or skipped. Group shares first ask whether to keep a named group or add everybody individually. Existing schedules are kept. Pasting a link or code in Import keeps the manual review and conflict choices. Anyone with your export can read the selected schedule details.</p></details>
         <details class="help-topic"><summary>Reorder, pin and undo</summary><p>Drag a person to reorder the list on desktop, or hold and move their card on touch screens. With the person's name focused, Alt + Up or Down moves them using the keyboard. Groups remember their own order. Pin people in Settings to keep them above unpinned people. The back arrow undoes recent schedule and ordering changes during the current page session.</p></details>
-        <details class="help-topic"><summary>Settings and notifications</summary><p>Open the cog for nicknames, pinned people, notification preferences and appearance. Choose a light or dark theme and an accent colour. Notifications need your browser's permission; keep UFree open for its time checks. Nicknames and personal preferences stay on this device. Group identity is included only when you choose Share Group.</p></details>
-        <details class="help-topic"><summary>Keep a backup</summary><p>Schedules are saved in this browser on this device, with no automatic sync between devices. Export a code or a JSON backup from Schedules before clearing website data, switching browsers or changing devices. Import the backup to restore your timetables. Undo does not survive closing or reloading the page.</p></details>
+        <details class="help-topic"><summary>Settings and notifications</summary><p>Open the cog for nicknames, pinned people, notification preferences and appearance. Choose a light or dark theme and an accent colour. Notifications need your browser's permission; keep UFree open for its time checks. Local nicknames and preferences stay on this device; Account collection preferences sync. Group identity is included only when you choose Share Group.</p></details>
+        <details class="help-topic"><summary>Keep a backup</summary><p>Local schedules stay in this browser without automatic sync. Optional Account collections sync through the cloud and keep a separate local copy. Export a code or a JSON backup from Schedules before clearing website data, switching browsers or changing devices. Import the backup to restore your timetables. Undo does not survive closing or reloading the page.</p></details>
       </div>
       <section class="help-privacy" aria-labelledby="privacyNoticeTitle">
         <h3 id="privacyNoticeTitle">Privacy Notice</h3>
-        <p><strong>No accounts required.</strong> Use the entire app without signing up or creating an account.</p>
-        <p><strong>No app data collection.</strong> UFree has no analytics or tracking. It does not collect or send your personal data, schedules, pictures, usage metrics or identifiers to an application server. Recognition, availability checks and export processing run on your device.</p>
-        <p><strong>Stored locally.</strong> Your schedules and settings stay in your device's browser storage, protected by the browser's site-storage isolation. UFree does not encrypt that storage itself. Clearing website data removes your saved information.</p>
-        <p><strong>Hosting and sharing.</strong> The website host and asset providers receive normal network requests, which can include your IP address and browser information. Only exports you choose to share reveal schedule data to recipients. Sending feedback by email shares what you include in that message.</p>
+        <p>Local schedules and picture recognition stay on your device. Optional accounts copy schedules to the cloud with your agreement. Sharing and mutual following can reveal schedule details to other people. Cloud data is not end-to-end encrypted.</p>
+        <p><a href="legal.html#privacy">Read the privacy notice</a> · <a href="legal.html#terms">Terms &amp; ownership</a></p>
       </section>
+      <p class="site-legal-links"><a href="legal.html#privacy">Privacy notice</a> · <a href="legal.html#terms">Terms &amp; ownership</a><br><small>© 2026 UFree project contributors. Third-party rights reserved.</small></p>
       <footer class="creator-credit settings-credit" aria-label="App credits">
         <p class="credit-team">App by David Dajbog and Hui En Qian.</p>
         <p class="credit-inspiration">Inspiration from Xander Vatch.</p>
@@ -538,7 +539,7 @@
   <div id="firstScheduleWelcome" class="modal-backdrop first-schedule-welcome" hidden>
     <section class="first-schedule-card panel" role="dialog" aria-modal="true" aria-labelledby="firstScheduleWelcomeTitle" aria-describedby="firstScheduleWelcomeBody">
       <h2 id="firstScheduleWelcomeTitle" tabindex="-1">Now, add your friends!</h2>
-      <p id="firstScheduleWelcomeBody">UFree runs entirely on your device, so it doesn't automatically sync with others. To see your group's availability, have your friends send you their timetable via a link, QR code, or text code.</p>
+      <p id="firstScheduleWelcomeBody">Local schedules stay on this device. Friends can send their timetable by link, QR code or text code. Optional accounts add cloud sync and mutual personal-schedule sharing with explicit approval.</p>
       <div class="first-schedule-actions">
         <button id="copyFirstScheduleLink" class="primary-button" type="button">Copy My Link to Invite Them</button>
         <button id="importFriendsSchedules" class="primary-button" type="button" hidden>Import friends’ schedules</button>
@@ -560,7 +561,7 @@
         <button class="primary-button add-picture" type="button">Add schedule picture</button>
         <button class="secondary-button create-schedule" type="button">Create manually</button>
       </div>
-      <p class="local-only-note"><span aria-hidden="true">●</span> Schedule data stays on this device.</p>
+      <p class="local-only-note"><span aria-hidden="true">●</span> Local schedules stay on this device. Account schedules also sync to the cloud.</p>
     </div>
   </template>
 
@@ -615,7 +616,7 @@
     }
   </script>
   <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js" defer></script>
-  <script src="i18n-fr.js?v=138" defer></script>
+  <script src="i18n-fr.js?v=139" defer></script>
   <script src="i18n.js?v=127" defer></script>
   <script src="schedule-image-guide.js?v=132" defer></script>
   <script src="schedule-parser.js?v=112" defer></script>
@@ -627,8 +628,8 @@
   <script src="schedule-groups.js?v=90" defer></script>
   <script src="schedule-qr-batches.js?v=126" defer></script>
   <script src="account-sync.js?v=138" defer></script>
-  <script src="accounts.js?v=138" defer></script>
-  <script src="app.js?v=138" defer></script>
+  <script src="accounts.js?v=139" defer></script>
+  <script src="app.js?v=139" defer></script>
 </body>
 </html>
 

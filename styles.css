@@ -3043,3 +3043,7 @@ html[lang="fr"] .nav-extra-label, html[lang="fr"] .nav-button-label { min-width:
 .follow-result { border: 1px solid var(--border, #555); border-radius: 12px; padding: 12px; }
 .follow-result p { margin: 6px 0 10px; }
 .live-personal-label { display: block; font-size: .75rem; color: var(--muted); }
+
+.site-legal-footer { text-align: center; padding: 1rem .75rem; color: var(--muted); }
+.site-legal-links { font-size: .8rem; line-height: 1.7; }
+.site-legal-links a { color: inherit; text-decoration: underline; text-underline-offset: .2em; }

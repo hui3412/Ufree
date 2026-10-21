@@ -1,0 +1,11 @@
+ :root { color-scheme: light dark; font-family: system-ui, sans-serif; line-height: 1.65; }
+body { margin: 0; background: #111820; color: #eff3f7; }
+main { max-width: 48rem; margin: auto; padding: 1.5rem clamp(1rem, 5vw, 3rem) 4rem; }
+a { color: #a6d8ff; overflow-wrap: anywhere; }
+button { font: inherit; padding: .6rem 1rem; margin: .25rem; color: inherit; background: transparent; border: 1px solid #8191a4; border-radius: .6rem; cursor: pointer; }
+button[aria-pressed="true"] { background: #244963; border-color: #a6d8ff; }
+a:focus-visible, button:focus-visible { outline: 3px solid #f7c45f; outline-offset: 4px; }
+h1 { font-size: 2rem; } h2 { font-size: 1.65rem; } h3 { font-size: 1.1rem; margin-top: 1.75rem; }
+section, footer { border-top: 1px solid #586576; margin-top: 2rem; padding-top: 1rem; scroll-margin-top: 1rem; }
+[hidden] { display: none !important; }
+@media (prefers-color-scheme: light) { body { background: #f8fafc; color: #16222e; } a { color: #145a87; } button[aria-pressed="true"] { background: #deedf7; } }
