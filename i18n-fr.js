@@ -756,7 +756,7 @@ window.UFreeFrench = {
     "Privacy notice": "Avis de confidentialité",
     "Read the privacy notice": "Lire l’avis de confidentialité",
     "Terms & ownership": "Conditions et propriété",
-    "© 2026 UFree project contributors. Third-party rights reserved.": "© 2026 Les contributeurs du projet UFree. Droits des tiers réservés.",
+    "© 2026 David Dajbog and Hui En Qian. All rights reserved.": "© 2026 David Dajbog et Hui En Qian. Tous droits réservés.",
     "Local schedules and picture recognition stay on your device. Optional accounts copy schedules to the cloud with your agreement. Sharing and mutual following can reveal schedule details to other people. Cloud data is not end-to-end encrypted.": "Les horaires locaux et la reconnaissance d’images restent sur votre appareil. Les comptes facultatifs copient les horaires dans le nuage avec votre accord. Le partage et le suivi réciproque peuvent révéler les détails des horaires à d’autres personnes. Les données infonuagiques ne sont pas chiffrées de bout en bout.",
     "Picture recognition runs on your device. OCR language files are cached for offline use. Account sync and cloud sharing upload schedule data only when you choose those features.": "La reconnaissance d’images s’exécute sur votre appareil. Les fichiers de langue sont mis en cache pour fonctionner hors ligne. La synchronisation du compte et le partage infonuagique transfèrent les données des horaires uniquement lorsque vous choisissez ces fonctions.",
     "Add or share schedules. Local stays on this device; Account syncs to the cloud.": "Ajoutez ou partagez des horaires. Locale reste sur cet appareil; Compte se synchronise dans le nuage.",
