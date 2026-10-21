@@ -332,3 +332,63 @@ test("follow inbox acceptance requires a second consent confirmation and preserv
     await a.close();
   }
 });
+test("an empty unchanged inbox does not need its own automatic request; manual Inbox still works", async () => {
+  const a = await app({
+    account: true,
+    handler: (path) =>
+      path === "/revision" ? { revision: 1, inboxRevision: 0 } : undefined,
+  });
+  try {
+    await settle(() => a.calls.some((c) => c.url.endsWith("/revision")));
+    await new Promise((r) => setTimeout(r, 20));
+    assert.equal(
+      a.calls.filter((c) => c.url.endsWith("/deliveries")).length,
+      0,
+    );
+    a.el("mobileMenuButton").click();
+    a.el("accountMenuButton").click();
+    buttonWith(a.w, "Inbox").click();
+    await settle(() => a.calls.some((c) => c.url.endsWith("/deliveries")));
+    assert.equal(
+      a.calls.filter((c) => c.url.endsWith("/deliveries")).length,
+      1,
+    );
+    assert.equal(
+      a.w.localStorage.getItem("whos-free-local-schedules"),
+      a.original,
+    );
+  } finally {
+    await a.close();
+  }
+});
+test("rapid Inbox clicks share one in-flight request", async () => {
+  let release;
+  const pending = new Promise((resolve) => (release = resolve));
+  const a = await app({
+    account: true,
+    handler: (path) =>
+      path === "/revision"
+        ? { revision: 1, inboxRevision: 0 }
+        : path === "/deliveries"
+          ? pending
+          : undefined,
+  });
+  try {
+    a.el("mobileMenuButton").click();
+    a.el("accountMenuButton").click();
+    const inbox = buttonWith(a.w, "Inbox");
+    inbox.click();
+    inbox.click();
+    inbox.click();
+    await settle(() => a.calls.some((c) => c.url.endsWith("/deliveries")));
+    assert.equal(
+      a.calls.filter((c) => c.url.endsWith("/deliveries")).length,
+      1,
+    );
+    release({ deliveries: [], inboxRevision: 0 });
+    await new Promise((r) => setTimeout(r, 10));
+  } finally {
+    release({ deliveries: [], inboxRevision: 0 });
+    await a.close();
+  }
+});

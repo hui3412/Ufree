@@ -3,7 +3,27 @@
   "use strict";
   const copy = (value) =>
     value === undefined ? undefined : JSON.parse(JSON.stringify(value));
-  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  // Cloud JSON sorts keys for deduplication; key order must not become an edit.
+  const ordered = (value) =>
+    Array.isArray(value)
+      ? value.map(ordered)
+      : value && typeof value === "object"
+        ? Object.fromEntries(
+            Object.keys(value)
+              .sort()
+              .map((key) => [key, ordered(value[key])]),
+          )
+        : value;
+  const same = (a, b) =>
+    JSON.stringify(ordered(a)) === JSON.stringify(ordered(b));
+  const recent = (timestamp) => {
+    const age = Date.now() - Number(timestamp);
+    return age >= 0 && age < 60000;
+  };
+  const delayed = (state) => {
+    const remaining = state.retryAt - Date.now();
+    return remaining > 0 && remaining <= 300000;
+  };
   const safe = (name) =>
     !["__proto__", "constructor", "prototype"].includes(name);
   function reconcile(base, local, cloud) {
@@ -79,6 +99,7 @@
       this.lastCheck = 0;
       this.timer = null;
       this.error = "";
+      this.authBlocked = false;
       this.reload();
     }
     reload() {
@@ -103,7 +124,9 @@
         );
     }
     persist(next = this.state) {
-      this.storage.setItem(this.key, JSON.stringify(next));
+      const serialized = JSON.stringify(next);
+      if (this.storage.getItem(this.key) !== serialized)
+        this.storage.setItem(this.key, serialized);
       this.state = next;
       this.onChange(this);
     }
@@ -122,16 +145,31 @@
         conflicts: [...this.state.conflicts, ...merged.conflicts],
       });
       clearTimeout(this.timer);
-      this.timer = setTimeout(() => this.check(true), 800);
+      this.timer = setTimeout(() => this.check("save"), 800);
+      this.timer.unref?.();
     }
     check(force = false) {
       if (this.running) return this.running;
-      if (!force && Date.now() - this.lastCheck < 60000)
+      this.reload();
+      if (
+        force !== true &&
+        (this.authBlocked ||
+          delayed(this.state) ||
+          (force === "save" && root.document?.hidden))
+      )
+        return Promise.resolve();
+      if (
+        !force &&
+        !this.state.failures &&
+        this.state.initialized &&
+        !this.pending() &&
+        recent(Math.max(this.lastCheck, this.state.checkedAt || 0))
+      )
         return Promise.resolve();
       this.running = (async () => {
         for (let attempt = 0; attempt < 3; attempt++) {
           try {
-            return await this.perform();
+            return await this.perform(force);
           } catch (error) {
             if (error.status !== 409 || attempt === 2) throw error;
           }
@@ -139,17 +177,49 @@
       })()
         .catch((error) => {
           this.error = error.message;
-          this.onChange(this);
+          this.authBlocked = [401, 403].includes(error.status);
+          this.reload();
+          const failures = Math.min((this.state.failures || 0) + 1, 6);
+          const delay = Math.min(
+            300000,
+            (error.status === 429 ? 60000 : 15000) * 2 ** (failures - 1),
+          );
+          this.persist({
+            ...this.state,
+            failures,
+            retryAt: Date.now() + delay,
+          });
+          if (
+            !this.authBlocked &&
+            this.pending() &&
+            root.navigator?.onLine !== false &&
+            root.document?.hidden !== true
+          ) {
+            clearTimeout(this.timer);
+            this.timer = setTimeout(() => this.check("save"), delay);
+            this.timer.unref?.();
+          }
         })
         .finally(() => {
           this.running = null;
         });
       return this.running;
     }
-    async perform() {
+    async perform(force = false) {
       // navigator.locks serializes sync across tabs where available. Server revision checks remain authoritative everywhere.
       const work = async () => {
         this.reload();
+        // Recheck after acquiring the cross-tab lock: another tab may just have checked.
+        if (force !== true && (this.authBlocked || delayed(this.state))) return;
+        if (
+          !force &&
+          !this.state.failures &&
+          this.state.initialized &&
+          !this.pending() &&
+          recent(this.state.checkedAt || 0)
+        )
+          return;
+        const beforeRecords = copy(this.state.records);
         this.error = "";
         this.onChange(this);
         const check = await this.request("/revision");
@@ -177,14 +247,16 @@
             conflicts: [...this.state.conflicts, ...merge.conflicts],
           });
         }
-        if (
-          check.personalSchedule !== undefined &&
+        this.persist({
+          ...this.state,
+          ...(check.personalSchedule !== undefined &&
           check.revision === this.state.revision
-        )
-          this.persist({
-            ...this.state,
-            personalSchedule: check.personalSchedule,
-          });
+            ? { personalSchedule: check.personalSchedule }
+            : {}),
+          ...(Number.isSafeInteger(check.inboxRevision)
+            ? { inboxRevision: check.inboxRevision }
+            : {}),
+        });
         for (let batch = 0; batch < 100; batch++) {
           this.reload();
           const changes = differences(
@@ -210,8 +282,17 @@
             initialized: true,
           });
         }
-        this.persist({ ...this.state, lastSync: new Date().toISOString() });
-        this.onSynced(this);
+        this.persist({
+          ...this.state,
+          lastSync: new Date().toISOString(),
+          checkedAt: Date.now(),
+          retryAt: 0,
+          failures: 0,
+        });
+        this.authBlocked = false;
+        this.onSynced(this, {
+          changed: !same(beforeRecords, this.state.records),
+        });
       };
       if (root.navigator?.locks)
         await root.navigator.locks.request(this.key, work);

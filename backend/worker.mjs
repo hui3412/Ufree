@@ -1,3 +1,4 @@
+import { measureDatabase, requestRoute } from "./request-metrics.mjs";
 import { CloudStorage } from "./cloud-storage.mjs";
 import { following, followRequests } from "./following.mjs";
 import { scryptAsync } from "@noble/hashes/scrypt";
@@ -7,6 +8,7 @@ const ORIGIN = "https://hui3412.github.io";
 const HOUR = 3600000,
   DAY = HOUR * 24;
 const encoder = new TextEncoder();
+const healthCache = new WeakMap();
 const random = () => bytesToHex(crypto.getRandomValues(new Uint8Array(32)));
 const digest = async (value) =>
   bytesToHex(
@@ -197,13 +199,14 @@ async function authenticate(request, db) {
       "Your session expired. Sign in again; pending local changes are retained.",
       401,
     );
-  await run(
-    db,
-    "UPDATE users SET last_active=? WHERE id=? AND last_active<?",
-    Date.now(),
-    user.id,
-    Date.now() - HOUR,
-  );
+  if (user.last_active < Date.now() - HOUR)
+    await run(
+      db,
+      "UPDATE users SET last_active=? WHERE id=? AND last_active<?",
+      Date.now(),
+      user.id,
+      Date.now() - HOUR,
+    );
   return user;
 }
 const profile = (user) => ({
@@ -214,6 +217,10 @@ const profile = (user) => ({
 });
 export default {
   async fetch(request, env) {
+    const diagnostics =
+      env.REQUEST_METRICS === "1" ? measureDatabase(env.DB) : null;
+    const db = diagnostics?.db || env.DB;
+    let responseStatus = 500;
     const headers = {
       "Cache-Control": "no-store",
       "Content-Type": "application/json",
@@ -226,44 +233,60 @@ export default {
         "Access-Control-Allow-Origin": ORIGIN,
         "Access-Control-Allow-Headers": "Authorization, Content-Type",
         "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-        "Access-Control-Max-Age": "600",
+        "Access-Control-Max-Age": "86400",
       });
-    const respond = (data, status = 200) =>
-      Response.json(data, { status, headers });
+    const respond = (data, status = 200) => {
+      responseStatus = status;
+      return Response.json(data, { status, headers });
+    };
     try {
       const path = new URL(request.url).pathname;
       if (origin && origin !== ORIGIN) fail("Origin not allowed.", 403);
-      if (request.method === "OPTIONS")
+      if (request.method === "OPTIONS") {
+        responseStatus = 204;
         return new Response(null, { status: 204, headers });
-      if (request.method === "GET" && ["/", "/health"].includes(path)) {
-        if ((await env.DB.prepare("SELECT 1 AS ok").first())?.ok !== 1)
+      }
+      if (!["GET", "POST"].includes(request.method))
+        fail("Method not allowed.", 405);
+      if (requestRoute(path) === "unknown") fail("Not found.", 404);
+      if (request.method === "GET" && path === "/") return respond({service:"youfreetest", status:"ok", database:"not-checked", health:"/health"});
+      if (request.method === "GET" && path === "/health") {
+        const now = Date.now(),
+          cached = db && healthCache.get(env.DB);
+        if (cached && cached.until > now) return respond(cached.body);
+        if (!db || (await db.prepare("SELECT 1 AS ok").first())?.ok !== 1)
           fail("Database unavailable.", 503);
-        let ready = false;
+        let schema;
         try {
-          ready = !!(await one(
-            env.DB,
-            "SELECT name FROM sqlite_master WHERE name='users'",
-          ));
-        } catch {}
-        return respond({
+          // Wrangler's migration ledger has an indexed integer primary key: read one row, not sqlite_master.
+          const migration=await one(db,"SELECT name FROM d1_migrations ORDER BY id DESC LIMIT 1");
+          const version=Number.parseInt(migration?.name || "0",10);
+          schema=new Set([...(version>=1?["users"]:[]),...(version>=2?["connections"]:[]),...(version>=3?["cloud_objects"]:[]),...(version>=4?["sessions_expiry"]:[])]);
+        } catch {
+          // Compatibility for databases installed outside Wrangler; cached per isolate as well.
+          schema=new Set((await rows(db,"SELECT name FROM sqlite_master WHERE name IN ('users','cloud_objects','connections','sessions_expiry')")).map(row=>row.name));
+        }
+        const body = {
           service: "youfreetest",
           status: "ok",
           database: "connected",
-          features: ready ? "accounts-test-v1" : "migration-required",
+          features: schema.has("users")
+            ? "accounts-test-v1"
+            : "migration-required",
           inactivityDeletion: "disabled-pending-warning-policy",
-          storage: (await one(
-            env.DB,
-            "SELECT name FROM sqlite_master WHERE name='cloud_objects'",
-          ))
+          storage: schema.has("cloud_objects")
             ? "lossless-deduplicated-v1"
             : "legacy-json",
-          following: !!(await one(
-            env.DB,
-            "SELECT name FROM sqlite_master WHERE name='connections'",
-          )),
-        });
+          following: schema.has("connections"),
+          usage: schema.has("sessions_expiry")
+            ? "indexed-sync-v1"
+            : "legacy-checks",
+          checkedAt: new Date(now).toISOString(),
+          healthCacheSeconds: 30,
+        };
+        healthCache.set(env.DB, { until: now + 30000, body });
+        return respond(body);
       }
-      const db = env.DB;
       const storage = new CloudStorage(db);
       if (!db) fail("Database unavailable.", 503);
       if (!["GET", "POST"].includes(request.method))
@@ -444,7 +467,15 @@ export default {
         return respond({ ok: true });
       }
       if (path === "/sync" && request.method === "GET") {
-        await storage.compact({ userId: user.id, limit: 5 });
+        if (user.needs_compaction) {
+          await storage.compact({ userId: user.id, limit: 5 });
+          if (!(await storage.hasLegacy(user.id)))
+            await run(
+              db,
+              "UPDATE users SET needs_compaction=0 WHERE id=? AND needs_compaction<>0",
+              user.id,
+            );
+        }
         const since = Number(
           new URL(request.url).searchParams.get("since") || 0,
         );
@@ -468,6 +499,7 @@ export default {
         return respond({
           revision: user.revision,
           personalSchedule: user.personal_schedule,
+          inboxRevision: user.inbox_revision,
         });
       if (path === "/sync" && input) {
         if (
@@ -506,11 +538,7 @@ export default {
           } else if (change.value !== null)
             validatePeople({ [change.name.slice(2)]: change.value });
         }
-        const size = await one(
-          db,
-          "SELECT COALESCE(SUM(CASE WHEN substr(r.payload,1,5)='@UF1:' THEN o.raw_bytes ELSE length(CAST(r.payload AS BLOB)) END),0) AS size FROM records r LEFT JOIN cloud_objects o ON o.id=substr(r.payload,6) WHERE r.user_id=? AND r.name NOT LIKE 'f:%'",
-          user.id,
-        );
+        const size = { size: user.storage_bytes };
         const existing = await rows(
           db,
           `SELECT r.name,CASE WHEN substr(r.payload,1,5)='@UF1:' THEN o.raw_bytes ELSE length(CAST(r.payload AS BLOB)) END AS size FROM records r LEFT JOIN cloud_objects o ON o.id=substr(r.payload,6) WHERE r.user_id=? AND r.name IN (${input.changes.map(() => "?").join(",")})`,
@@ -604,6 +632,7 @@ export default {
           user.id,
         );
         return respond({
+          inboxRevision: user.inbox_revision,
           followRequests: await followRequests(db, user.id, rows),
           deliveries: await Promise.all(
             inbox.map(async (x) => ({
@@ -707,6 +736,22 @@ export default {
         },
         error.status || 503,
       );
+    } finally {
+      if (diagnostics) {
+        const { statements, rowsRead, rowsWritten, complete } =
+          diagnostics.stats;
+        console.info(
+          JSON.stringify({
+            event: "ufree_request",
+            route: requestRoute(new URL(request.url).pathname),
+            method: request.method,
+            status: responseStatus,
+            dbStatements: statements,
+            rowsRead: complete ? rowsRead : null,
+            rowsWritten: complete ? rowsWritten : null,
+          }),
+        );
+      }
     }
   },
   async scheduled(_event, env) {

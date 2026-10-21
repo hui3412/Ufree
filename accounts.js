@@ -35,6 +35,7 @@
     busy = false,
     verified = "",
     lastInbox = 0,
+    inboxTask = null,
     needsReload = false,
     lastActivityCheck = Date.now();
   try {
@@ -181,8 +182,8 @@
       onChange: () => {
         renderStatus();
       },
-      onSynced: () => {
-        needsReload = true;
+      onSynced: (_, details) => {
+        if (details?.changed !== false) needsReload = true;
         queueMicrotask(() =>
           flushPersonalChange().then(applySync).catch(showError),
         );
@@ -378,8 +379,9 @@
     window.addEventListener("online", () => sync(true).catch(showError));
     document.addEventListener("visibilitychange", () => {
       if (!document.hidden) {
-        sync(false).catch(showError);
-        inbox().catch(showError);
+        sync(false)
+          .then(() => inbox())
+          .catch(showError);
       }
     });
     window.addEventListener("pageshow", () => sync(false).catch(showError));
@@ -396,7 +398,20 @@
     window.addEventListener("hashchange", cloudHash);
     window.addEventListener("storage", (event) => {
       if (event.key === SESSION || event.key === VIEW) location.reload();
-      else if (session && event.key === key()) sync(false);
+      else if (session && event.key === key()) {
+        try {
+          const before = JSON.parse(event.oldValue || "null"),
+            after = JSON.parse(event.newValue || "null");
+          // Status/check timestamps written by another tab do not require a cloud check.
+          if (
+            before?.revision === after?.revision &&
+            JSON.stringify(before?.records) === JSON.stringify(after?.records)
+          )
+            return;
+        } catch {}
+        needsReload = true;
+        sync(false).then(applySync).catch(showError);
+      }
     });
     updateCollectionLabels();
     window.addEventListener("ufree:languagechange", () => {
@@ -497,9 +512,17 @@
     clear();
     element("h3", signup ? "Create account" : "Sign in", main);
     const legalLinks = element("p", "", main);
-    element("a", "Privacy notice", legalLinks, {href: "legal.html#privacy", target: "_blank", rel: "noopener noreferrer"});
+    element("a", "Privacy notice", legalLinks, {
+      href: "legal.html#privacy",
+      target: "_blank",
+      rel: "noopener noreferrer",
+    });
     element("span", " · ", legalLinks);
-    element("a", "Terms & ownership", legalLinks, {href: "legal.html#terms", target: "_blank", rel: "noopener noreferrer"});
+    element("a", "Terms & ownership", legalLinks, {
+      href: "legal.html#terms",
+      target: "_blank",
+      rel: "noopener noreferrer",
+    });
     const username = field("Username"),
       password = field("Password", "password");
     username.autocomplete = "username";
@@ -802,7 +825,14 @@
       dialog.showModal();
     });
   }
-  async function inbox(force = false) {
+  function inbox(force = false) {
+    if (inboxTask) return inboxTask;
+    inboxTask = loadInbox(force).finally(() => {
+      inboxTask = null;
+    });
+    return inboxTask;
+  }
+  async function loadInbox(force = false) {
     if (
       !session ||
       !ready ||
@@ -814,8 +844,26 @@
           bridge.canNotify?.() === false))
     )
       return;
+    const revision = engine?.state.inboxRevision;
+    const seenKey = key() + ":inbox-seen-v1";
+    let seen = 0;
+    try {
+      seen = Number(localStorage.getItem(seenKey) || 0);
+    } catch {}
+    if (!force && Number.isSafeInteger(revision) && revision <= seen) return;
     lastInbox = Date.now();
     const result = await request("/deliveries");
+    if (
+      !force &&
+      (panel?.open || bridge.isBusy() || bridge.canNotify?.() === false)
+    )
+      return;
+    const receivedRevision = result.inboxRevision ?? revision;
+    if (Number.isSafeInteger(receivedRevision)) {
+      try {
+        localStorage.setItem(seenKey, String(receivedRevision));
+      } catch {}
+    }
     if (!result.deliveries.length && !(result.followRequests || []).length) {
       if (force) text(status, "No pending deliveries.");
       return;

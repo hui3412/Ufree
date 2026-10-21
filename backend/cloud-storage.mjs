@@ -384,13 +384,25 @@ export class CloudStorage {
     }
     return Object.fromEntries(result);
   }
+  async hasLegacy(userId) {
+    const result = await this.stmt(
+      `SELECT
+      EXISTS(SELECT 1 FROM records WHERE user_id=? AND payload IS NOT NULL AND substr(payload,1,5)<>'@UF1:' AND CASE WHEN name LIKE 'f:%' AND json_valid(payload) THEN substr(json_extract(payload,'$.person'),1,5) IS NOT '@UF1:' ELSE 1 END)
+      OR EXISTS(SELECT 1 FROM shares WHERE owner_id=? AND substr(payload,1,5)<>'@UF1:')
+      OR EXISTS(SELECT 1 FROM deliveries WHERE sender_id=? AND substr(payload,1,5)<>'@UF1:') AS pending`,
+      userId,
+      userId,
+      userId,
+    ).first();
+    return !!result.pending;
+  }
   async compact({ userId = null, limit = 10 } = {}) {
     // Compare-and-swap: maintenance cannot overwrite a simultaneous user edit or deletion.
     let count = 0,
       processedBytes = 0;
     const budget = 5 * 1024 * 1024;
     const records = await this.all(
-      `SELECT user_id,name,payload FROM records WHERE payload IS NOT NULL AND substr(payload,1,5)<>'@UF1:' AND CASE WHEN name LIKE 'f:%' AND json_valid(payload) THEN substr(json_extract(payload,'$.person'),1,5) IS NOT '@UF1:' ELSE 1 END ${userId ? "AND user_id=?" : ""} ORDER BY CASE WHEN name LIKE 'f:%' THEN 1 ELSE 0 END LIMIT ?`,
+      `SELECT user_id,name,payload FROM records WHERE payload IS NOT NULL AND substr(payload,1,5)<>'@UF1:' AND CASE WHEN name LIKE 'f:%' AND json_valid(payload) THEN substr(json_extract(payload,'$.person'),1,5) IS NOT '@UF1:' ELSE 1 END ${userId ? "AND user_id=?" : ""} LIMIT ?`,
       ...(userId ? [userId] : []),
       limit,
     );

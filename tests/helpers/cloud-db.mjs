@@ -3,6 +3,7 @@ import fs from "node:fs";
 import worker from "../../backend/worker.mjs";
 export function fixture({ through = null } = {}) {
   const sql = new DatabaseSync(":memory:");
+  sql.exec("CREATE TABLE d1_migrations(id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT UNIQUE,applied_at TEXT DEFAULT CURRENT_TIMESTAMP)");
   for (const name of fs
     .readdirSync(new URL("../../backend/migrations/", import.meta.url))
     .sort()) {
@@ -13,6 +14,7 @@ export function fixture({ through = null } = {}) {
         "utf8",
       ),
     );
+    sql.prepare("INSERT INTO d1_migrations(name) VALUES(?)").run(name);
   }
   const db = {
     queries: 0,
