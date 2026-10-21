@@ -3392,7 +3392,6 @@ const SYNC_URL = 'https://youfree.ca';
 
   function openHelp() {
     if (state.isParsing || state.pendingImage || state.codeMode) return;
-    els.helpModal.querySelector("#iosShortcutGuide").open = false;
     els.helpModal.hidden = false;
     document.body.style.overflow = "hidden";
     els.helpModal.querySelector(".help-modal").scrollTop = 0;
@@ -5410,7 +5409,7 @@ const SYNC_URL = 'https://youfree.ca';
     if (!("serviceWorker" in navigator)) return;
     if (location.protocol !== "https:" && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") return;
 
-    navigator.serviceWorker.register("./service-worker.js?v=139", { updateViaCache: "none" })
+    navigator.serviceWorker.register("./service-worker.js?v=141", { updateViaCache: "none" })
       .then(registration => registration.update())
       .catch(() => {
         // The app works normally even if PWA caching isn't available.

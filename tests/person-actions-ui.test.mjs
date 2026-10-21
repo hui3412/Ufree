@@ -297,27 +297,29 @@ test("Class Soon, collapsed people, removed summary/forecast, UFree identity, an
     a.card("Alice").click(); assert.equal(a.el("detailPanel").querySelector(".status-badge").textContent, "Class Soon");
     for (const id of ["settingsModal", "helpModal"]) {
       const dialog = a.el(id).querySelector('[role="dialog"]');
-      const footer = dialog.querySelector("footer");
-      assert.equal(id === "helpModal" ? dialog.lastElementChild.id : dialog.lastElementChild.tagName, id === "helpModal" ? "iosShortcutGuide" : "FOOTER");
-      assert.equal(footer.textContent.replace(/\s+/g, " ").trim(), "App by David Dajbog and Hui En Qian. Inspiration from Xander Vatch.");
+      const credits = dialog.querySelector(".site-legal-links");
+      assert.equal(dialog.lastElementChild, credits);
+      assert.equal(dialog.querySelector(".creator-credit"), null);
+      assert.deepEqual([...credits.querySelectorAll("small")].map(node => node.textContent), ["© 2026 David Dajbog and Hui En Qian. All rights reserved.", "Inspiration from Xander Vatch."]);
+      assert.ok(credits.querySelector('a[href="legal.html#privacy"]'));
+      assert.ok(credits.querySelector('a[href="legal.html#terms"]'));
     }
   } finally { await a.window.happyDOM.abort(); }
 });
 
-test("Help opens with the bottom iOS guide collapsed, restores focus and allows page scrolling after close", async () => {
+test("Help opens without the removed iOS guide, restores focus and allows page scrolling after close", async () => {
   const a = await app();
   try {
     a.el("helpButton").click();
     assert.equal(a.el("helpModal").hidden, false);
     assert.equal(a.el("helpTitle").textContent, "Help & Tips");
-    const guide = a.el("iosShortcutGuide");
-    assert.equal(guide.open, false);
-    guide.open = true;
+    assert.equal(a.el("iosShortcutGuide"), null);
+    assert.equal(a.window.document.body.style.overflow, "hidden");
     a.el("closeHelpModal").click();
     assert.equal(a.window.document.activeElement.id, "mobileMenuButton");
     assert.equal(a.window.document.body.style.overflow, "");
     a.el("helpButton").click();
-    assert.equal(guide.open, false);
+    assert.equal(a.el("helpModal").hidden, false);
     a.window.document.dispatchEvent(new a.window.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
     assert.equal(a.el("helpModal").hidden, true);
     const before = a.stored();
