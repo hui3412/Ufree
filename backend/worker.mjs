@@ -8,7 +8,7 @@ const ORIGIN = "https://hui3412.github.io";
 const HOUR = 3600000,
   DAY = HOUR * 24;
 const encoder = new TextEncoder();
-const RELEASE = "public-health-v2";
+const RELEASE = "schedule-content-v2";
 const random = () => bytesToHex(crypto.getRandomValues(new Uint8Array(32)));
 const digest = async (value) =>
   bytesToHex(
@@ -251,13 +251,22 @@ export default {
       if (requestRoute(path) === "unknown") fail("Not found.", 404);
       if (request.method === "GET" && ["/", "/health"].includes(path))
         return respond({ service: "youfreetest", status: "ok", database: "not-checked", release: RELEASE });
-      if (path === "/admin/diagnostics") {
+      if (["/admin/diagnostics", "/admin/compact"].includes(path)) {
         if (request.method !== "POST") fail("Method not allowed.", 405);
         // A separate server-only secret grants diagnostics, never an ordinary account session.
         const token = request.headers.get("authorization")?.match(/^Bearer (.{32,256})$/)?.[1];
         if (!env.ADMIN_DIAGNOSTICS_TOKEN) fail("Admin diagnostics are disabled.", 503);
         if (!token || !safeEqual(await digest(token), await digest(env.ADMIN_DIAGNOSTICS_TOKEN)))
           fail("Admin authorization required.", 401);
+        if (path === "/admin/compact") {
+          if (!db) fail("Database unavailable.",503);
+          const input = await bodyJSON(request);
+          const limit = input.limit ?? 10;
+          if (!Number.isSafeInteger(limit) || limit < 1 || limit > 20) fail("Invalid maintenance limit.");
+          const completed = await new CloudStorage(db).repack({limit});
+          const pending = await one(db,"SELECT count(*) AS n FROM cloud_repack");
+          return respond({completed,pending:pending.n});
+        }
         if (!db || (await one(db, "SELECT 1 AS ok"))?.ok !== 1)
           fail("Database unavailable.", 503);
         const migration = await one(db, "SELECT name FROM d1_migrations ORDER BY id DESC LIMIT 1");
@@ -518,12 +527,12 @@ export default {
         // Once the migration lands, ordinary saves always use the incremental counter.
         const size = Number.isSafeInteger(user.storage_bytes) ? { size: user.storage_bytes } : await one(
           db,
-          "SELECT COALESCE(SUM(CASE WHEN substr(r.payload,1,5)='@UF1:' THEN o.raw_bytes ELSE length(CAST(r.payload AS BLOB)) END),0) AS size FROM records r LEFT JOIN cloud_objects o ON o.id=substr(r.payload,6) WHERE r.user_id=? AND r.name NOT LIKE 'f:%'",
+          "SELECT COALESCE(SUM(CASE WHEN substr(r.payload,1,5)='@UF1:' THEN COALESCE(o.logical_bytes,o.raw_bytes) ELSE length(CAST(r.payload AS BLOB)) END),0) AS size FROM records r LEFT JOIN cloud_objects o ON o.id=substr(r.payload,6) WHERE r.user_id=? AND r.name NOT LIKE 'f:%'",
           user.id,
         );
         const existing = await rows(
           db,
-          `SELECT r.name,CASE WHEN substr(r.payload,1,5)='@UF1:' THEN o.raw_bytes ELSE length(CAST(r.payload AS BLOB)) END AS size FROM records r LEFT JOIN cloud_objects o ON o.id=substr(r.payload,6) WHERE r.user_id=? AND r.name IN (${input.changes.map(() => "?").join(",")})`,
+          `SELECT r.name,CASE WHEN substr(r.payload,1,5)='@UF1:' THEN COALESCE(o.logical_bytes,o.raw_bytes) ELSE length(CAST(r.payload AS BLOB)) END AS size FROM records r LEFT JOIN cloud_objects o ON o.id=substr(r.payload,6) WHERE r.user_id=? AND r.name IN (${input.changes.map(() => "?").join(",")})`,
           user.id,
           ...input.changes.map((change) => change.name),
         );

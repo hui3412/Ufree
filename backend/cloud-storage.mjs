@@ -117,7 +117,34 @@ export class CloudStorage {
   async all(sql, ...args) {
     return (await this.stmt(sql, ...args).all()).results;
   }
-  async prepare(value, { schedule = false, kind = "json" } = {}) {
+  async prepare(value, { schedule = false, kind = "json", projection = true } = {}) {
+    if (schedule) {
+      // Names and import provenance never participate in the shared timetable ID.
+      // Normalize only representation differences; retain the exact original in patches.
+      const fields = ["day", "start", "end", "course", "room", "kind"];
+      const rows = value.classes.map((c, index) => {
+        const core = Object.fromEntries(fields.map(k => [k, k === "kind" ? (c[k] === "busy_block" ? "busy_block" : "class") : (c[k] ?? "")]));
+        const patch = Object.fromEntries(Object.entries(c).filter(([k,v]) => !Object.hasOwn(core,k) || canonical(v) !== canonical(core[k])));
+        const omit = fields.filter(k => !Object.hasOwn(c,k));
+        return { core, patch, omit, index, key: canonical(core) };
+      }).sort((a,b) => a.key < b.key ? -1 : a.key > b.key ? 1 : a.index-b.index);
+      const core = await encodeObject(rows.map(r => r.core));
+      const metadata = Object.fromEntries(Object.entries(value).filter(([k]) => k !== "classes"));
+      const patches = rows.map(r => [r.omit, r.patch]);
+      const order = rows.map(r => r.index);
+      const object = await encodeObject(["ufree-schedule-v2", core.id, metadata, patches, order]);
+      object.logicalBytes = enc.encode(canonical(value)).length;
+      if (object.logicalBytes > MAX_RAW) throw Error("Cloud object exceeds its decoded limit.");
+      object.children = [core.id];
+      const objects = new Map([[core.id,core],[object.id,object]]);
+      if (projection) {
+        const projected = await this.prepare(personalProjection(value), {schedule:true,projection:false});
+        object.personal = projected.ref.slice(PREFIX.length);
+        if (object.personal !== object.id) object.children.push(object.personal);
+        for (const [id,o] of projected.objects) if (!objects.has(id)) objects.set(id,o);
+      }
+      return {ref:PREFIX+object.id, objects};
+    }
     const cacheKey = kind + ":" + canonical(value);
     if (!this.encoded.has(cacheKey))
       this.encoded.set(cacheKey, encodeObject(value, kind));
@@ -138,7 +165,7 @@ export class CloudStorage {
     const objects = new Map(),
       entries = [];
     for (const [name, person] of Object.entries(people)) {
-      const prepared = await this.prepare(person);
+      const prepared = await this.prepare(person, {schedule:true,projection:false});
       for (const [id, o] of prepared.objects) objects.set(id, o);
       entries.push([name, prepared.ref.slice(PREFIX.length)]);
     }
@@ -173,11 +200,11 @@ export class CloudStorage {
     };
     const values = [...objects.values()];
     const inline = values.filter((o) => o.data.length <= CHUNK);
-    for (let start = 0; start < inline.length; start += 10) {
-      const group = inline.slice(start, start + 10);
+    for (let start = 0; start < inline.length; start += 11) {
+      const group = inline.slice(start, start + 11);
       batch.push(
         this.stmt(
-          `INSERT INTO cloud_objects(id,kind,codec,raw_bytes,stored_bytes,data,personal_id,last_used) VALUES ${group.map(() => "(?,?,?,?,?,?,?,?)").join(",")} ON CONFLICT(id) DO UPDATE SET last_used=MAX(cloud_objects.last_used,excluded.last_used),personal_id=COALESCE(excluded.personal_id,cloud_objects.personal_id)`,
+          `INSERT INTO cloud_objects(id,kind,codec,raw_bytes,stored_bytes,data,personal_id,last_used,logical_bytes) VALUES ${group.map(() => "(?,?,?,?,?,?,?,?,?)").join(",")} ON CONFLICT(id) DO UPDATE SET last_used=MAX(cloud_objects.last_used,excluded.last_used),personal_id=COALESCE(excluded.personal_id,cloud_objects.personal_id),logical_bytes=excluded.logical_bytes`,
           ...group.flatMap((o) => [
             o.id,
             o.kind,
@@ -187,6 +214,7 @@ export class CloudStorage {
             o.data.length <= CHUNK ? bindBytes(o.data) : null,
             o.personal,
             Date.now(),
+            o.logicalBytes ?? o.rawBytes,
           ]),
         ),
       );
@@ -197,7 +225,7 @@ export class CloudStorage {
       // A large object and every chunk become visible atomically. An interrupted batch leaves no partial object.
       const writes = [
         this.stmt(
-          "INSERT INTO cloud_objects(id,kind,codec,raw_bytes,stored_bytes,data,personal_id,last_used) VALUES(?,?,?,?,?,NULL,?,?) ON CONFLICT(id) DO UPDATE SET last_used=MAX(cloud_objects.last_used,excluded.last_used),personal_id=COALESCE(excluded.personal_id,cloud_objects.personal_id)",
+          "INSERT INTO cloud_objects(id,kind,codec,raw_bytes,stored_bytes,data,personal_id,last_used,logical_bytes) VALUES(?,?,?,?,?,NULL,?,?,?) ON CONFLICT(id) DO UPDATE SET last_used=MAX(cloud_objects.last_used,excluded.last_used),personal_id=COALESCE(excluded.personal_id,cloud_objects.personal_id),logical_bytes=excluded.logical_bytes",
           o.id,
           o.kind,
           o.codec,
@@ -205,6 +233,7 @@ export class CloudStorage {
           o.data.length,
           o.personal,
           Date.now(),
+          o.logicalBytes ?? o.rawBytes,
         ),
       ];
       for (
@@ -276,6 +305,7 @@ export class CloudStorage {
         )
         .map((r) => r.payload.slice(PREFIX.length)),
     );
+    await this.preloadCores(rows.filter(r => r.payload?.startsWith(PREFIX)).map(r => r.payload.slice(PREFIX.length)));
     const result = [];
     for (const row of rows)
       result.push({
@@ -347,10 +377,33 @@ export class CloudStorage {
     this.reads.set(cacheKey, promise);
     return promise;
   }
+  async preloadCores(ids) {
+    const cores = [];
+    for (const id of ids) {
+      const value = await this.object(id);
+      if (Array.isArray(value) && value[0] === "ufree-schedule-v2") cores.push(value[1]);
+    }
+    await this.preload(cores);
+  }
+  async person(id) {
+    const value = await this.object(id);
+    if (!Array.isArray(value) || value[0] !== "ufree-schedule-v2") return value;
+    const [,coreId,metadata,patches,order] = value;
+    const core = await this.object(coreId);
+    const classes = new Array(core.length);
+    for (let i=0;i<core.length;i++) {
+      const [omit,patch] = patches[i];
+      classes[order[i]] = Object.fromEntries([
+        ...Object.entries(core[i]).filter(([k]) => !omit.includes(k)),
+        ...Object.entries(patch),
+      ]);
+    }
+    return {...metadata, classes};
+  }
   async record(payload, name = "") {
     if (payload === null) return null;
     const value = payload.startsWith(PREFIX)
-      ? await this.object(payload.slice(PREFIX.length))
+      ? await (name.startsWith("p:") ? this.person(payload.slice(PREFIX.length)) : this.object(payload.slice(PREFIX.length)))
       : JSON.parse(payload);
     if (
       name.startsWith("f:") &&
@@ -359,7 +412,7 @@ export class CloudStorage {
     )
       return {
         ...value,
-        person: await this.object(value.person.slice(PREFIX.length)),
+        person: await this.person(value.person.slice(PREFIX.length)),
       };
     return value;
   }
@@ -372,6 +425,7 @@ export class CloudStorage {
     if (!Array.isArray(entries) || entries.length > 2000)
       throw Error("Invalid cloud collection.");
     await this.preload(entries.map((entry) => entry[1]));
+    await this.preloadCores(entries.map(entry => entry[1]));
     const result = [];
     for (const entry of entries) {
       if (
@@ -380,11 +434,38 @@ export class CloudStorage {
         typeof entry[0] !== "string"
       )
         throw Error("Invalid cloud collection.");
-      result.push([entry[0], await this.object(entry[1])]);
+      result.push([entry[0], await this.person(entry[1])]);
     }
     return Object.fromEntries(result);
   }
+  async repack({userId = null, limit = 10} = {}) {
+    const jobs = await this.all(`SELECT * FROM cloud_repack ${userId ? "WHERE user_id=?" : ""} LIMIT ?`, ...(userId ? [userId] : []), limit);
+    let count=0, bytes=0;
+    for (const job of jobs) {
+      const table = job.target;
+      if (!["records","shares","deliveries"].includes(table)) throw Error("Invalid maintenance job.");
+      const predicate = table === "records" ? "user_id=? AND name=?" : "id=?";
+      const args = table === "records" ? [job.user_id,job.row_key] : [job.row_key];
+      const row = await this.stmt(`SELECT payload FROM ${table} WHERE ${predicate}`, ...args).first();
+      if (row?.payload != null) {
+        const value = table === "records" ? await this.record(row.payload,job.row_key) : await this.people(row.payload);
+        bytes += enc.encode(canonical(value)).length;
+        if (count && bytes > 5*1024*1024) break;
+        const prepared = table === "records" ? await this.prepare(value,{schedule:job.row_key.startsWith("p:")}) : await this.collection(value);
+        await this.stage([prepared]);
+        const verified = table === "records" ? await this.record(prepared.ref,job.row_key) : await this.people(prepared.ref);
+        if (canonical(verified) !== canonical(value)) throw Error("Maintenance round-trip verification failed.");
+        // A maintenance conversion never changes sync revisions or resurrects deleted data.
+        await this.stmt(`UPDATE ${table} SET payload=? WHERE ${predicate} AND payload=?`, prepared.ref,...args,row.payload).run();
+      }
+      await this.stmt("DELETE FROM cloud_repack WHERE target=? AND user_id=? AND row_key=?",table,job.user_id,job.row_key).run();
+      count++;
+      this.encoded.clear(); this.reads.clear(); this.metadata.clear(); this.parts.clear();
+    }
+    return count;
+  }
   async hasLegacy(userId) {
+    if ((await this.stmt("SELECT 1 AS pending FROM cloud_repack WHERE user_id=? LIMIT 1",userId).first())?.pending) return true;
     const result = await this.stmt(
       `SELECT
       EXISTS(SELECT 1 FROM records WHERE user_id=? AND payload IS NOT NULL AND substr(payload,1,5)<>'@UF1:' AND CASE WHEN name LIKE 'f:%' AND json_valid(payload) THEN substr(json_extract(payload,'$.person'),1,5) IS NOT '@UF1:' ELSE 1 END)
@@ -398,9 +479,10 @@ export class CloudStorage {
   }
   async compact({ userId = null, limit = 10 } = {}) {
     // Compare-and-swap: maintenance cannot overwrite a simultaneous user edit or deletion.
-    let count = 0,
+    let count = await this.repack({userId,limit}),
       processedBytes = 0;
     const budget = 5 * 1024 * 1024;
+    if (count >= limit) return count;
     const records = await this.all(
       `SELECT user_id,name,payload FROM records WHERE payload IS NOT NULL AND substr(payload,1,5)<>'@UF1:' AND CASE WHEN name LIKE 'f:%' AND json_valid(payload) THEN substr(json_extract(payload,'$.person'),1,5) IS NOT '@UF1:' ELSE 1 END ${userId ? "AND user_id=?" : ""} LIMIT ?`,
       ...(userId ? [userId] : []),

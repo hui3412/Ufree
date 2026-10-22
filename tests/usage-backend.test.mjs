@@ -67,7 +67,7 @@ test("logical quota counters remain exact for compression, updates, tombstones a
       Number(
         f.sql
           .prepare(
-            "SELECT COALESCE(SUM(CASE WHEN substr(r.payload,1,5)='@UF1:' THEN o.raw_bytes ELSE length(CAST(r.payload AS BLOB)) END),0) AS n FROM records r LEFT JOIN cloud_objects o ON o.id=substr(r.payload,6) WHERE r.user_id=? AND r.name NOT LIKE 'f:%'",
+            "SELECT COALESCE(SUM(CASE WHEN substr(r.payload,1,5)='@UF1:' THEN COALESCE(o.logical_bytes,o.raw_bytes) ELSE length(CAST(r.payload AS BLOB)) END),0) AS n FROM records r LEFT JOIN cloud_objects o ON o.id=substr(r.payload,6) WHERE r.user_id=? AND r.name NOT LIKE 'f:%'",
           )
           .get(u.id).n,
       );
@@ -274,8 +274,8 @@ test("completed collections skip migration scans; newly inserted legacy data is 
     f.db.queries = 0;
     await f.call(a, "/sync?since=0");
     assert.ok(
-      f.db.queries <= 3,
-      "auth + revision delta + batched object read only",
+      f.db.queries <= 4,
+      "auth + revision delta + batched envelopes and timetable reads only",
     );
     f.sql
       .prepare(
@@ -319,7 +319,7 @@ test("admin diagnostics reject guests and ordinary accounts before querying D1",
   assert.equal((await call(secret,true,'GET')).status,405);
   assert.equal(f.db.queries,0);
   const good=await call(secret); assert.equal(good.status,200);
-  assert.equal((await good.json()).migration,'0004_usage_efficiency.sql');
+  assert.equal((await good.json()).migration,'0005_schedule_content.sql');
   assert.equal(f.db.queries,2);
   for (const path of ['/','/health']) {
    const r=await worker.fetch(new Request('https://api.test'+path),{});
@@ -337,12 +337,11 @@ test("D1 daily quota errors return a structured pause until midnight UTC",async(
  assert.ok(Number(r.headers.get('Retry-After'))>0);
 });
 
-test('health hotfix is compatible with migration 0003 while quota counters await deployment',async()=>{
+test('public health stays database-free even before required storage migrations',async()=>{
  const f=fixture({through:'0003_cloud_compression.sql'});
  try{
   const a=await f.seed('legacy_schema_hotfix');
-  assert.equal((await f.update(a,'Personal',person())).status,200);
-  assert.deepEqual((await f.call(a,'/sync?since=0')).data.changes.find(x=>x.name==='p:Personal').value,person());
+  assert.equal((await f.call(null,'/')).status,200);
   f.db.queries=0;assert.equal((await f.call(null,'/health')).status,200);assert.equal(f.db.queries,0);
  }finally{f.sql.close();}
 });

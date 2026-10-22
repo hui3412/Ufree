@@ -87,8 +87,8 @@ test("separate accounts reference one immutable compressed schedule; editing and
     assert.ok(object.stored_bytes < object.raw_bytes * 0.25);
     assert.equal(
       f.sql.prepare("SELECT count(*) AS n FROM cloud_objects").get().n,
-      2,
-      "full data plus a distinct privacy projection",
+      3,
+      "shared timetable plus private and privacy envelopes",
     );
     assert.deepEqual(
       (await all(f, b)).data.changes.find((r) => r.name === "p:Other name")
@@ -112,7 +112,7 @@ test("separate accounts reference one immutable compressed schedule; editing and
     );
     assert.equal(
       f.sql.prepare("SELECT count(*) AS n FROM cloud_objects").get().n,
-      2,
+      3,
     );
     assert.equal((await f.call(a, "/objects/" + object.id)).status, 404);
     assert.equal((await f.call(null, "/sync?since=0")).status, 401);
@@ -141,7 +141,7 @@ test("snapshot and inbox manifests reuse account objects and remain fixed after 
     assert.equal(shareRow.payload, deliveryRow.payload);
     assert.equal(
       f.sql.prepare("SELECT count(*) AS n FROM cloud_objects").get().n,
-      3,
+      4,
       "one full schedule, privacy projection and collection manifest",
     );
     await f.update(a, "Personal", person("Later edit"));
@@ -206,6 +206,7 @@ test("existing JSON migrates without data loss or own revision changes, and all 
         "utf8",
       ),
     );
+    for (const name of ["0004_usage_efficiency.sql","0005_schedule_content.sql"]) f.sql.exec(fs.readFileSync(new URL("../backend/migrations/"+name,import.meta.url),"utf8"));
     const storage = new CloudStorage(f.db);
     assert.deepEqual(
       await storage.people(

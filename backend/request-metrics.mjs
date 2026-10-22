@@ -53,6 +53,7 @@ export const requestRoute = (path) =>
           "/",
           "/health",
           "/admin/diagnostics",
+          "/admin/compact",
           "/auth/signup",
           "/auth/login",
           "/auth/session",
