@@ -78,31 +78,6 @@ export async function encodeObject(value, kind = "json") {
     children: [],
   };
 }
-// Same explicit privacy projection as migration 0002; never used to replace the full private object.
-export function personalProjection(person) {
-  const out = {
-    classes: person.classes.map((c) =>
-      Object.fromEntries(
-        [
-          "day",
-          "start",
-          "end",
-          "course",
-          "course_code",
-          "section",
-          "room",
-          "instructor",
-          "kind",
-        ]
-          .filter((k) => typeof c[k] === "string")
-          .map((k) => [k, c[k]]),
-      ),
-    ),
-  };
-  if (person.semester !== undefined && person.semester !== null)
-    out.semester = person.semester;
-  return out;
-}
 export class CloudStorage {
   constructor(db) {
     this.db = db;
@@ -117,7 +92,7 @@ export class CloudStorage {
   async all(sql, ...args) {
     return (await this.stmt(sql, ...args).all()).results;
   }
-  async prepare(value, { schedule = false, kind = "json", projection = true } = {}) {
+  async prepare(value, { schedule = false, kind = "json" } = {}) {
     if (schedule) {
       // Names and import provenance never participate in the shared timetable ID.
       // Normalize only representation differences; retain the exact original in patches.
@@ -137,12 +112,6 @@ export class CloudStorage {
       if (object.logicalBytes > MAX_RAW) throw Error("Cloud object exceeds its decoded limit.");
       object.children = [core.id];
       const objects = new Map([[core.id,core],[object.id,object]]);
-      if (projection) {
-        const projected = await this.prepare(personalProjection(value), {schedule:true,projection:false});
-        object.personal = projected.ref.slice(PREFIX.length);
-        if (object.personal !== object.id) object.children.push(object.personal);
-        for (const [id,o] of projected.objects) if (!objects.has(id)) objects.set(id,o);
-      }
       return {ref:PREFIX+object.id, objects};
     }
     const cacheKey = kind + ":" + canonical(value);
@@ -150,22 +119,13 @@ export class CloudStorage {
       this.encoded.set(cacheKey, encodeObject(value, kind));
     const object = { ...(await this.encoded.get(cacheKey)), children: [] },
       objects = new Map([[object.id, object]]);
-    if (schedule) {
-      const projected = await encodeObject(personalProjection(value));
-      projected.personal = projected.id;
-      object.personal = projected.id;
-      if (projected.id !== object.id) {
-        object.children.push(projected.id);
-        objects.set(projected.id, projected);
-      }
-    }
     return { ref: PREFIX + object.id, objects };
   }
   async collection(people) {
     const objects = new Map(),
       entries = [];
     for (const [name, person] of Object.entries(people)) {
-      const prepared = await this.prepare(person, {schedule:true,projection:false});
+      const prepared = await this.prepare(person, {schedule:true});
       for (const [id, o] of prepared.objects) objects.set(id, o);
       entries.push([name, prepared.ref.slice(PREFIX.length)]);
     }
@@ -438,6 +398,51 @@ export class CloudStorage {
     }
     return Object.fromEntries(result);
   }
+  // Restore only from this sender's named source, never another account or a guessed match.
+  async completePeople(userId, people) {
+    if (!userId) return {people, recovered:0, unresolved:Object.keys(people).length};
+    const names = Object.keys(people), rows = [];
+    for (let i=0;i<names.length;i+=40) {
+      const group=names.slice(i,i+40).map(name => "p:"+name);
+      rows.push(...await this.all(`SELECT name,payload,revision FROM records WHERE user_id=? AND name IN (${group.map(()=>"?").join(",")}) AND payload IS NOT NULL`,userId,...group));
+    }
+    const source = new Map((await this.records(rows)).map(row => [row.name.slice(2),row.value]));
+    let recovered=0, unresolved=0;
+    const result=[];
+    for (const [name,person] of Object.entries(people)) {
+      const original=source.get(name);
+      if (original && compatibleSnapshot(person,original)) {
+        if (canonical(person)!==canonical(original)) recovered++;
+        result.push([name,original]);
+      } else { unresolved++; result.push([name,person]); }
+    }
+    return {people:Object.fromEntries(result),recovered,unresolved};
+  }
+  async repairShares({limit=5}={}) {
+    const jobs=await this.all("SELECT * FROM cloud_share_repair WHERE status='pending' LIMIT ?",limit);
+    for (const job of jobs) {
+      if (!["shares","deliveries"].includes(job.target)) throw Error("Invalid repair job.");
+      const owner=job.target==='shares'?'owner_id':'sender_id';
+      const row=await this.stmt(`SELECT payload,${owner} AS owner_id FROM ${job.target} WHERE id=?`,job.row_key).first();
+      let status='missing', recovered=0, unresolved=0;
+      if (row) {
+        const before=await this.people(row.payload);
+        const result=await this.completePeople(row.owner_id,before);
+        recovered=result.recovered; unresolved=result.unresolved;
+        status=unresolved?'unresolved':recovered?'recovered':'complete';
+        if (recovered) {
+          const prepared=await this.collection(result.people);
+          await this.stage([prepared]);
+          if (canonical(await this.people(prepared.ref))!==canonical(result.people)) throw Error('Share restoration failed verification.');
+          const update=await this.stmt(`UPDATE ${job.target} SET payload=? WHERE id=? AND payload=?`,prepared.ref,job.row_key,row.payload).run();
+          if (!update.meta.changes) continue;
+          if (job.target==='deliveries') await this.stmt("UPDATE users SET inbox_revision=inbox_revision+1 WHERE id=(SELECT recipient_id FROM deliveries WHERE id=? AND status='pending')",job.row_key).run();
+        }
+      }
+      await this.stmt("UPDATE cloud_share_repair SET status=?,recovered=?,unresolved=? WHERE target=? AND row_key=?",status,recovered,unresolved,job.target,job.row_key).run();
+    }
+    return jobs.length;
+  }
   async repack({userId = null, limit = 10} = {}) {
     const jobs = await this.all(`SELECT * FROM cloud_repack ${userId ? "WHERE user_id=?" : ""} LIMIT ?`, ...(userId ? [userId] : []), limit);
     let count=0, bytes=0;
@@ -546,7 +551,7 @@ export class CloudStorage {
     return count;
   }
   async collect(now = Date.now()) {
-    // A single atomic reachability delete protects all accounts, snapshots, inboxes and live projections.
+    // A single atomic reachability delete protects all accounts, snapshots, inboxes and live schedules.
     await this.stmt(
       `WITH RECURSIVE roots(id) AS (
     SELECT substr(payload,6) FROM records WHERE substr(payload,1,5)='@UF1:'
@@ -559,4 +564,18 @@ export class CloudStorage {
       now - HOLD,
     ).run();
   }
+}
+
+// Every populated shared field must agree with the retained source. Class order may differ.
+function compatibleSnapshot(snapshot, original) {
+  if (!Array.isArray(snapshot.classes) || !Array.isArray(original.classes) || snapshot.classes.length!==original.classes.length) return false;
+  const sameFields=(a,b)=>Object.entries(a).every(([key,value]) => value==null || value==="" || (Object.hasOwn(b,key) && canonical(value)===canonical(b[key])));
+  if (!sameFields(Object.fromEntries(Object.entries(snapshot).filter(([k])=>k!=="classes")),original)) return false;
+  const remaining=[...original.classes];
+  for (const row of snapshot.classes) {
+    const index=remaining.findIndex(c=>c.day===row.day && c.start===row.start && c.end===row.end && sameFields(row,c));
+    if (index<0) return false;
+    remaining.splice(index,1);
+  }
+  return true;
 }

@@ -87,8 +87,8 @@ test("separate accounts reference one immutable compressed schedule; editing and
     assert.ok(object.stored_bytes < object.raw_bytes * 0.25);
     assert.equal(
       f.sql.prepare("SELECT count(*) AS n FROM cloud_objects").get().n,
-      3,
-      "shared timetable plus private and privacy envelopes",
+      2,
+      "shared timetable and full schedule envelope",
     );
     assert.deepEqual(
       (await all(f, b)).data.changes.find((r) => r.name === "p:Other name")
@@ -112,7 +112,7 @@ test("separate accounts reference one immutable compressed schedule; editing and
     );
     assert.equal(
       f.sql.prepare("SELECT count(*) AS n FROM cloud_objects").get().n,
-      3,
+      2,
     );
     assert.equal((await f.call(a, "/objects/" + object.id)).status, 404);
     assert.equal((await f.call(null, "/sync?since=0")).status, 401);
@@ -141,8 +141,8 @@ test("snapshot and inbox manifests reuse account objects and remain fixed after 
     assert.equal(shareRow.payload, deliveryRow.payload);
     assert.equal(
       f.sql.prepare("SELECT count(*) AS n FROM cloud_objects").get().n,
-      4,
-      "one full schedule, privacy projection and collection manifest",
+      3,
+      "one full schedule, shared timetable and collection manifest",
     );
     await f.update(a, "Personal", person("Later edit"));
     await f.update(a, "Personal", null);
@@ -206,7 +206,7 @@ test("existing JSON migrates without data loss or own revision changes, and all 
         "utf8",
       ),
     );
-    for (const name of ["0004_usage_efficiency.sql","0005_schedule_content.sql"]) f.sql.exec(fs.readFileSync(new URL("../backend/migrations/"+name,import.meta.url),"utf8"));
+    for (const name of ["0004_usage_efficiency.sql","0005_schedule_content.sql","0006_complete_cloud_shares.sql"]) f.sql.exec(fs.readFileSync(new URL("../backend/migrations/"+name,import.meta.url),"utf8"));
     const storage = new CloudStorage(f.db);
     assert.deepEqual(
       await storage.people(
@@ -262,7 +262,7 @@ test("large incompressible values are chunked below D1 row limits and corruption
     f.sql.close();
   }
 });
-test("deduplication retains live privacy projections and stop-following GC cannot delete either private schedule", async () => {
+test("deduplication reuses complete live schedules and stop-following GC cannot delete either private schedule", async () => {
   const f = fixture();
   try {
     const a = await f.seed("live_storage_a"),
@@ -286,9 +286,9 @@ test("deduplication retains live privacy projections and stop-following GC canno
     );
     let delta = (await all(f, b)).data;
     const live = delta.changes.find((r) => r.name === "f:" + a.id).value.person;
-    assert.equal(live.source_file, undefined);
-    assert.equal(live.extra, undefined);
-    assert.equal(live.classes[0].privateNote, undefined);
+    assert.equal(live.source_file, person().source_file);
+    assert.deepEqual(live.extra, person().extra);
+    assert.equal(live.classes[0].privateNote, person().classes[0].privateNote);
     assert.equal(live.classes[0].kind, "lecture");
     await f.update(a, "Personal", person("New live version"));
     delta = (await all(f, b)).data;

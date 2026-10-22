@@ -222,9 +222,9 @@ test("follow requests notify only the recipient and both personal schedules rema
       );
       assert.equal(row.value.username, source.username);
       assert.equal(row.value.person.classes[0].course, "Fictional Math");
-      assert.equal(row.value.person.school, undefined);
-      assert.equal(row.value.person.source_file, undefined);
-      assert.equal(row.value.person.classes[0].privateNote, undefined);
+      assert.equal(row.value.person.school, person().school);
+      assert.equal(row.value.person.source_file, person().source_file);
+      assert.equal(row.value.person.classes[0].privateNote, person().classes[0].privateNote);
     }
     assert.equal(
       (await f.call(b, "/deliveries")).data.followRequests.length,

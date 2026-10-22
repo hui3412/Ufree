@@ -747,30 +747,10 @@
         input = element("input", "", label, { type: "checkbox" });
       choices.push([name, input]);
     }
-    const detailLabel = element(
-        "label",
-        "Include course names, rooms and teachers",
-        main,
-      ),
-      details = element("input", "", detailLabel, { type: "checkbox" });
-    const selected = () =>
-      Object.fromEntries(
-        choices
-          .filter(([, input]) => input.checked)
-          .map(([name]) => [
-            name,
-            details.checked
-              ? copy(values[name])
-              : {
-                  semester: values[name].semester,
-                  classes: values[name].classes.map(({ day, start, end }) => ({
-                    day,
-                    start,
-                    end,
-                  })),
-                },
-          ]),
-      );
+    element("p", "Includes the complete schedule and all saved details.", main);
+    const selected = () => Object.fromEntries(
+      choices.filter(([,input]) => input.checked).map(([name]) => [name,copy(values[name])]),
+    );
     formButton("Create 48-hour link / code", async () => {
       const result = await request("/shares", { people: selected() });
       const output = element("textarea", "", main, {
@@ -804,7 +784,7 @@
       const snapshot = JSON.stringify(people);
       if (
         !(await confirmDialog(
-          `${tr("Verified recipient")}: @${verified}\n${Object.keys(people).join(", ")}\n${details.checked ? tr("Includes course names, rooms and teachers.") : tr("Includes names, semester and availability only.")}\n${tr(warning)}`,
+          `${tr("Verified recipient")}: @${verified}\n${Object.keys(people).join(", ")}\n${tr("Includes the complete schedule and all saved details.")}\n${tr(warning)}`,
         ))
       )
         return;

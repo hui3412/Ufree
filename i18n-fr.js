@@ -658,6 +658,7 @@ window.UFreeFrench = {
     "Copy the Local collection into Account? Existing Account schedules with the same name will be kept as separate copies.": "Copier la collection locale dans le compte ? Les horaires du compte portant le même nom seront conservés dans des copies distinctes.",
     "Recipients can save, screenshot, or reshare their copy. Deleting your account does not delete their copy. Get permission before sharing someone else's schedule.": "Les destinataires peuvent enregistrer, capturer ou repartager leur copie. La suppression de votre compte ne supprime pas leur copie. Obtenez la permission avant de partager l’horaire d’une autre personne.",
     "Select schedules to share. Shared copies are fixed snapshots and will not receive future edits.": "Sélectionnez les horaires à partager. Les copies partagées sont figées et ne recevront aucune modification ultérieure.",
+    "Includes the complete schedule and all saved details.": "Comprend l’horaire complet et tous les détails enregistrés.",
     "Include course names, rooms and teachers": "Inclure les noms des cours, les locaux et le personnel enseignant",
     "Create 48-hour link / code": "Créer un lien / code de 48 heures",
     "Recipient username": "Nom d’utilisateur du destinataire",

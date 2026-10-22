@@ -405,3 +405,15 @@ test('structured and edge HTML daily quota errors pause cloud requests across re
   } finally {await a.close();}
  }
 });
+test('cloud-sharing controls send all saved details without a filtering checkbox in English and French',async()=>{
+ const full={semester:'Fall 2026',source_file:'original-photo.jpg',savedNote:'Exact',classes:[{day:'Monday',start:'09:00',end:'10:00',course:'Math',course_code:'201',section:'01',room:'A-1',instructor:'Full Teacher Name',custom:'Keep'}]};
+ const a=await app({account:true,extraRecords:{'p:Complete':full},handler:(path)=>path==='/shares'?{code:'UFC1:'+'c'.repeat(64),expiresAt:Date.now()+86400000}:undefined});
+ try{
+ a.el('mobileMenuButton').click();a.el('accountMenuButton').click();buttonWith(a.w,'Cloud sharing').click();
+ assert.doesNotMatch(a.w.document.querySelector('.account-dialog').textContent,/Include course names, rooms and teachers/);
+ const label=[...a.w.document.querySelectorAll('.account-dialog label')].find(label=>label.textContent==='Complete');label.querySelector('input').checked=true;
+ buttonWith(a.w,'Create 48-hour link / code').click();await new Promise(r=>setTimeout(r,30));
+ const request=a.calls.find(call=>new URL(call.url).pathname==='/shares');assert.ok(request);assert.deepEqual(JSON.parse(request.options.body).people,{Complete:full});
+ a.w.UFreeI18n.setLanguage('fr');assert.match(a.w.document.querySelector('.account-dialog').textContent,/Comprend l’horaire complet/);
+ }finally{await a.close();}
+});

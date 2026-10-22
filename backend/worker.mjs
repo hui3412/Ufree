@@ -8,7 +8,7 @@ const ORIGIN = "https://hui3412.github.io";
 const HOUR = 3600000,
   DAY = HOUR * 24;
 const encoder = new TextEncoder();
-const RELEASE = "schedule-content-v2";
+const RELEASE = "complete-cloud-shares-v1";
 const random = () => bytesToHex(crypto.getRandomValues(new Uint8Array(32)));
 const digest = async (value) =>
   bytesToHex(
@@ -263,8 +263,11 @@ export default {
           const input = await bodyJSON(request);
           const limit = input.limit ?? 10;
           if (!Number.isSafeInteger(limit) || limit < 1 || limit > 20) fail("Invalid maintenance limit.");
-          const completed = await new CloudStorage(db).repack({limit});
-          const pending = await one(db,"SELECT count(*) AS n FROM cloud_repack");
+          const storage = new CloudStorage(db);
+          const complete = input.mode === "complete-shares";
+          if (input.mode && !complete) fail("Invalid maintenance mode.");
+          const completed = complete ? await storage.repairShares({limit}) : await storage.repack({limit});
+          const pending = await one(db,complete ? "SELECT count(*) AS n FROM cloud_share_repair WHERE status='pending'" : "SELECT count(*) AS n FROM cloud_repack");
           return respond({completed,pending:pending.n});
         }
         if (!db || (await one(db, "SELECT 1 AS ok"))?.ok !== 1)
@@ -592,7 +595,9 @@ export default {
         const id = random(),
           createdAt = Date.now(),
           expiresAt = createdAt + 48 * HOUR;
-        const prepared = await storage.collection(input.people);
+        const full = await storage.completePeople(user.id,input.people);
+        validatePeople(full.people);
+        const prepared = await storage.collection(full.people);
         await storage.stage([prepared]);
         await run(
           db,
@@ -659,7 +664,9 @@ export default {
         await throttle(db, `send:${user.id}`, 20, DAY);
         await throttle(db, `inbox:${recipient.id}`, 100, DAY);
         const id = crypto.randomUUID();
-        const prepared = await storage.collection(input.people);
+        const full = await storage.completePeople(user.id,input.people);
+        validatePeople(full.people);
+        const prepared = await storage.collection(full.people);
         await storage.stage([prepared]);
         await run(
           db,
@@ -765,6 +772,7 @@ export default {
       ),
     ]);
     await storage.compact({ limit: 100 });
+    await storage.repairShares({limit:5});
     await storage.collect(now);
   },
 };
