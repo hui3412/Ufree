@@ -127,6 +127,7 @@ test("signed-out introduction adds only an account entry and preserves saved Loc
     assert.ok(a.el("peopleList").textContent.includes("Original"));
     assert.deepEqual(JSON.parse(a.w.localStorage.getItem("whos-free-local-schedules")).data.people.Original, record.data.people.Original);
     assert.equal(a.calls.length, 0);
+    assert.equal(a.el("friendsMenuButton"), null);
     assert.equal(a.w.document.querySelector(".account-collection-label"), null);
     a.el("mobileMenuButton").click();
     a.el("accountMenuButton").click();
@@ -426,6 +427,83 @@ test('cloud-sharing controls send all saved details without a filtering checkbox
 });
 
 const snapshotStorage = w => Object.fromEntries(Array.from({length:w.localStorage.length}, (_,i) => {const key=w.localStorage.key(i);return [key,w.localStorage.getItem(key)];}));
+test("Friends opens directly from the drawer; private notes persist, sync and never change shared schedules", async () => {
+  const peer = {username:"David",person:{semester:"Fall 2026",classes:[]}};
+  const connections = [{id:"pair",username:"David",status:"accepted",direction:"outgoing"}];
+  let a = await app({account:true,extraRecords:{"f:peer":peer},handler:path=>path==="/connections"?{connections}:undefined});
+  let saved;
+  try {
+    await settle(() => a.el("peopleList").textContent.includes("@David"));
+    a.el("mobileMenuButton").click();
+    assert.ok(a.el("homeNavigation").contains(a.el("friendsMenuButton")));
+    a.el("friendsMenuButton").click();
+    assert.equal(a.el("mobileMenuButton").getAttribute("aria-expanded"),"false");
+    await settle(() => a.w.document.querySelector(".friend-row"));
+    const row = a.w.document.querySelector(".friend-row"), menu = row.querySelector("details");
+    assert.equal(menu.open,false);
+    assert.equal(row.querySelectorAll(":scope > button").length,0);
+    assert.ok(menu.contains(buttonWith(a.w,"Remove friend")));
+    assert.ok(menu.contains(buttonWith(a.w,"Block")));
+    menu.querySelector("summary").click();
+    assert.equal(menu.open,true);
+    buttonWith(a.w,"Add a note").click();
+    const input = a.w.document.querySelector(".friend-note-dialog input");
+    input.value = "Biology <class>";
+    a.w.UFreeI18n.setLanguage("fr");
+    assert.equal(input.isConnected,true);
+    assert.equal(input.value,"Biology <class>");
+    buttonWith(a.w,"Enregistrer la note").click();
+    assert.equal(row.querySelector(".friend-note").textContent,"Biology <class>");
+    assert.equal(a.el("peopleList").querySelector(".friend-note").textContent,"Biology <class>");
+    assert.equal(a.el("peopleList").querySelector(".friend-note class"),null);
+    a.w.UFreeI18n.setLanguage("en");
+    assert.equal(a.el("peopleList").querySelector(".friend-note").textContent,"Biology <class>");
+    buttonWith(a.w,"Back to account").click();
+    assert.equal(a.w.document.querySelector(".account-actions").textContent.includes("Friends"),false);
+    buttonWith(a.w,"Refresh sync").click();
+    await settle(() => a.calls.some(c=>new URL(c.url).pathname==="/sync" && JSON.parse(c.options?.body||"null")?.changes.some(r=>r.name==="@preferences" && r.value["friend-note:david"]==="Biology <class>")));
+    const value = JSON.parse(a.w.localStorage.getItem("ufree-test-account-v1:test-user")).records;
+    assert.equal(value["@preferences"]["friend-note:david"],"Biology <class>");
+    assert.deepEqual(value["f:peer"],peer);
+    const phone = JSON.parse(a.w.localStorage.getItem("whos-free-local-schedules"));
+    assert.deepEqual(phone.data.people["@David"],peer.person);
+    assert.equal(JSON.stringify(phone).includes("Biology <class>"),false);
+    saved = snapshotStorage(a.w);
+  } finally { await a.close(); }
+  a = await app({savedStorage:saved,handler:()=>{throw Error("Offline");}});
+  try {
+    assert.equal(a.el("peopleList").querySelector(".friend-note").textContent,"Biology <class>");
+  } finally { await a.close(); }
+  delete saved["ufree-test-session-v1"];
+  a = await app({savedStorage:saved});
+  try {
+    assert.equal(a.el("friendsMenuButton"),null);
+    assert.equal(a.el("peopleList").querySelector(".friend-note"),null);
+    assert.equal(a.calls.length,0);
+  } finally { await a.close(); }
+});
+test("friend notes can be cancelled or cleared and three-dot menus close with Escape", async () => {
+  const a = await app({account:true,extraRecords:{"f:peer":{username:"David",person:{semester:"Fall 2026",classes:[]}},"@preferences":{"friend-note:david":"Biology"}},handler:path=>path==="/connections"?{connections:[{id:"pair",username:"David",status:"accepted",direction:"outgoing"}]}:undefined});
+  try {
+    a.el("mobileMenuButton").click(); a.el("friendsMenuButton").click();
+    await settle(() => a.w.document.querySelector(".friend-menu"));
+    const menu = a.w.document.querySelector(".friend-menu"), toggle = menu.querySelector("summary");
+    toggle.click();
+    toggle.dispatchEvent(new a.w.KeyboardEvent("keydown",{key:"Escape",bubbles:true}));
+    assert.equal(menu.open,false);
+    assert.equal(a.w.document.querySelector(".account-dialog").open,true);
+    toggle.click(); buttonWith(a.w,"Add a note").click();
+    a.w.document.querySelector(".friend-note-dialog input").value = "Wrong note";
+    buttonWith(a.w,"Cancel").click();
+    assert.equal(a.w.UFreeAccounts.friendNote("@David"),"Biology");
+    toggle.click(); buttonWith(a.w,"Add a note").click();
+    a.w.document.querySelector(".friend-note-dialog input").value = "";
+    buttonWith(a.w,"Save note").click();
+    assert.equal(a.w.UFreeAccounts.friendNote("@David"),"");
+    assert.equal(a.el("peopleList").querySelector(".friend-note"),null);
+    assert.equal(a.w.document.querySelector(".friend-row .friend-note").textContent,"");
+  } finally { await a.close(); }
+});
 test("signing out reads the same phone collection and signed-out edits merge on return", async () => {
   let a = await app({account:true});
   let storage;

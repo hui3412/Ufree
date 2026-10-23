@@ -43,6 +43,11 @@
   const active = () => !!session?.user?.id;
   const prefix = () => "";
   const key = () => PREFIX + session.user.id;
+  const noteKey = (username) => "friend-note:" + username.toLowerCase();
+  function friendNote(username) {
+    const value = active() && engine?.state.records["@preferences"]?.[noteKey(username)];
+    return typeof value === "string" ? value.slice(0, 100) : "";
+  }
   const tr = (s) => window.UFreeI18n?.translate?.(s) || s;
   const text = (node, s) =>
     window.UFreeI18n
@@ -82,6 +87,10 @@
   }
   function prefs(isLocal = false) {
     const out = {};
+    // Account-only notes never enter the shared phone preferences or schedule exports.
+    for (const [name, value] of Object.entries(engine?.state.records["@preferences"] || {})) {
+      if (name.startsWith("friend-note:") && typeof value === "string") out[name] = value;
+    }
     for (const name of PREFS) {
       const value = localStorage.getItem((isLocal ? "" : prefix()) + name);
       if (value !== null) out[name] = value;
@@ -202,6 +211,7 @@
     active,
     prefix,
     isLive: (name) => liveNames.has(name),
+    friendNote: (name) => friendNote(liveNames.get(name)?.username || ""),
     renamed: (from, to) => {
       if (!active()) return;
       const pending = pendingPersonal();
@@ -369,6 +379,7 @@
   function renderStatus() {
     if (!status) return;
     if (!session) return;
+    for (const note of main.querySelectorAll("[data-friend-note]")) note.textContent = friendNote(note.dataset.friendNote);
     const parts = [
       active() ? "Signed in: syncing this device" : "Signed out: saved on this device",
     ];
@@ -399,6 +410,20 @@
       open,
     );
     button.id = "accountMenuButton";
+    if (active()) {
+      const friends = action("", nav.querySelector(".header-actions"), () => {
+        if (!active()) return;
+        focusBefore = bridge.prepareDialog();
+        panel.showModal();
+        return followingForm();
+      });
+      friends.id = "friendsMenuButton";
+      friends.classList.add("header-data-button");
+      friends.setAttribute("aria-haspopup", "dialog");
+      const icon = document.getElementById("viewToggleButton")?.querySelector("svg");
+      if (icon) friends.append(icon.cloneNode(true));
+      element("span", "Friends", friends, {class: "nav-button-label"});
+    }
     panel = element("dialog", "", document.body, {
       class: "account-dialog",
       "aria-labelledby": "accountDialogTitle",
@@ -410,6 +435,9 @@
     status = element("p", "", panel, { role: "status", "aria-live": "polite" });
     panel.addEventListener("click", (event) => {
       if (event.target === panel) close();
+      for (const menu of panel.querySelectorAll(".friend-menu[open]")) {
+        if (!menu.contains(event.target)) menu.open = false;
+      }
     });
     window.addEventListener("online", () => sync(true).catch(showError));
     document.addEventListener("visibilitychange", () => {
@@ -480,6 +508,7 @@
   }
   function render() {
     clear();
+    text(document.getElementById("accountDialogTitle"), "Account");
     if (!session) {
       authForm(false);
       return;
@@ -495,7 +524,6 @@
     const controls = element("div", "", main, { class: "account-actions" });
     action("Refresh sync", controls, () => sync(true));
     action("Find accounts", controls, searchAccounts);
-    action("Friends", controls, followingForm);
     action("Your personal schedule", controls, personalForm);
     action("Cloud sharing", controls, sharing);
     action("Inbox", controls, () => inbox(true));
@@ -1120,45 +1148,85 @@
     });
     backToAccount();
   }
+  function editFriendNote(username, returnFocus) {
+    const dialog = element("dialog", "", document.body, {class: "account-dialog friend-note-dialog", "aria-labelledby": "friendNoteTitle"});
+    element("h2", "Add a note", dialog, {id: "friendNoteTitle"});
+    element("p", "@" + username, dialog, {"data-no-translate": ""});
+    element("p", "Only you can see this note. Leave it empty to remove it.", dialog);
+    const label = element("label", "", dialog);
+    element("span", "Note", label);
+    const input = element("input", "", label, {type: "text", maxlength: "100", autocomplete: "off"});
+    input.value = friendNote(username);
+    const finish = () => { dialog.close(); dialog.remove(); returnFocus?.focus(); };
+    const save = action("Save note", dialog, () => {
+      if (!active() || !input.reportValidity()) return;
+      engine.save({...engine.state.records, "@preferences": {...prefs(), [noteKey(username)]: input.value.trim()}});
+      for (const note of main.querySelectorAll("[data-friend-note]")) {
+        note.textContent = friendNote(note.dataset.friendNote);
+      }
+      bridge.refresh();
+      finish();
+      text(status, "Note saved.");
+    });
+    action("Cancel", dialog, finish);
+    input.addEventListener("keydown", event => {
+      if (event.key === "Enter" && !event.isComposing) { event.preventDefault(); save.click(); }
+    });
+    dialog.addEventListener("cancel", event => { event.preventDefault(); finish(); });
+    dialog.addEventListener("click", event => { if (event.target === dialog) finish(); });
+    dialog.showModal();
+    input.focus();
+  }
   async function followingForm() {
     clear();
-    element("h3", "Friends", main);
+    text(document.getElementById("accountDialogTitle"), "Friends");
     element(
       "p",
       "Friends appear as @username in the main list. Their schedules refresh each time you sign in or open UFree. Offline copies remain available until the next sync.",
       main,
     );
-    const list = element("div", "", main, { class: "follow-results" });
+    action("Find accounts", main, searchAccounts);
+    const list = element("div", "", main, { class: "follow-results friends-list" });
     backToAccount();
     const result = await request("/connections");
     if (!list.isConnected) return;
     if (!result.connections.length)
       element("p", "You are not friends with anyone yet.", list);
     for (const connection of result.connections) {
-      const row = element("section", "", list, { class: "follow-result" });
-      element("p", "@" + connection.username, row, { "data-no-translate": "" });
-      element(
+      const row = element("section", "", list, { class: "follow-result friend-row" });
+      const identity = element("div", "", row, {class: "friend-identity"});
+      const name = element("div", "", identity, {class: "friend-name"});
+      element("span", "@" + connection.username, name, { "data-no-translate": "" });
+      element("span", friendNote(connection.username), name, {class: "friend-note", "data-no-translate": "", "data-friend-note": connection.username});
+      if (connection.status !== "accepted") element(
         "p",
-        connection.status === "accepted"
-          ? "Friends"
-          : connection.direction === "incoming"
+        connection.direction === "incoming"
             ? "This person wants to add you as a friend."
             : "Friend request pending.",
-        row,
+        identity,
       );
-      if (connection.status === "accepted")
-        element("p", "Their schedule is available in the main list.", row);
+      const menu = element("details", "", row, {class: "friend-menu"});
+      const toggle = element("summary", "", menu, {"aria-label": "Friend options", title: "Friend options"});
+      element("span", "⋮", toggle, {"aria-hidden": "true", "data-no-translate": ""});
+      menu.addEventListener("toggle", () => {
+        if (menu.open) for (const other of list.querySelectorAll(".friend-menu[open]")) if (other !== menu) other.open = false;
+      });
+      menu.addEventListener("keydown", event => {
+        if (event.key === "Escape" && menu.open) { event.preventDefault(); event.stopPropagation(); menu.open = false; toggle.focus(); }
+      });
+      const actions = element("div", "", menu, {class: "friend-menu-actions"});
+      action("Add a note", actions, () => { menu.open = false; editFriendNote(connection.username, toggle); });
       if (
         connection.direction === "incoming" &&
         connection.status === "pending"
       )
-        action("Accept friend request", row, () => followBack(connection.username));
+        action("Accept friend request", actions, () => followBack(connection.username));
       else
         action(
           connection.status === "accepted"
             ? "Remove friend"
             : "Cancel request",
-          row,
+          actions,
           async () => {
             if (
               !(await confirmDialog(
@@ -1176,7 +1244,7 @@
             await sync(true);
           },
         );
-      action("Block", row, async () => {
+      action("Block", actions, async () => {
         if (
           !(await confirmDialog(
             "@" +

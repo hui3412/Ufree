@@ -3043,6 +3043,21 @@ html[lang="fr"] .nav-extra-label, html[lang="fr"] .nav-button-label { min-width:
 .follow-result { border: 1px solid var(--border, #555); border-radius: 12px; padding: 12px; }
 .follow-result p { margin: 6px 0 10px; }
 .live-personal-label { display: block; font-size: .75rem; color: var(--muted); }
+.friends-list { gap: 0; }
+.friend-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border: 0; border-bottom: 1px solid var(--border); border-radius: 0; }
+.friend-identity { flex: 1; min-width: 0; }
+.friend-name { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; overflow-wrap: anywhere; }
+.friend-note { color: var(--muted); font-size: .85em; font-weight: 400; white-space: normal; overflow-wrap: anywhere; }
+.person-name .friend-note { margin-left: .4em; }
+.friend-identity p { font-size: .8rem; color: var(--muted); margin: 3px 0 0; }
+.friend-menu { position: relative; flex: 0 0 auto; }
+.friend-menu summary { display: flex; align-items: center; justify-content: center; list-style: none; cursor: pointer; min-width: 44px; min-height: 44px; border-radius: 8px; font-size: 1.7rem; }
+.friend-menu summary::-webkit-details-marker { display: none; }
+.friend-menu summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.friend-menu[open] { z-index: 2; }
+.friend-menu-actions { position: absolute; right: 0; top: 100%; display: grid; width: min(240px, 65vw); padding: 6px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel, #232428); box-shadow: 0 6px 20px rgb(0 0 0 / .25); }
+.friend-menu-actions button { text-align: left; margin: 2px; }
+.friends-list:has(.friend-menu[open]) { padding-bottom: 170px; }
 
 .site-legal-footer { text-align: center; padding: 1rem .75rem; color: var(--muted); }
 .site-legal-links { font-size: .8rem; line-height: 1.7; }

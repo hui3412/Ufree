@@ -4551,7 +4551,16 @@ const SYNC_URL = 'https://youfree.ca';
     setUiAttribute(personName, "aria-label", `View details for ${displayName(name)}`);
     personName.setAttribute("aria-pressed", String(selected));
     personName.setAttribute("aria-describedby", "personOrderHelp");
-    setUiText(personName, displayName(name), false);
+    const username = document.createElement("span");
+    setUiText(username, displayName(name), false);
+    personName.append(username);
+    const friendNote = window.UFreeAccounts?.friendNote(name);
+    if (friendNote) {
+      const note = document.createElement("span");
+      note.className = "friend-note";
+      setUiText(note, friendNote, false);
+      personName.append(" ", note);
+    }
     if (pinned) {
       const pinMark = document.createElement("span");
       pinMark.className = "person-pin-mark";
@@ -5497,6 +5506,7 @@ const SYNC_URL = 'https://youfree.ca';
       await openSharedLink();
       window.UFreeAccounts?.ready({
         snapshot: () => ({ data: JSON.parse(JSON.stringify(state.data || { people: {} })), meta: state.scheduleMeta }),
+        refresh: () => refresh({preserveScroll: true}),
         writeDevice: writeDeviceScheduleRecord,
         localSnapshot: readLegacyLocalScheduleRecord,
         prepareDialog: () => {
