@@ -20,5 +20,8 @@
   },
   "build": {
     "command": "node backend/prepare-deploy.mjs"
-  }
+  },
+  "compatibility_flags": [
+    "nodejs_compat"
+  ]
 }

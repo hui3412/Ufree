@@ -1,14 +1,14 @@
 import { measureDatabase, requestRoute } from "./request-metrics.mjs";
 import { CloudStorage } from "./cloud-storage.mjs";
 import { following, followRequests } from "./following.mjs";
-import { scryptAsync } from "@noble/hashes/scrypt";
+import { scrypt } from "node:crypto";
 import { bytesToHex, hexToBytes } from "@noble/hashes/utils";
 
 const ORIGIN = "https://hui3412.github.io";
 const HOUR = 3600000,
   DAY = HOUR * 24;
 const encoder = new TextEncoder();
-const RELEASE = "complete-cloud-shares-v1";
+const RELEASE = "complete-cloud-shares-native-auth-v1";
 const random = () => bytesToHex(crypto.getRandomValues(new Uint8Array(32)));
 const digest = async (value) =>
   bytesToHex(
@@ -31,13 +31,14 @@ function safeEqual(a, b) {
   return diff === 0;
 }
 export async function passwordHash(password, salt = random()) {
-  // OWASP scrypt profile: N=2^15, r=8, p=3; ~32 MiB. Requires a sufficient Worker CPU allowance.
-  const value = await scryptAsync(password, hexToBytes(salt), {
-    N: 32768,
-    r: 8,
-    p: 3,
-    dkLen: 32,
-    maxmem: 64 * 1024 * 1024,
+  // Preserve the existing scrypt profile and hash format, using the runtime's native implementation.
+  const value = await new Promise((resolve, reject) => {
+    scrypt(password, hexToBytes(salt), 32, {
+      N: 32768,
+      r: 8,
+      p: 3,
+      maxmem: 64 * 1024 * 1024,
+    }, (error, key) => error ? reject(error) : resolve(key));
   });
   return `scrypt$32768$8$3$${salt}$${bytesToHex(value)}`;
 }
