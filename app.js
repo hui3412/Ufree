@@ -1216,9 +1216,8 @@ const SYNC_URL = 'https://youfree.ca';
   }
 
   function displayName(name) {
-    const onlineNickname=window.UFreeAccounts?.nickname?.(name);
     const nickname = String(state.nicknames[name] || "").trim();
-    return nickname || (onlineNickname ? `${onlineNickname} (${name})` : name);
+    return nickname || name;
   }
 
   function loadPersonOrders() {
@@ -2598,7 +2597,6 @@ const SYNC_URL = 'https://youfree.ca';
   }
 
   function openManualSchedule(name = "", person = { source_file: "manual", classes: [] }) {
-    if (window.UFreeAccounts?.active()) { window.UFreeAccounts.profile(); return; }
     if (window.UFreeAccounts?.isLive(name)) { showToast("Live personal schedules are read-only. Manage following in Account."); return; }
     if (!schedulesWritable() || state.isParsing || state.pendingImage) return;
     state.pendingImage = { name, person, editingName: name || null };
@@ -2612,7 +2610,7 @@ const SYNC_URL = 'https://youfree.ca';
     els.imageReview.hidden = false;
     openScheduleModal();
     updateScheduleModal();
-    setImageStatus("Check each course name, day and time before saving. Empty time is free.", "success");
+    setImageStatus("Check the schedule or choose Add a class to add busy time. Empty time is free; labels are optional.", "success");
     revealSection(els.imageReview, els.imageReviewName);
   }
 
@@ -2648,7 +2646,6 @@ const SYNC_URL = 'https://youfree.ca';
   }
 
   async function handleScheduleImage(event) {
-    if (window.UFreeAccounts?.active()) {showToast("Switch to Local schedules to import fixed copies.");return;}
     const file = event.target.files?.[0];
     if (!schedulesWritable() || !file || state.isParsing || state.pendingImage) return;
     if (els.scheduleModal.hidden) openScheduleModal();
@@ -2700,7 +2697,6 @@ const SYNC_URL = 'https://youfree.ca';
       review_warning: card.dataset.warning,
       ...(card.dataset.confidence ? { recognition_confidence: Number(card.dataset.confidence) } : {}),
     } : {}) }));
-    if (classes.some(c=>typeof c.course!=="string" || !c.course.trim())) {setUiText(els.imageReviewError,"Every class needs a course name, day, start time and later end time.");return;}
     // An empty manual schedule represents someone with no busy times.
     const workingData = state.hasData ? JSON.parse(JSON.stringify(state.data)) : { schema_version: 1, people: {} };
     const isPicture = state.pendingImage.isPicture;
@@ -3127,7 +3123,6 @@ const SYNC_URL = 'https://youfree.ca';
   }
 
   async function handleSchedulePdfs(event) {
-    if (window.UFreeAccounts?.active()) {showToast("Switch to Local schedules to import fixed copies.");return;}
     if (!schedulesWritable() || state.isParsing || state.pendingImage || state.codeMode) return;
     const files = Array.from(event.target.files || []);
     if (!files.length) return;
@@ -3380,7 +3375,6 @@ const SYNC_URL = 'https://youfree.ca';
   }
 
   function openQuickCodePanel(mode, event) {
-    if (mode === "import" && window.UFreeAccounts?.active()) { window.UFreeAccounts.profile(); return; }
     if (state.isParsing || state.pendingImage || state.codeMode || (mode === "export" && !Object.keys(peopleMap()).length)) return;
     if (!els.helpModal.hidden) closeHelp();
     state.quickExportReturnFocus = usesDrawerNavigation() ? mobileMenuButton : event?.currentTarget || (mode === "import" ? els.homeImportButton : els.homeExportButton);
@@ -3884,7 +3878,6 @@ const SYNC_URL = 'https://youfree.ca';
   }
 
   async function importShareCode({ automatic = false, groupChoice = null } = {}) {
-    if (window.UFreeAccounts?.active()) {showToast("Switch to Local schedules to import fixed copies.");return;}
     if (!state.deviceReady || state.isParsing || state.codeMode !== "import") return;
     if (!automatic && !state.sharedImport && window.UFreeAccounts?.isCloudInput(els.importCodeInput.value)) {
       try { await window.UFreeAccounts.receive(els.importCodeInput.value); }
@@ -3964,7 +3957,6 @@ const SYNC_URL = 'https://youfree.ca';
   }
 
   async function handleLocalScheduleFile(event) {
-    if (window.UFreeAccounts?.active()) {showToast("Switch to Local schedules to import fixed copies.");return;}
     if (!schedulesWritable() || state.isParsing || state.pendingImage || state.codeMode) return;
     const [file] = event.target.files || [];
     if (!file) return;
@@ -4226,7 +4218,7 @@ const SYNC_URL = 'https://youfree.ca';
     const peopleCount = Object.keys(peopleMap()).length;
     renderPeopleManager();
     const importBusy = !state.deviceReady || state.isParsing || Boolean(state.pendingImage) || Boolean(state.codeMode);
-    const writeBlocked = !schedulesWritable() || Boolean(window.UFreeAccounts?.active());
+    const writeBlocked = !schedulesWritable();
     els.exportSchedulesButton.disabled = importBusy || peopleCount === 0;
     els.homeExportButton.disabled = importBusy || peopleCount === 0;
     if (els.homeImportButton) els.homeImportButton.disabled = importBusy;
@@ -4255,7 +4247,7 @@ const SYNC_URL = 'https://youfree.ca';
     els.manualScheduleButton.disabled = writeBlocked || importBusy;
     els.importSchedulesButton.disabled = writeBlocked || importBusy;
     els.shareSchedulesButton.disabled = importBusy || !state.hasData || peopleCount === 0;
-    els.removeSchedulesButton.disabled = importBusy || !state.hasData || Boolean(window.UFreeAccounts?.active());
+    els.removeSchedulesButton.disabled = importBusy || !state.hasData;
     els.saveImageScheduleButton.disabled = writeBlocked || state.isParsing || Boolean(state.duplicatePicture);
     els.cancelImageScheduleButton.disabled = state.isParsing;
 
@@ -5492,6 +5484,16 @@ const SYNC_URL = 'https://youfree.ca';
           state.nicknames = { ...saved.nicknames }; state.pinnedPeople = new Set(saved.pinnedPeople);
           Object.assign(state, loadGroupPreferences()); loadPersonOrders();
           await loadSchedulesFromDevice();
+        },
+        importPeople: async people => {
+          if (!schedulesWritable() || state.isParsing || state.pendingImage) throw new Error("Finish the current import or export first.");
+          const incoming = { people: JSON.parse(JSON.stringify(people)) }; validateData(incoming); applyAutomaticSemester(incoming);
+          const merged = await window.WhosFreeShareCode.merge(state.hasData ? state.data : null, incoming, () => "both");
+          const before = captureScheduleChange(); state.data = merged.data;
+          const warning = await persistCurrentDatabase("Imported cloud snapshot");
+          if (warning) throw new Error(warning);
+          rememberScheduleChange(before, "Imported cloud snapshot");
+          showToast("Imported cloud snapshot");
         },
       });
       maybeShowSingleScheduleReminder();

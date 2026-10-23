@@ -40,9 +40,6 @@
     lastActivityCheck = Date.now();
   try {
     session = JSON.parse(localStorage.getItem(SESSION) || "null");
-    if (session?.user?.modelVersion !== 2) {
-      session=null;localStorage.removeItem(SESSION);localStorage.setItem(VIEW,"local");
-    }
     mode =
       localStorage.getItem(VIEW) === "account" && session?.user?.id
         ? "account"
@@ -97,7 +94,18 @@
     return out;
   }
   function records(record, preferences = prefs()) {
-    return {...engine?.state.records,"@preferences":preferences};
+    const people = copy(record?.data?.people || {});
+    for (const person of Object.values(people))
+      if (person.classes === undefined) person.classes = [];
+    return {
+      ...Object.fromEntries(
+        Object.entries(people)
+          .filter(([name]) => !liveNames.has(name))
+          .map(([name, value]) => ["p:" + name, value]),
+      ),
+      ...linkedRecords(),
+      "@preferences": preferences,
+    };
   }
   function linkedRecords() {
     return Object.fromEntries(
@@ -106,8 +114,37 @@
       ),
     );
   }
-  function pendingPersonal() {return null;}
-  async function flushPersonalChange() {}
+  function pendingPersonal() {
+    const raw = localStorage.getItem(key() + ":personal-change");
+    return raw ? JSON.parse(raw) : null;
+  }
+  async function flushPersonalChange() {
+    if (!session || !engine) return;
+    if (personalChangeTask) return personalChangeTask;
+    personalChangeTask = (async () => {
+      const pending = pendingPersonal();
+      if (!pending || !engine.state.base["p:" + pending.to]) return;
+      const current =
+        engine.state.personalSchedule ?? session.user.personalSchedule;
+      if (current !== pending.to) {
+        if (current !== pending.from)
+          throw Error(
+            "Your personal schedule selection changed on another device. Choose it again.",
+          );
+        await request("/profile/personal-schedule", {
+          name: pending.to,
+          expected: pending.from,
+        });
+      }
+      session.user.personalSchedule = pending.to;
+      localStorage.setItem(SESSION, JSON.stringify(session));
+      engine.persist({ ...engine.state, personalSchedule: pending.to });
+      localStorage.removeItem(key() + ":personal-change");
+    })().finally(() => {
+      personalChangeTask = null;
+    });
+    return personalChangeTask;
+  }
   function peopleFromRecords(values) {
     return Object.fromEntries(
       Object.entries(values)
@@ -125,14 +162,8 @@
     }
   }
   function accountRecord() {
-    const people = {};
+    const people = peopleFromRecords(engine.state.records);
     liveNames.clear();
-    const own = engine.state.records["p:Personal"];
-    if (own) {
-      const label="@"+session.user.username;
-      people[label]=copy(own);
-      liveNames.set(label,{id:session.user.id,username:session.user.username,nickname:engine.state.records["@profile"]?.nickname || ""});
-    }
     for (const [name, value] of Object.entries(linkedRecords()).sort(
       ([a], [b]) => a.localeCompare(b),
     )) {
@@ -147,7 +178,7 @@
       while (Object.hasOwn(people, label))
         label = `@${value.username} (${index++})`;
       people[label] = copy(value.person);
-      liveNames.set(label, { id: name.slice(2), username: value.username, nickname:value.nickname || "" });
+      liveNames.set(label, { id: name.slice(2), username: value.username });
     }
     return {
       data: { people },
@@ -177,15 +208,32 @@
     active,
     prefix,
     isLive: (name) => active() && liveNames.has(name),
-    nickname: (name) => active() ? liveNames.get(name)?.nickname || "" : "",
-    profile: () => { if (!session) return open(); if (!panel.open) {focusBefore=bridge.prepareDialog();panel.showModal();} profileForm(); },
-    renamed: () => {},
+    renamed: (from, to) => {
+      if (!active()) return;
+      const pending = pendingPersonal();
+      const selected =
+        pending?.to ??
+        engine.state.personalSchedule ??
+        session.user.personalSchedule;
+      if (selected !== from) return;
+      localStorage.setItem(
+        key() + ":personal-change",
+        JSON.stringify({ from: pending?.from ?? from, to }),
+      );
+      engine.check(true).then(flushPersonalChange).catch(showError);
+    },
     uiIdle: () => {
       if (needsReload) queueMicrotask(applySync);
     },
     read: () => accountRecord(),
-    save: () => { throw Error("Online schedules are read-only here. Edit your schedule in Profile."); },
-    clear: () => { throw Error("Online schedules are attached to accounts. Manage your followers in Profile."); },
+    save: (record) => {
+      engine.save(records(record));
+      return { ...record, data: accountRecord().data };
+    },
+    clear: () => {
+      engine.save({ ...linkedRecords(), "@preferences": prefs() });
+      return true;
+    },
     preferences: () => {
       if (active() && ready)
         engine.save({ ...engine.state.records, "@preferences": prefs() });
@@ -210,7 +258,17 @@
         )
       );
     },
-    async receive() { throw Error("Cloud snapshot sharing has been removed."); },
+    async receive(value) {
+      const id = value.trim().match(/(?:UFC1:|#cloud=)([a-f0-9]{64})$/i)?.[1];
+      if (!id) throw Error("Invalid cloud code.");
+      if (!session)
+        await notice(
+          "Create an account to send cloud snapshots and sync your schedules. You can receive this snapshot without an account.",
+        );
+      const result = await request("/shares/" + id, undefined, false);
+      await bridge.importPeople(result.people);
+      return true;
+    },
   };
   let panel, button, status, main, focusBefore;
   function element(tag, content, parent, attrs = {}) {
@@ -289,7 +347,7 @@
     if (!status) return;
     if (!session) return;
     const parts = [
-      active() ? "Online schedules" : "Local schedules",
+      active() ? "Import destination: Account" : "Import destination: Local",
     ];
     if (engine) {
       parts.push(
@@ -301,7 +359,7 @@
       if (engine.error) parts.push(tr(engine.error));
       if (engine.state.conflicts.length)
         parts.push(
-          tr("Conflicting edits were preserved as local drafts. Review them in Profile."),
+          tr("Conflicting edits were preserved as separate schedules."),
         );
     }
     status.textContent = parts.join(" · ");
@@ -367,14 +425,6 @@
         sync(false).then(applySync).catch(showError);
       }
     });
-    const tabs=element("div","",null,{class:"account-view-switch",role:"group","aria-label":"Schedule collection"});
-    document.querySelector(".people-panel").prepend(tabs);
-    for (const [value,label] of [["local","Local schedules"],["account","Online schedules"]]) {
-      const tab=action(label,tabs,()=>session ? switchView(value) : value==="account" ? open() : undefined);
-      tab.id=value==="local"?"localSchedulesTab":"onlineSchedulesTab";
-      tab.setAttribute("aria-pressed",String(mode===value));
-    }
-    if (session) action("Find accounts",tabs,()=>{if(!panel.open){focusBefore=bridge.prepareDialog();panel.showModal();}searchAccounts();});
     updateCollectionLabels();
     window.addEventListener("ufree:languagechange", () => {
       updateCollectionLabels();
@@ -395,7 +445,7 @@
       }
       text(
         label,
-        active() ? "Online schedules" : "Local schedules",
+        active() ? "Import destination: Account" : "Import destination: Local",
       );
     }
   }
@@ -430,18 +480,18 @@
     });
     element(
       "p",
-      "Local schedules are fixed copies on this device. Online shows your attached schedule and people you mutually follow.",
+      "Local and Account are separate collections. Signing out keeps both saved copies on this device.",
       main,
     );
     const controls = element("div", "", main, { class: "account-actions" });
     action("Local view", controls, () => switchView("local"));
-    action("Online schedules", controls, () => switchView("account"));
+    action("Account view", controls, () => switchView("account"));
     action("Refresh sync", controls, () => sync(true));
-
+    action("Copy Local to Account", controls, copyLocal);
     action("Find accounts", controls, searchAccounts);
-    action("Followers", controls, followingForm);
-    action("Edit profile", controls, profileForm);
-
+    action("Following", controls, followingForm);
+    action("Your personal schedule", controls, personalForm);
+    action("Cloud sharing", controls, sharing);
     action("Inbox", controls, () => inbox(true));
     action("Change password", controls, passwordForm);
     action("Sign in again", controls, () => authForm(false));
@@ -465,62 +515,6 @@
       main,
     );
     renderStatus();
-  }
-  function schoolChooser() {
-    const section = element("section", "", main, {class: "school-picker", "aria-labelledby": "schoolPickerLabel"});
-    element("p", "School", section, {id: "schoolPickerLabel", class: "school-picker-label"});
-    const selected = element("input", "", section, {type: "hidden", id: "selectedCegep"});
-    const details = element("details", "", section, {id: "schoolChooser"});
-    const summary = element("summary", "", details);
-    const placeholder = element("span", "Choose your CEGEP or college", summary);
-    const selection = element("span", "", summary, {"data-no-translate": ""});
-    const content = element("div", "", details, {class: "school-picker-content"});
-    element("label", "Search CEGEPs and colleges", content, {for: "cegepSearch"});
-    const row = element("div", "", content, {class: "school-search-row"});
-    const search = element("input", "", row, {type: "search", id: "cegepSearch", "aria-controls": "cegepResults", autocomplete: "off", maxlength: "200"});
-    const searchButton = action("Search", row, () => renderResults());
-    searchButton.setAttribute("aria-controls", "cegepResults");
-    const count = element("p", "", content, {role: "status", "aria-live": "polite", "aria-atomic": "true", class: "school-result-count"});
-    const number = element("span", "", count, {"data-no-translate": ""});
-    element("span", "Colleges found", count);
-    const results = element("ul", "", content, {id: "cegepResults", class: "school-results"});
-    const empty = element("p", "No matching colleges. Try another search.", content);
-    function renderResults() {
-      const matches = window.UFreeSchools.search(search.value);
-      results.replaceChildren();
-      number.textContent = matches.length + " ";
-      empty.hidden = matches.length > 0;
-      for (const school of matches) {
-        const li = element("li", "", results);
-        const button = element("button", "", li, {type: "button", "data-school-id": school.id, "aria-pressed": String(selected.value === school.id)});
-        element("span", school.name, button, {"data-no-translate": ""});
-        element("small", school.region, button, {"data-no-translate": ""});
-        button.addEventListener("click", () => {
-          selected.value = school.id;
-          selection.textContent = school.name;
-          placeholder.hidden = true;
-          for (const option of results.querySelectorAll("button")) option.setAttribute("aria-pressed", String(option === button));
-          details.open = false;
-          summary.focus();
-        });
-      }
-    }
-    search.addEventListener("input", renderResults);
-    search.addEventListener("keydown", event => {
-      if (event.key === "Enter") {
-        event.preventDefault(); event.stopPropagation(); renderResults();
-      }
-    });
-    details.addEventListener("keydown", event => {
-      if (event.key === "Escape") {
-        event.preventDefault(); event.stopPropagation(); details.open = false; summary.focus();
-      }
-    });
-    renderResults();
-    return {get value() {return selected.value;}, requireSelection() {
-      if (window.UFreeSchools.find(selected.value)) return true;
-      details.open = true; search.focus(); return false;
-    }};
   }
   function authForm(signup) {
     if (signup && session) {
@@ -547,7 +541,7 @@
     password.autocomplete = signup ? "new-password" : "current-password";
     username.pattern = "[A-Za-z0-9_]{3,24}";
     username.maxLength = 24;
-    let school, personal, consent, nickname;
+    let school, personal, consent;
     if (signup) {
       element(
         "p",
@@ -556,7 +550,7 @@
       );
       element(
         "p",
-        "Only the schedule you select as your own is attached to your account. Other Local schedules stay on this device and are never uploaded.",
+        "Creating an account copies all existing Local schedules and preferences to your private Account collection. Your Local collection stays on this device. Later changes are separate.",
         main,
       );
       element(
@@ -564,8 +558,8 @@
         "Cloud storage is not end-to-end encrypted. Your school and personal schedule are not shared automatically.",
         main,
       );
-      nickname=field("Account nickname");nickname.required=false;nickname.maxLength=60;
-      school = schoolChooser();
+      school = field("School");
+      school.maxLength = 200;
       const label = element("label", "Your personal schedule", main);
       personal = element("select", "", label, { required: "" });
       for (const name of Object.keys(bridge.snapshot().data.people))
@@ -585,7 +579,7 @@
       });
       const l = element(
         "label",
-        "I confirm this is my own schedule and agree to attach it to my account.",
+        "I agree to copy my Local collection to my private Account.",
         main,
       );
       consent = element("input", "", l, { type: "checkbox" });
@@ -598,11 +592,9 @@
           password.reportValidity();
           return;
         }
-        if (signup && !school.requireSelection())
-          throw Error("Select a CEGEP or college from the list.");
         if (
           signup &&
-          (!personal.value || !consent.checked)
+          (!school.checkValidity() || !personal.value || !consent.checked)
         )
           throw Error(
             "School, personal schedule and upload consent are required.",
@@ -611,7 +603,6 @@
         localStorage.setItem(probe, "1");
         localStorage.removeItem(probe);
         const snapshot = signup ? bridge.snapshot() : null;
-        if (signup) validateAttached(snapshot.data.people[personal.value]);
         const result = await request(
           "/auth/" + (signup ? "signup" : "login"),
           {
@@ -620,9 +611,8 @@
             ...(signup
               ? {
                   school: school.value,
-                  personalSchedule: "Personal",
-                  nickname: nickname.value.trim(),
-                  people: {Personal:copy(snapshot.data.people[personal.value])},
+                  personalSchedule: personal.value,
+                  people: peopleFromRecords(records(snapshot)),
                   consent: true,
                 }
               : {}),
@@ -634,7 +624,7 @@
         session = result;
         localStorage.setItem(SESSION, JSON.stringify(result));
         setupEngine();
-
+        if (signup) engine.save(records(snapshot, prefs(true)));
         await engine.check(true);
         if (!engine.state.initialized && !signup) {
           localStorage.setItem(VIEW, "local");
@@ -672,6 +662,26 @@
     }
     localStorage.setItem(VIEW, next);
     location.reload();
+  }
+  async function copyLocal() {
+    const record = await bridge.localSnapshot();
+    const confirmed = await confirmDialog(
+      "Copy the Local collection into Account? Existing Account schedules with the same name will be kept as separate copies.",
+    );
+    if (!confirmed) return;
+    const values = copy(engine.state.records);
+    for (const [name, value] of Object.entries(record?.data?.people || {})) {
+      let label = "p:" + name,
+        n = 2;
+      while (
+        Object.hasOwn(values, label) &&
+        JSON.stringify(values[label]) !== JSON.stringify(value)
+      )
+        label = `p:${name} (${n++})`;
+      values[label] = value;
+    }
+    engine.save(values);
+    await sync(true);
   }
   async function applySync() {
     if (!ready || !active() || !needsReload || bridge.isBusy()) return;
@@ -721,6 +731,71 @@
   }
   const warning =
     "Recipients can save, screenshot, or reshare their copy. Deleting your account does not delete their copy. Get permission before sharing someone else's schedule.";
+  function sharing(recipientUsername = "") {
+    clear();
+    element("h3", "Cloud sharing", main);
+    element("p", warning, main);
+    element(
+      "p",
+      "Select schedules to share. Shared copies are fixed snapshots and will not receive future edits.",
+      main,
+    );
+    const values = bridge.snapshot().data.people,
+      choices = [];
+    for (const name of Object.keys(values)) {
+      const label = element("label", name, main, { "data-no-translate": "" }),
+        input = element("input", "", label, { type: "checkbox" });
+      choices.push([name, input]);
+    }
+    element("p", "Includes the complete schedule and all saved details.", main);
+    const selected = () => Object.fromEntries(
+      choices.filter(([,input]) => input.checked).map(([name]) => [name,copy(values[name])]),
+    );
+    formButton("Create 48-hour link / code", async () => {
+      const result = await request("/shares", { people: selected() });
+      const output = element("textarea", "", main, {
+        readonly: "",
+        "aria-label": "Cloud link and code",
+      });
+      output.value = `${location.origin}${location.pathname}#cloud=${result.code.slice(5)}\n${result.code}`;
+      element(
+        "p",
+        `${tr("Expires")}: ${new Date(result.expiresAt).toLocaleString()}`,
+        main,
+      );
+    });
+    const recipient = field("Recipient username", "text", recipientUsername);
+    recipient.addEventListener("input", () => {
+      verified = "";
+    });
+    action("Verify recipient", main, async () => {
+      const result = await request("/users/lookup", {
+        username: recipient.value,
+      });
+      if (!result.username) throw Error("Recipient unavailable.");
+      verified = result.username;
+      status.textContent = `${tr("Verified recipient")}: @${verified}`;
+    });
+    formButton("Send by username", async () => {
+      if (!verified || verified !== recipient.value.toLowerCase())
+        throw Error("Verify the recipient first.");
+      const people = selected();
+      if (!Object.keys(people).length) throw Error("Select schedules.");
+      const snapshot = JSON.stringify(people);
+      if (
+        !(await confirmDialog(
+          `${tr("Verified recipient")}: @${verified}\n${Object.keys(people).join(", ")}\n${tr("Includes the complete schedule and all saved details.")}\n${tr(warning)}`,
+        ))
+      )
+        return;
+      await request("/deliveries", {
+        username: verified,
+        people: JSON.parse(snapshot),
+        confirmed: true,
+      });
+      text(status, "Schedules sent.");
+    });
+  }
   async function confirmDialog(message) {
     return new Promise((resolve) => {
       const dialog = element("dialog", "", document.body, {
@@ -769,7 +844,7 @@
     } catch {}
     if (!force && Number.isSafeInteger(revision) && revision <= seen) return;
     lastInbox = Date.now();
-    const result = await request("/connections/inbox");
+    const result = await request("/deliveries");
     if (
       !force &&
       (panel?.open || bridge.isBusy() || bridge.canNotify?.() === false)
@@ -781,7 +856,7 @@
         localStorage.setItem(seenKey, String(receivedRevision));
       } catch {}
     }
-    if (!(result.followRequests || []).length) {
+    if (!result.deliveries.length && !(result.followRequests || []).length) {
       if (force) text(status, "No pending deliveries.");
       return;
     }
@@ -793,7 +868,7 @@
     element("h3", "Incoming schedules", main);
     element(
       "p",
-      active() ? "Online schedules" : "Local schedules",
+      active() ? "Import destination: Account" : "Import destination: Local",
       main,
     );
     for (const item of result.followRequests || []) {
@@ -818,11 +893,41 @@
         await sync(true);
         text(
           status,
-          "You now follow each other. Personal schedules stay updated in Online schedules.",
+          "You now follow each other. Personal schedules will stay updated in Account view.",
         );
       });
       action("Decline", box, async () => {
         await request("/connections/respond", {
+          id: item.id,
+          decision: "declined",
+        });
+        box.remove();
+      });
+      action("Block sender", box, async () => {
+        await request("/blocks", { username: item.sender, blocked: true });
+        box.remove();
+        await sync(true);
+      });
+    }
+    for (const item of result.deliveries) {
+      const box = element("section", "", main);
+      element("p", `${tr("From")}: @${item.sender}`, box);
+      element("p", Object.keys(item.people).join(", "), box, {
+        "data-no-translate": "",
+      });
+      action("Accept", box, async () => {
+        if (bridge.isBusy())
+          throw Error("Finish the current import or export first.");
+        close();
+        await bridge.importPeople(item.people);
+        await request("/deliveries/respond", {
+          id: item.id,
+          decision: "accepted",
+        });
+        box.remove();
+      });
+      action("Decline", box, async () => {
+        await request("/deliveries/respond", {
           id: item.id,
           decision: "declined",
         });
@@ -874,10 +979,10 @@
       if (!users.length) element("p", "No matching accounts.", results);
       for (const match of users) {
         const row = element("section", "", results, { class: "follow-result" });
-        element("p", (match.nickname ? match.nickname+" · " : "")+"@" + match.username, row, { "data-no-translate": "" });
+        element("p", "@" + match.username, row, { "data-no-translate": "" });
         if (match.connection?.status === "accepted") {
           element("p", "Following each other", row);
-
+          action("Share schedules", row, () => sharing(match.username));
         } else if (match.connection?.status === "pending") {
           element(
             "p",
@@ -929,10 +1034,10 @@
   }
   async function followingForm() {
     clear();
-    element("h3", "Followers", main);
+    element("h3", "Following", main);
     element(
       "p",
-      "Online schedules refresh when UFree opens, returns online, or you refresh sync. Offline copies may differ until synced.",
+      "Live personal schedules appear in Account view. They refresh when UFree opens, returns online, or you refresh sync. Offline copies may differ until synced.",
       main,
     );
     const list = element("div", "", main, { class: "follow-results" });
@@ -943,7 +1048,7 @@
       element("p", "You are not following anyone yet.", list);
     for (const connection of result.connections) {
       const row = element("section", "", list, { class: "follow-result" });
-      element("p", (connection.nickname ? connection.nickname+" · " : "")+"@" + connection.username, row, { "data-no-translate": "" });
+      element("p", "@" + connection.username, row, { "data-no-translate": "" });
       element(
         "p",
         connection.status === "accepted"
@@ -953,7 +1058,8 @@
             : "Follow request pending.",
         row,
       );
-
+      if (connection.status === "accepted")
+        action("Share schedules", row, () => sharing(connection.username));
       if (
         connection.direction === "incoming" &&
         connection.status === "pending"
@@ -1003,70 +1109,53 @@
       });
     }
   }
-  function validateAttached(person) {
-    if (!person || !Array.isArray(person.classes) || person.classes.length>500) throw Error("Invalid schedule.");
-    for (const c of person.classes) {
-      if (!c || typeof c.course!=="string" || !c.course.trim() || c.course.length>300 || !["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"].includes(c.day) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(c.start) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(c.end) || c.end<=c.start) throw Error("Every class needs a course name, day, start time and later end time.");
-    }
-  }
-  function profileForm() {
-    clear();element("h3","Edit profile",main);
-    element("p","@"+session.user.username,main,{"data-no-translate":""});
-    element("p","Your username cannot change. Your nickname and attached schedule update for your followers.",main);
-    const nickname=field("Account nickname","text",engine.state.records["@profile"]?.nickname || session.user.nickname || "");nickname.required=false;nickname.maxLength=60;
-    let parsing=false;
-    let original=copy(engine.state.records["p:Personal"] || {classes:[]});
-    const semester=field("Semester","text",original.semester || "");semester.required=false;semester.placeholder="Fall 2026";
-    const list=element("div","",main,{class:"profile-classes"});
-    const inputs=[];
-    const add=(item={day:"Monday",start:"",end:"",course:""})=>{
-      const row=element("fieldset","",list,{class:"profile-class"});element("legend","Class",row);
-      const values={};
-      for (const [key,label,type] of [["course","Course name","text"],["day","Day","select"],["start","Start time","time"],["end","End time","time"],["room","Room","text"],["instructor","Teacher","text"],["course_code","Course code","text"],["section","Section","text"]]) {
-        const wrap=element("label",label,row),input=element(type==="select"?"select":"input","",wrap,{...(type==="select"?{}:{type}),"data-profile-field":key});
-        if (type==="select") for(const day of ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"])element("option",day,input,{value:day});
-        input.value=item[key] || "";input.required=["course","day","start","end"].includes(key);if (key==="course")input.maxLength=300;
-        values[key]=input;
-      }
-      inputs.push({row,values,original:copy(item)});
-      action("Remove class",row,()=>row.remove());
-    };
-    const load=(person)=>{original=copy(person);semester.value=person.semester || "";list.replaceChildren();inputs.length=0;for(const c of person.classes || [])add(c);};
-    load(original);
-    for (const name of engine.state.conflicts || []) {
-      const draft=engine.state.records[name];
-      if (name.startsWith("draft:") && draft?.classes) action("Review saved conflict draft",main,()=>load(draft));
-    }
-    action("Add class",main,()=>add());
-    const photo=element("label","Upload your schedule picture",main),file=element("input","",photo,{type:"file",accept:"image/*"});
-    file.addEventListener("change",async()=>{try {const selected=file.files?.[0];if(!selected)return;parsing=true;const parsed=await window.WhosFreeImageParser.parseScheduleImage(selected);load(parsed.person);text(status,"Check every class before saving.");}catch(error){showError(error);}finally{parsing=false;file.value="";}});
-    action("Use one of my Local schedules",main,async()=>{
-      const local=await bridge.localSnapshot();const wrap=element("label","Your personal schedule",main),select=element("select","",wrap);
-      for(const name of Object.keys(local?.data?.people || {})) element("option",name,select,{value:name,"data-no-translate":""});
-      action("Load my schedule for review",main,()=>{if(select.value)load(local.data.people[select.value]);});
-    });
-    formButton("Save profile",async()=>{
-      if(parsing)throw Error("Wait for the picture to finish loading.");
-      const classes=[];
-      for (const entry of inputs.filter(x=>x.row.isConnected)) {
-        for (const input of Object.values(entry.values)) if (!input.checkValidity()) {input.reportValidity();throw Error("Every class needs a course name, day, start time and later end time.");}
-        const c={...entry.original};for(const [key,input] of Object.entries(entry.values)){const value=input.value.trim();if(value)c[key]=value;else delete c[key];}classes.push(c);
-      }
-      const person={...original,classes};
-      if (semester.value.trim()) {if(!/^(Winter|Fall) 20\d{2}$/.test(semester.value.trim()))throw Error("Use Winter or Fall followed by a year.");person.semester=semester.value.trim();}else delete person.semester;
-      validateAttached(person);
-      if (nickname.value.trim().length>60)throw Error("Nickname must be 60 characters or fewer.");
-      const values={...engine.state.records,"p:Personal":person,"@profile":{nickname:nickname.value.trim()}};
-      const conflictsBefore=engine.state.conflicts.length;
-      engine.save(values);session.user.nickname=nickname.value.trim();localStorage.setItem(SESSION,JSON.stringify(session));needsReload=true;
+  function personalForm() {
+    clear();
+    element("h3", "Your personal schedule", main);
+    element(
+      "p",
+      "Choose a schedule from your Account collection. Changes to this selection are automatically shared only with people you mutually follow.",
+      main,
+    );
+    const label = element("label", "Your personal schedule", main),
+      select = element("select", "", label, {
+        required: "",
+        "data-testid": "personal-schedule-select",
+      });
+    element("option", "Choose your personal schedule", select, { value: "" });
+    const current =
+      pendingPersonal()?.to ??
+      engine.state.personalSchedule ??
+      session.user.personalSchedule;
+    const names = Object.keys(engine.state.records)
+      .filter((name) => name.startsWith("p:"))
+      .map((name) => name.slice(2));
+    for (const name of names)
+      element("option", name, select, { value: name, "data-no-translate": "" });
+    select.value = names.includes(current) ? current : "";
+    if (!select.value)
+      element(
+        "p",
+        "Your selected personal schedule is missing. Choose and sync a replacement to keep sharing updates.",
+        main,
+      );
+    formButton("Use this personal schedule", async () => {
+      if (!select.value) throw Error("Select your personal schedule.");
+      // An explicit choice replaces any unresolved offline rename choice.
+      localStorage.removeItem(key() + ":personal-change");
+      await ensureSynced();
+      const expected =
+        engine.state.personalSchedule ?? session.user.personalSchedule;
+      await request("/profile/personal-schedule", {
+        name: select.value,
+        expected,
+      });
+      session.user.personalSchedule = select.value;
+      localStorage.setItem(SESSION, JSON.stringify(session));
+      engine.persist({ ...engine.state, personalSchedule: select.value });
       await sync(true);
-      if (engine.state.conflicts.length>conflictsBefore) {
-        text(status,"Conflicting edits were preserved as local drafts. Review them in Profile.");
-        const draftName=engine.state.conflicts.at(-1),draft=engine.state.records[draftName];
-        if (draft?.classes) action("Review saved conflict draft",main,()=>load(draft));
-      } else text(status,engine.error || "Profile saved. Pending edits stay on this device until synced.");
+      text(status, "Personal schedule updated.");
     });
-    action("Followers",main,followingForm);
     backToAccount();
   }
 
@@ -1077,7 +1166,6 @@
       history.replaceState(null, "", location.pathname + location.search);
     } catch (error) {
       await notice(error.message);
-      history.replaceState(null,"",location.pathname+location.search);
     }
   }
 })();

@@ -68,7 +68,6 @@ export const requestRoute = (path) =>
           "/deliveries/respond",
           "/blocks",
           "/connections",
-          "/connections/inbox",
           "/connections/request",
           "/connections/respond",
           "/connections/remove",

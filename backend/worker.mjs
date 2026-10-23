@@ -1,4 +1,3 @@
-import schoolCatalog from "../schools.js";
 import { measureDatabase, requestRoute } from "./request-metrics.mjs";
 import { CloudStorage } from "./cloud-storage.mjs";
 import { following, followRequests } from "./following.mjs";
@@ -9,7 +8,7 @@ const ORIGIN = "https://hui3412.github.io";
 const HOUR = 3600000,
   DAY = HOUR * 24;
 const encoder = new TextEncoder();
-const RELEASE = "college-selection-v2";
+const RELEASE = "complete-cloud-shares-v1";
 const random = () => bytesToHex(crypto.getRandomValues(new Uint8Array(32)));
 const digest = async (value) =>
   bytesToHex(
@@ -95,7 +94,6 @@ export function validatePeople(people) {
           "Saturday",
           "Sunday",
         ].includes(item.day) ||
-        typeof item.course !== "string" || !item.course.trim() || item.course.length > 300 ||
         !/^([01]\d|2[0-3]):[0-5]\d$/.test(item.start) ||
         !/^([01]\d|2[0-3]):[0-5]\d$/.test(item.end) ||
         item.end <= item.start
@@ -216,8 +214,6 @@ const profile = (user) => ({
   username: user.username,
   school: user.school,
   personalSchedule: user.personal_schedule,
-  nickname: user.nickname || "",
-  modelVersion: 2,
 });
 export default {
   async fetch(request, env) {
@@ -252,7 +248,6 @@ export default {
       }
       if (!["GET", "POST"].includes(request.method))
         fail("Method not allowed.", 405);
-      if (path === "/shares" || path.startsWith("/shares/") || path === "/deliveries" || path.startsWith("/deliveries/")) fail("Cloud snapshot sharing has been removed.",410);
       if (requestRoute(path) === "unknown") fail("Not found.", 404);
       if (request.method === "GET" && ["/", "/health"].includes(path))
         return respond({ service: "youfreetest", status: "ok", database: "not-checked", release: RELEASE });
@@ -269,9 +264,10 @@ export default {
           const limit = input.limit ?? 10;
           if (!Number.isSafeInteger(limit) || limit < 1 || limit > 20) fail("Invalid maintenance limit.");
           const storage = new CloudStorage(db);
-          if (input.mode) fail("Invalid maintenance mode.");
-          const completed = await storage.repack({limit});
-          const pending = await one(db,"SELECT count(*) AS n FROM cloud_repack");
+          const complete = input.mode === "complete-shares";
+          if (input.mode && !complete) fail("Invalid maintenance mode.");
+          const completed = complete ? await storage.repairShares({limit}) : await storage.repack({limit});
+          const pending = await one(db,complete ? "SELECT count(*) AS n FROM cloud_share_repair WHERE status='pending'" : "SELECT count(*) AS n FROM cloud_repack");
           return respond({completed,pending:pending.n});
         }
         if (!db || (await one(db, "SELECT 1 AS ok"))?.ok !== 1)
@@ -286,35 +282,57 @@ export default {
       const input = request.method === "POST" ? await bodyJSON(request) : null;
       if (path === "/auth/signup" && input) {
         const username = credentials(input);
-        const school = schoolCatalog.find(input.school);
-        if (!school) fail("Select a CEGEP or college from the list.");
         await throttle(
           db,
           `signup:${request.headers.get("cf-connecting-ip") || "unknown"}`,
           5,
           HOUR,
         );
+        if (
+          typeof input.school !== "string" ||
+          !input.school.trim() ||
+          input.school.length > 200
+        )
+          fail("School is required.");
         validatePeople(input.people);
         if (!Object.hasOwn(input.people, input.personalSchedule))
           fail("Select your personal schedule.");
         if (input.consent !== true)
-          fail("Confirm uploading your personal schedule.");
-        if (input.personalSchedule !== "Personal" || Object.keys(input.people).length !== 1) fail("Only your attached personal schedule can be uploaded.");
-        const nickname = typeof input.nickname === "string" ? input.nickname.trim() : "";
-        if (nickname.length > 60) fail("Nickname must be 60 characters or fewer.");
-        const id = crypto.randomUUID(), now = Date.now(), hash = await passwordHash(input.password);
-        const prepared = await storage.prepare(input.people.Personal,{schedule:true});
-        const profileObject = await storage.prepare({nickname});
-        await storage.stage([prepared,profileObject]);
+          fail("Confirm the initial upload of your local collection.");
+        const id = crypto.randomUUID(),
+          now = Date.now(),
+          hash = await passwordHash(input.password);
         try {
-          await db.batch([
-            statement(db,"INSERT INTO users(id,username,password_hash,school,personal_schedule,created_at,last_active,nickname,revision) VALUES(?,?,?,?,?,?,?,?,1)",id,username,hash,school.name,"Personal",now,now,nickname),
-            statement(db,"INSERT INTO records(user_id,name,payload,revision) VALUES(?,?,?,1)",id,"p:Personal",prepared.ref),
-            statement(db,"INSERT INTO records(user_id,name,payload,revision) VALUES(?,?,?,1)",id,"@profile",profileObject.ref),
-          ]);
-        } catch(error) { if (/unique/i.test(error.message)) fail("That username is unavailable.",409); throw error; }
-        const session = await newSession(db,id);
-        return respond({...session,user:{id,username,school:school.name,personalSchedule:"Personal",nickname,modelVersion:2}},201);
+          await run(
+            db,
+            "INSERT INTO users(id,username,password_hash,school,personal_schedule,created_at,last_active) VALUES(?,?,?,?,?,?,?)",
+            id,
+            username,
+            hash,
+            input.school.trim(),
+            input.personalSchedule,
+            now,
+            now,
+          );
+        } catch (error) {
+          if (/unique/i.test(error.message))
+            fail("That username is unavailable.", 409);
+          throw error;
+        }
+        // Signup creates identity only; the client queues and resumes the initial copy through /sync.
+        const session = await newSession(db, id);
+        return respond(
+          {
+            ...session,
+            user: {
+              id,
+              username,
+              school: input.school.trim(),
+              personalSchedule: input.personalSchedule,
+            },
+          },
+          201,
+        );
       }
       if (path === "/auth/login" && input) {
         if (
@@ -356,6 +374,27 @@ export default {
         return respond({
           ...(await newSession(db, user.id)),
           user: profile(user),
+        });
+      }
+      if (path.startsWith("/shares/") && request.method === "GET") {
+        const id = path.slice("/shares/".length);
+        if (!/^[a-f0-9]{64}$/.test(id)) fail("Invalid cloud code.");
+        await throttle(
+          db,
+          `receive:${request.headers.get("cf-connecting-ip") || "unknown"}`,
+          120,
+          HOUR,
+        );
+        const share = await one(
+          db,
+          "SELECT payload,expires_at FROM shares WHERE id=? AND expires_at>?",
+          id,
+          Date.now(),
+        );
+        if (!share) fail("This snapshot expired or does not exist.", 404);
+        return respond({
+          people: await storage.people(share.payload),
+          expiresAt: share.expires_at,
         });
       }
       const user = await authenticate(request, db);
@@ -448,8 +487,6 @@ export default {
         return respond({
           revision: user.revision,
           personalSchedule: user.personal_schedule,
-  nickname: user.nickname || "",
-  modelVersion: 2,
           inboxRevision: user.inbox_revision,
         });
       if (path === "/sync" && input) {
@@ -468,7 +505,7 @@ export default {
           if (
             !change ||
             typeof change.name !== "string" ||
-            (!["@preferences","@profile"].includes(change.name) &&
+            (change.name !== "@preferences" &&
               (!change.name.startsWith("p:") ||
                 !change.name.slice(2).trim() ||
                 change.name.length > 202 ||
@@ -477,18 +514,13 @@ export default {
                 )))
           )
             fail("Invalid name.");
-          if (!["p:"+user.personal_schedule,"@profile","@preferences"].includes(change.name)) fail("Only your attached personal schedule can be uploaded.");
-          if (change.name === "p:"+user.personal_schedule && change.value === null) fail("Your attached schedule cannot be deleted. Edit it in Profile.");
           if (seen.has(change.name)) fail("Duplicate change.");
           seen.add(change.name);
-          if (change.name === "@profile") {
-            if (!change.value || typeof change.value.nickname !== "string" || change.value.nickname.trim().length>60 || Object.keys(change.value).some(k=>k!=="nickname")) fail("Invalid nickname.");
-            change.value = {nickname:change.value.nickname.trim()};
-          } else if (change.name === "@preferences") {
+          if (change.name === "@preferences") {
             if (
               change.value !== null &&
               (typeof change.value !== "object" ||
-                Array.isArray(change.value) || Object.entries(change.value).some(([key,value])=>!/^whos-free-|^ufree-has-had-schedules-v1$/.test(key) || typeof value!=="string") || JSON.stringify(change.value).length > 100000)
+                JSON.stringify(change.value).length > 100000)
             )
               fail("Invalid preferences.");
           } else if (change.value !== null)
@@ -542,8 +574,6 @@ export default {
             input.baseRevision,
           ),
         );
-        const profileChange = input.changes.find(change=>change.name==="@profile");
-        if (profileChange) batch.push(statement(db,"UPDATE users SET nickname=? WHERE id=? AND revision=?",profileChange.value.nickname,user.id,input.baseRevision));
         batch.push(
           statement(
             db,
@@ -558,7 +588,110 @@ export default {
           fail("Cloud changed. Reconcile and retry.", 409);
         return respond({ revision: next });
       }
-      if (path === "/connections/inbox" && request.method === "GET") return respond({inboxRevision:user.inbox_revision,followRequests:await followRequests(db,user.id,rows)});
+      if (path === "/shares" && input) {
+        validatePeople(input.people);
+        if (!Object.keys(input.people).length) fail("Select schedules.");
+        await throttle(db, `shares:${user.id}`, 30, DAY);
+        const id = random(),
+          createdAt = Date.now(),
+          expiresAt = createdAt + 48 * HOUR;
+        const full = await storage.completePeople(user.id,input.people);
+        validatePeople(full.people);
+        const prepared = await storage.collection(full.people);
+        await storage.stage([prepared]);
+        await run(
+          db,
+          "INSERT INTO shares(id,owner_id,payload,created_at,expires_at) VALUES(?,?,?,?,?)",
+          id,
+          user.id,
+          prepared.ref,
+          createdAt,
+          expiresAt,
+        );
+        return respond({ code: `UFC1:${id}`, expiresAt }, 201);
+      }
+      if (path === "/users/lookup" && input) {
+        await throttle(db, `lookup:${user.id}`, 60, HOUR);
+        if (typeof input.username !== "string" || input.username.length > 24)
+          fail("Enter a username.");
+        const found = await one(
+          db,
+          "SELECT username FROM users WHERE username=?",
+          input.username.toLowerCase(),
+        );
+        return respond({ username: found?.username || null });
+      }
+      if (path === "/deliveries" && request.method === "GET") {
+        const inbox = await rows(
+          db,
+          "SELECT id,sender_name,payload,created_at FROM deliveries WHERE recipient_id=? AND status='pending' ORDER BY created_at LIMIT 10",
+          user.id,
+        );
+        return respond({
+          inboxRevision: user.inbox_revision,
+          followRequests: await followRequests(db, user.id, rows),
+          deliveries: await Promise.all(
+            inbox.map(async (x) => ({
+              id: x.id,
+              sender: x.sender_name,
+              people: await storage.people(x.payload),
+              createdAt: x.created_at,
+            })),
+          ),
+        });
+      }
+      if (path === "/deliveries" && input) {
+        validatePeople(input.people);
+        if (!Object.keys(input.people).length) fail("Select schedules.");
+        if (typeof input.username !== "string" || input.confirmed !== true)
+          fail("Verify and confirm the recipient.");
+        const recipient = await one(
+          db,
+          "SELECT id FROM users WHERE username=?",
+          input.username.toLowerCase(),
+        );
+        if (!recipient || recipient.id === user.id)
+          fail("Recipient unavailable.");
+        const blocked = await one(
+          db,
+          "SELECT 1 FROM blocks WHERE (user_id=? AND blocked_id=?) OR (user_id=? AND blocked_id=?)",
+          recipient.id,
+          user.id,
+          user.id,
+          recipient.id,
+        );
+        if (blocked) fail("Recipient unavailable.");
+        await throttle(db, `send:${user.id}`, 20, DAY);
+        await throttle(db, `inbox:${recipient.id}`, 100, DAY);
+        const id = crypto.randomUUID();
+        const full = await storage.completePeople(user.id,input.people);
+        validatePeople(full.people);
+        const prepared = await storage.collection(full.people);
+        await storage.stage([prepared]);
+        await run(
+          db,
+          "INSERT INTO deliveries(id,sender_id,recipient_id,sender_name,payload,created_at) VALUES(?,?,?,?,?,?)",
+          id,
+          user.id,
+          recipient.id,
+          user.username,
+          prepared.ref,
+          Date.now(),
+        );
+        return respond({ ok: true }, 201);
+      }
+      if (path === "/deliveries/respond" && input) {
+        if (!["accepted", "declined"].includes(input.decision))
+          fail("Choose Accept or Decline.");
+        await run(
+          db,
+          "UPDATE deliveries SET status=? WHERE id=? AND recipient_id=? AND status='pending'",
+          input.decision,
+          input.id,
+          user.id,
+        );
+        return respond({ ok: true });
+      }
       if (path === "/blocks" && input) {
         const target = await one(
           db,
@@ -578,6 +711,12 @@ export default {
             statement(
               db,
               "INSERT OR IGNORE INTO blocks(user_id,blocked_id) VALUES(?,?)",
+              user.id,
+              target.id,
+            ),
+            statement(
+              db,
+              "UPDATE deliveries SET status='declined' WHERE recipient_id=? AND sender_id=? AND status='pending'",
               user.id,
               target.id,
             ),
@@ -625,7 +764,7 @@ export default {
     const storage = new CloudStorage(env.DB);
     await env.DB.batch([
       statement(env.DB, "DELETE FROM sessions WHERE expires_at<=?", now),
-
+      statement(env.DB, "DELETE FROM shares WHERE expires_at<=?", now),
       statement(
         env.DB,
         "DELETE FROM rate_limits WHERE window<?",
@@ -633,7 +772,7 @@ export default {
       ),
     ]);
     await storage.compact({ limit: 100 });
-
+    await storage.repairShares({limit:5});
     await storage.collect(now);
   },
 };
