@@ -1,4 +1,4 @@
-// Apply only additive test migrations during the connected Cloudflare build.
+// Apply migrations only to the test setup. Migration 0007 is the user-authorized one-time test-account reset.
 // Local development and local dry runs never touch the remote database.
 import { readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';

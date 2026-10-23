@@ -47,7 +47,7 @@
       }
       if (same(l, b)) put(name, r);
       else if (same(r, b) || same(l, r)) put(name, l);
-      else if (name === "@preferences") {
+      else if (["@preferences","@profile"].includes(name)) {
         const merged = Object.create(null);
         for (const key of new Set([
           ...Object.keys(b || {}),
@@ -65,7 +65,7 @@
           let index = 1,
             label;
           do {
-            label = `${name.slice(0, 165)} (sync conflict ${index++})`;
+            label = `${name.startsWith("p:") ? "draft:"+name.slice(2) : name.slice(0,165)} (sync conflict ${index++})`;
           } while (names.has(label) || Object.hasOwn(result, label));
           names.add(label);
           put(label, edited);
@@ -78,7 +78,7 @@
   function differences(base, local) {
     return [...new Set([...Object.keys(base), ...Object.keys(local)])]
       .filter(
-        (name) => !name.startsWith("f:") && !same(base[name], local[name]),
+        (name) => ["p:Personal","@profile","@preferences"].includes(name) && !same(base[name], local[name]),
       )
       .map((name) => ({ name, value: copy(local[name] ?? null) }));
   }

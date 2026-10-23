@@ -135,7 +135,7 @@ test("authenticated substring search is case-insensitive, literal, capped at ten
     assert.equal(results.data.users.length, 10);
     assert.equal(new Set(results.data.users.map((x) => x.username)).size, 10);
     for (const row of results.data.users) {
-      assert.deepEqual(Object.keys(row).sort(), ["connection", "username"]);
+      assert.deepEqual(Object.keys(row).sort(), ["connection", "nickname", "username"]);
       assert.match(row.username, /alex_/);
     }
     assert.equal(
@@ -173,11 +173,11 @@ test("follow requests notify only the recipient and both personal schedules rema
     assert.equal(request.status, 200);
     assert.equal((await f.follow(b, a)).status, 409);
     assert.equal(
-      (await f.call(b, "/deliveries")).data.followRequests[0].sender,
+      (await f.call(b, "/connections/inbox")).data.followRequests[0].sender,
       a.username,
     );
     assert.equal(
-      (await f.call(c, "/deliveries")).data.followRequests.length,
+      (await f.call(c, "/connections/inbox")).data.followRequests.length,
       0,
     );
     assert.equal(
@@ -227,156 +227,10 @@ test("follow requests notify only the recipient and both personal schedules rema
       assert.equal(row.value.person.classes[0].privateNote, person().classes[0].privateNote);
     }
     assert.equal(
-      (await f.call(b, "/deliveries")).data.followRequests.length,
+      (await f.call(b, "/connections/inbox")).data.followRequests.length,
       0,
     );
     assert.equal((await f.call(c, "/connections")).data.connections.length, 0);
-  } finally {
-    f.sql.close();
-  }
-});
-test("personal edits propagate both ways through server revisions while unrelated schedules and fixed snapshots do not", async () => {
-  const f = await fixture();
-  try {
-    const a = await f.seed("live_a"),
-      b = await f.seed("live_b");
-    const req = await f.follow(a, b);
-    await f.call(b, "/connections/respond", {
-      id: req.data.id,
-      decision: "accepted",
-      sharePersonal: true,
-    });
-    const bBefore = await f.revision(b);
-    const share = (
-      await f.call(a, "/shares", {
-        people: { Saved: person("Original snapshot") },
-      })
-    ).data;
-    assert.equal(
-      (await f.update(a, "Personal", person("Updated A"))).status,
-      200,
-    );
-    assert.ok((await f.revision(b)) > bBefore);
-    assert.equal(
-      (await f.delta(b, bBefore)).changes.find((x) => x.name === "f:" + a.id)
-        .value.person.classes[0].course,
-      "Updated A",
-    );
-    assert.equal(
-      (
-        await f.call(b, "/sync", {
-          baseRevision: bBefore,
-          changes: [{ name: "p:Offline", value: person() }],
-        })
-      ).status,
-      409,
-    );
-    assert.equal((await f.update(b, "Offline", person())).status, 200);
-    assert.equal(
-      (await f.update(b, "Personal", person("Updated B"))).status,
-      200,
-    );
-    assert.equal(
-      (await f.delta(a)).changes.find((x) => x.name === "f:" + b.id).value
-        .person.classes[0].course,
-      "Updated B",
-    );
-    const after = await f.revision(b);
-    await f.update(a, "Private other", person("Never shared"));
-    assert.equal(await f.revision(b), after);
-    assert.equal(
-      (await f.delta(b)).changes.some((x) => x.name === "p:Private other"),
-      false,
-    );
-    assert.equal(
-      (await f.call(null, "/shares/" + share.code.slice(5))).data.people.Saved
-        .classes[0].course,
-      "Original snapshot",
-    );
-    assert.equal(
-      (
-        await f.call(b, "/sync", {
-          baseRevision: await f.revision(b),
-          changes: [{ name: "f:" + a.id, value: person("forged") }],
-        })
-      ).status,
-      400,
-    );
-  } finally {
-    f.sql.close();
-  }
-});
-test("personal selection, deletion, stop-following and blocking update only live copies and respect ownership", async () => {
-  const f = await fixture();
-  try {
-    const a = await f.seed("revoke_a"),
-      b = await f.seed("revoke_b"),
-      c = await f.seed("revoke_c");
-    const request = await f.follow(a, b);
-    await f.call(b, "/connections/respond", {
-      id: request.data.id,
-      decision: "accepted",
-      sharePersonal: true,
-    });
-    await f.update(b, "Saved independent", person("Kept snapshot"));
-    await f.update(a, "New personal", person("Selected replacement"));
-    assert.equal(
-      (
-        await f.call(a, "/profile/personal-schedule", {
-          name: "New personal",
-          expected: "Personal",
-        })
-      ).status,
-      200,
-    );
-    assert.equal(
-      (await f.delta(b)).changes.find((x) => x.name === "f:" + a.id).value
-        .person.classes[0].course,
-      "Selected replacement",
-    );
-    assert.equal(
-      (
-        await f.call(a, "/profile/personal-schedule", {
-          name: "Personal",
-          expected: "Personal",
-        })
-      ).status,
-      409,
-    );
-    await f.update(a, "New personal", null);
-    assert.equal(
-      (await f.delta(b)).changes.find((x) => x.name === "f:" + a.id).value,
-      null,
-    );
-    await f.update(a, "New personal", person("Back"));
-    await f.call(c, "/connections/remove", { id: request.data.id });
-    assert.equal(
-      (await f.call(b, "/connections")).data.connections[0].status,
-      "accepted",
-    );
-    await f.call(b, "/blocks", { username: a.username, blocked: true });
-    for (const [viewer, source] of [
-      [a, b],
-      [b, a],
-    ])
-      assert.equal(
-        (await f.delta(viewer)).changes.find((x) => x.name === "f:" + source.id)
-          .value,
-        null,
-      );
-    const rev = await f.revision(b);
-    await f.update(a, "New personal", person("Must not arrive"));
-    assert.equal(await f.revision(b), rev);
-    assert.ok(
-      (await f.delta(b)).changes.find((x) => x.name === "p:Saved independent")
-        .value,
-    );
-    assert.equal((await f.follow(a, b)).status, 400);
-    assert.equal(
-      (await f.call(a, "/users/search", { query: "revoke_b" })).data.users
-        .length,
-      0,
-    );
   } finally {
     f.sql.close();
   }
@@ -400,7 +254,7 @@ test("declining and cancelling requests grant no schedule access; stop-following
     req = await f.follow(a, c);
     await f.call(a, "/connections/remove", { id: req.data.id });
     assert.equal(
-      (await f.call(c, "/deliveries")).data.followRequests.length,
+      (await f.call(c, "/connections/inbox")).data.followRequests.length,
       0,
     );
     f.sql.prepare("UPDATE connections SET created_at=0").run();

@@ -2,7 +2,7 @@
 export async function followRequests(db, userId, rows) {
   return rows(
     db,
-    "SELECT c.id,u.username AS sender,c.created_at AS createdAt FROM connections c JOIN users u ON u.id=c.requester_id WHERE c.recipient_id=? AND c.status='pending' ORDER BY c.created_at LIMIT 100",
+    "SELECT c.id,u.username AS sender,u.nickname,c.created_at AS createdAt FROM connections c JOIN users u ON u.id=c.requester_id WHERE c.recipient_id=? AND c.status='pending' ORDER BY c.created_at LIMIT 100",
     userId,
   );
 }
@@ -46,7 +46,7 @@ export async function following(
       fail("Search using 1–24 username letters, numbers or underscores.");
     const found = await rows(
       db,
-      `SELECT u.username,c.id AS connectionId,c.status,c.requester_id FROM users u
+      `SELECT u.username,u.nickname,c.id AS connectionId,c.status,c.requester_id FROM users u
       LEFT JOIN connections c ON (c.requester_id=? AND c.recipient_id=u.id) OR (c.recipient_id=? AND c.requester_id=u.id)
       WHERE u.id<>? AND instr(u.username,?)>0 AND NOT EXISTS(SELECT 1 FROM blocks b WHERE (b.user_id=? AND b.blocked_id=u.id) OR (b.user_id=u.id AND b.blocked_id=?))
       ORDER BY CASE WHEN u.username=? THEN 0 WHEN instr(u.username,?)=1 THEN 1 ELSE 2 END,u.username COLLATE NOCASE LIMIT 10`,
@@ -62,6 +62,7 @@ export async function following(
     return {
       users: found.map((row) => ({
         username: row.username,
+        nickname: row.nickname || "",
         connection:
           row.status === "pending" || row.status === "accepted"
             ? {
@@ -77,7 +78,7 @@ export async function following(
   if (path === "/connections" && request.method === "GET") {
     const list = await rows(
       db,
-      `SELECT c.id,c.status,c.requester_id,u.username FROM connections c JOIN users u ON u.id=CASE WHEN c.requester_id=? THEN c.recipient_id ELSE c.requester_id END
+      `SELECT c.id,c.status,c.requester_id,u.username,u.nickname FROM connections c JOIN users u ON u.id=CASE WHEN c.requester_id=? THEN c.recipient_id ELSE c.requester_id END
       WHERE (c.requester_id=? OR c.recipient_id=?) AND c.status IN ('pending','accepted') ORDER BY c.status,u.username`,
       user.id,
       user.id,
@@ -87,6 +88,7 @@ export async function following(
       connections: list.map((row) => ({
         id: row.id,
         username: row.username,
+        nickname: row.nickname || "",
         status: row.status,
         direction: row.requester_id === user.id ? "outgoing" : "incoming",
       })),
@@ -190,39 +192,6 @@ export async function following(
     );
     return { ok: true };
   }
-  if (path === "/profile/personal-schedule" && input) {
-    if (
-      typeof input.name !== "string" ||
-      !input.name.trim() ||
-      input.name.length > 200
-    )
-      fail("Select your personal schedule.");
-    const source = await one(
-      db,
-      "SELECT payload FROM records WHERE user_id=? AND name=? AND payload IS NOT NULL",
-      user.id,
-      "p:" + input.name,
-    );
-    if (!source)
-      fail("Sync the selected schedule to your Account collection first.");
-    if (input.expected !== user.personal_schedule)
-      fail(
-        "Your personal schedule selection changed on another device. Choose it again.",
-        409,
-      );
-    const result = await one(
-      db,
-      "UPDATE users SET personal_schedule=?,revision=revision+1 WHERE id=? AND personal_schedule=? RETURNING id",
-      input.name,
-      user.id,
-      input.expected,
-    );
-    if (!result)
-      fail(
-        "Your personal schedule selection changed on another device. Choose it again.",
-        409,
-      );
-    return { ok: true, personalSchedule: input.name };
-  }
+  if (path === "/profile/personal-schedule" && input) fail("Edit your attached schedule in Profile.",410);
   return null;
 }

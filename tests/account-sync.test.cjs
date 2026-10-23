@@ -10,16 +10,16 @@ const make = () => {
 };
 const person = (n) => ({ classes: [], semester: "Fall 2026", note: n });
 test("concurrent edits preserve both versions and deletions preserve edited conflicts separately", () => {
-  const b = { Alex: person("old") };
-  let r = reconcile(b, { Alex: person("local") }, { Alex: person("remote") });
-  assert.equal(r.records.Alex.note, "remote");
-  assert.equal(r.records["Alex (sync conflict 1)"].note, "local");
-  r = reconcile(b, {}, { Alex: person("edit") });
-  assert.equal(r.records.Alex, undefined);
-  assert.equal(r.records["Alex (sync conflict 1)"].note, "edit");
-  r = reconcile(b, { Alex: person("edit") }, {});
-  assert.equal(r.records.Alex, undefined);
-  assert.equal(r.records["Alex (sync conflict 1)"].note, "edit");
+  const b = { "p:Personal": person("old") };
+  let r = reconcile(b, { "p:Personal": person("local") }, { "p:Personal": person("remote") });
+  assert.equal(r.records["p:Personal"].note, "remote");
+  assert.equal(r.records["draft:Personal (sync conflict 1)"].note, "local");
+  r = reconcile(b, {}, { "p:Personal": person("edit") });
+  assert.equal(r.records["p:Personal"], undefined);
+  assert.equal(r.records["draft:Personal (sync conflict 1)"].note, "edit");
+  r = reconcile(b, { "p:Personal": person("edit") }, {});
+  assert.equal(r.records["p:Personal"], undefined);
+  assert.equal(r.records["draft:Personal (sync conflict 1)"].note, "edit");
   assert.deepEqual({ ...reconcile(b, {}, b).records }, {});
 });
 test("unchanged checks transfer no schedules and recent checks are reused", async () => {
@@ -29,8 +29,8 @@ test("unchanged checks transfer no schedules and recent checks are reused", asyn
     "a",
     JSON.stringify({
       revision: 1,
-      base: { Alex: person(1) },
-      records: { Alex: person(1) },
+      base: { "p:Personal": person(1) },
+      records: { "p:Personal": person(1) },
       initialized: true,
       conflicts: [],
     }),
@@ -53,15 +53,15 @@ test("offline saves survive restart and reconcile with remote changes before upl
     "account",
     JSON.stringify({
       revision: 1,
-      base: { Alex: person("old") },
-      records: { Alex: person("old") },
+      base: { "p:Personal": person("old") },
+      records: { "p:Personal": person("old") },
       initialized: true,
       conflicts: [],
     }),
   );
   let offline = true,
     revision = 2,
-    cloud = { Alex: person("remote"), Sam: person("remote") };
+    cloud = { "p:Personal": person("remote"), Sam: person("remote") };
   const calls = [];
   const request = async (path, data) => {
     if (offline) throw Error("offline");
@@ -83,7 +83,7 @@ test("offline saves survive restart and reconcile with remote changes before upl
     return { revision: ++revision };
   };
   let sync = new Sync({ storage, key: "account", request });
-  sync.save({ Alex: person("local") });
+  sync.save({ "p:Personal": person("local") });
   clearTimeout(sync.timer);
   await sync.check(true);
   assert.equal(sync.pending(), 1);
@@ -92,10 +92,11 @@ test("offline saves survive restart and reconcile with remote changes before upl
   sync = new Sync({ storage, key: "account", request });
   await sync.check(true);
   assert.equal(sync.pending(), 0);
-  assert.equal(sync.state.records.Alex.note, "remote");
-  assert.equal(sync.state.records["Alex (sync conflict 1)"].note, "local");
+  assert.equal(sync.state.records["p:Personal"].note, "remote");
+  assert.equal(sync.state.records["draft:Personal (sync conflict 1)"].note, "local");
   assert.equal(sync.state.records.Sam.note, "remote");
-  assert.equal(calls.find((x) => x.data).data.changes.length, 1);
+  assert.equal(calls.some(x=>x.data), false, "conflicting personal edits stay as a local draft until explicitly reviewed");
+  assert.equal(cloud["p:Personal"].note,"remote");
 });
 test("a lost upload response and a 409 retry do not duplicate edits", async () => {
   const storage = make();
@@ -123,12 +124,12 @@ test("a lost upload response and a 409 retry do not duplicate edits", async () =
     return { revision: ++revision };
   };
   const sync = new Sync({ storage, key: "a", request });
-  sync.save({ Alex: person("new") });
+  sync.save({ "p:Personal": person("new") });
   clearTimeout(sync.timer);
   await sync.check(true);
   assert.equal(sync.pending(), 0);
   assert.equal(sync.state.records.Sam.note, "other");
-  assert.equal(sync.state.records.Alex.note, "new");
+  assert.equal(sync.state.records["p:Personal"].note, "new");
   assert.equal(Object.keys(cloud).length, 2);
 });
 test("edits made during an upload remain queued after the older upload is acknowledged", async () => {
@@ -140,48 +141,48 @@ test("edits made during an upload remain queued after the older upload is acknow
     if (path === "/revision") return { revision };
     if (path.startsWith("/sync?")) return { revision, changes: [] };
     if (updates++ === 0) {
-      sync.save({ Alex: person("newer") });
+      sync.save({ "p:Personal": person("newer") });
       clearTimeout(sync.timer);
     }
     return { revision: ++revision };
   };
   sync = new Sync({ storage, key: "a", request });
-  sync.save({ Alex: person("first") });
+  sync.save({ "p:Personal": person("first") });
   clearTimeout(sync.timer);
   await sync.check(true);
   assert.equal(sync.pending(), 0);
-  assert.equal(sync.state.base.Alex.note, "newer");
+  assert.equal(sync.state.base["p:Personal"].note, "newer");
   assert.equal(updates, 2);
 });
 
 test("live records always follow server updates and tombstones without uploading private edits", () => {
   const { differences } = require("../account-sync.js");
-  const base = { "f:peer": person("old"), "p:own": person("old") };
+  const base = { "f:peer": person("old"), "p:Personal": person("old") };
   const local = {
     "f:peer": person("tampered"),
-    "p:own": person("offline edit"),
+    "p:Personal": person("offline edit"),
   };
   let merged = reconcile(base, local, {
     "f:peer": person("new"),
-    "p:own": person("old"),
+    "p:Personal": person("old"),
   });
   assert.equal(merged.records["f:peer"].note, "new");
-  assert.equal(merged.records["p:own"].note, "offline edit");
+  assert.equal(merged.records["p:Personal"].note, "offline edit");
   assert.equal(merged.conflicts.length, 0);
   assert.deepEqual(
     differences(base, local).map((r) => r.name),
-    ["p:own"],
+    ["p:Personal"],
   );
-  merged = reconcile(base, local, { "p:own": person("old") });
+  merged = reconcile(base, local, { "p:Personal": person("old") });
   assert.equal(merged.records["f:peer"], undefined);
-  assert.equal(merged.records["p:own"].note, "offline edit");
+  assert.equal(merged.records["p:Personal"].note, "offline edit");
 });
 test("object key ordering from compressed cloud JSON does not cause edits or conflicts", () => {
   const { differences } = require("../account-sync.js");
   const a = { classes: [], semester: "Fall 2026", custom: { z: 1, a: 2 } },
     b = { custom: { a: 2, z: 1 }, semester: "Fall 2026", classes: [] };
-  assert.equal(differences({ "p:Person": a }, { "p:Person": b }).length, 0);
-  const r = reconcile({ "p:Person": a }, { "p:Person": b }, { "p:Person": a });
+  assert.equal(differences({ "p:Personal": a }, { "p:Personal": b }).length, 0);
+  const r = reconcile({ "p:Personal": a }, { "p:Personal": b }, { "p:Personal": a });
   assert.equal(r.conflicts.length, 0);
   const prefs = { b: "second", a: "first" },
     reverse = { a: "first", b: "second" };
@@ -196,8 +197,8 @@ test("recent successful checks are reused across restarts without hiding unsynce
     "recent",
     JSON.stringify({
       revision: 1,
-      base: { Alex: person("old") },
-      records: { Alex: person("old") },
+      base: { "p:Personal": person("old") },
+      records: { "p:Personal": person("old") },
       initialized: true,
       conflicts: [],
     }),
@@ -213,7 +214,7 @@ test("recent successful checks are reused across restarts without hiding unsynce
   const reopened = new Sync({ storage, key: "recent", request });
   await reopened.check();
   assert.equal(calls, 1);
-  reopened.save({ Alex: person("edited") });
+  reopened.save({ "p:Personal": person("edited") });
   clearTimeout(reopened.timer);
   await reopened.check();
   assert.equal(calls, 3);
@@ -230,7 +231,7 @@ test("failed event bursts back off while preserving pending changes, and explici
       throw Object.assign(Error("unavailable"), { status: 503 });
     },
   });
-  sync.save({ Alex: person("offline") });
+  sync.save({ "p:Personal": person("offline") });
   clearTimeout(sync.timer);
   await sync.check("save");
   for (let i = 0; i < 100; i++) await sync.check();
@@ -242,7 +243,7 @@ test("failed event bursts back off while preserving pending changes, and explici
   assert.equal(calls, 1);
   await sync.check(true);
   assert.equal(calls, 2);
-  assert.equal(sync.state.records.Alex.note, "offline");
+  assert.equal(sync.state.records["p:Personal"].note, "offline");
   clearTimeout(sync.timer);
 });
 test("tabs recheck shared freshness after acquiring the browser lock", async () => {
@@ -299,7 +300,7 @@ test("expired sessions do not trigger background upload retries and pending chan
       throw Object.assign(Error("expired"), { status: 401 });
     },
   });
-  sync.save({ Alex: person("pending") });
+  sync.save({ "p:Personal": person("pending") });
   clearTimeout(sync.timer);
   await sync.check("save");
   assert.equal(calls, 1);
@@ -341,7 +342,7 @@ test('daily quota pauses survive reloads and foreground events without schedulin
  const storage=make();let calls=0;
  const retryAt=Date.now()+3600000;
  const options={storage,key:'quota-paused',request:async()=>{calls++;throw Object.assign(Error('daily quota'),{status:429,code:'DAILY_QUOTA_EXHAUSTED',retryAt});}};
- let sync=new Sync(options);sync.save({Alex:person('pending')});clearTimeout(sync.timer);sync.timer=null;
+ let sync=new Sync(options);sync.save({"p:Personal":person('pending')});clearTimeout(sync.timer);sync.timer=null;
  await sync.check('save');assert.equal(calls,1);assert.equal(sync.timer,null);
  sync=new Sync(options);
  for(let i=0;i<100;i++)await sync.check();

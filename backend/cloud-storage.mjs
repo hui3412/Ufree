@@ -121,19 +121,6 @@ export class CloudStorage {
       objects = new Map([[object.id, object]]);
     return { ref: PREFIX + object.id, objects };
   }
-  async collection(people) {
-    const objects = new Map(),
-      entries = [];
-    for (const [name, person] of Object.entries(people)) {
-      const prepared = await this.prepare(person, {schedule:true});
-      for (const [id, o] of prepared.objects) objects.set(id, o);
-      entries.push([name, prepared.ref.slice(PREFIX.length)]);
-    }
-    const root = await encodeObject(entries, "collection");
-    root.children = [...new Set(entries.map((e) => e[1]))];
-    objects.set(root.id, root);
-    return { ref: PREFIX + root.id, objects };
-  }
   async stage(prepared) {
     // Staging leases protect in-flight references from GC. Roots are attached only after all bytes exist.
     const objects = new Map();
@@ -376,89 +363,22 @@ export class CloudStorage {
       };
     return value;
   }
-  async people(payload) {
-    if (!payload.startsWith(PREFIX)) return JSON.parse(payload);
-    const entries = await this.object(
-      payload.slice(PREFIX.length),
-      "collection",
-    );
-    if (!Array.isArray(entries) || entries.length > 2000)
-      throw Error("Invalid cloud collection.");
-    await this.preload(entries.map((entry) => entry[1]));
-    await this.preloadCores(entries.map(entry => entry[1]));
-    const result = [];
-    for (const entry of entries) {
-      if (
-        !Array.isArray(entry) ||
-        entry.length !== 2 ||
-        typeof entry[0] !== "string"
-      )
-        throw Error("Invalid cloud collection.");
-      result.push([entry[0], await this.person(entry[1])]);
-    }
-    return Object.fromEntries(result);
-  }
-  // Restore only from this sender's named source, never another account or a guessed match.
-  async completePeople(userId, people) {
-    if (!userId) return {people, recovered:0, unresolved:Object.keys(people).length};
-    const names = Object.keys(people), rows = [];
-    for (let i=0;i<names.length;i+=40) {
-      const group=names.slice(i,i+40).map(name => "p:"+name);
-      rows.push(...await this.all(`SELECT name,payload,revision FROM records WHERE user_id=? AND name IN (${group.map(()=>"?").join(",")}) AND payload IS NOT NULL`,userId,...group));
-    }
-    const source = new Map((await this.records(rows)).map(row => [row.name.slice(2),row.value]));
-    let recovered=0, unresolved=0;
-    const result=[];
-    for (const [name,person] of Object.entries(people)) {
-      const original=source.get(name);
-      if (original && compatibleSnapshot(person,original)) {
-        if (canonical(person)!==canonical(original)) recovered++;
-        result.push([name,original]);
-      } else { unresolved++; result.push([name,person]); }
-    }
-    return {people:Object.fromEntries(result),recovered,unresolved};
-  }
-  async repairShares({limit=5}={}) {
-    const jobs=await this.all("SELECT * FROM cloud_share_repair WHERE status='pending' LIMIT ?",limit);
-    for (const job of jobs) {
-      if (!["shares","deliveries"].includes(job.target)) throw Error("Invalid repair job.");
-      const owner=job.target==='shares'?'owner_id':'sender_id';
-      const row=await this.stmt(`SELECT payload,${owner} AS owner_id FROM ${job.target} WHERE id=?`,job.row_key).first();
-      let status='missing', recovered=0, unresolved=0;
-      if (row) {
-        const before=await this.people(row.payload);
-        const result=await this.completePeople(row.owner_id,before);
-        recovered=result.recovered; unresolved=result.unresolved;
-        status=unresolved?'unresolved':recovered?'recovered':'complete';
-        if (recovered) {
-          const prepared=await this.collection(result.people);
-          await this.stage([prepared]);
-          if (canonical(await this.people(prepared.ref))!==canonical(result.people)) throw Error('Share restoration failed verification.');
-          const update=await this.stmt(`UPDATE ${job.target} SET payload=? WHERE id=? AND payload=?`,prepared.ref,job.row_key,row.payload).run();
-          if (!update.meta.changes) continue;
-          if (job.target==='deliveries') await this.stmt("UPDATE users SET inbox_revision=inbox_revision+1 WHERE id=(SELECT recipient_id FROM deliveries WHERE id=? AND status='pending')",job.row_key).run();
-        }
-      }
-      await this.stmt("UPDATE cloud_share_repair SET status=?,recovered=?,unresolved=? WHERE target=? AND row_key=?",status,recovered,unresolved,job.target,job.row_key).run();
-    }
-    return jobs.length;
-  }
   async repack({userId = null, limit = 10} = {}) {
     const jobs = await this.all(`SELECT * FROM cloud_repack ${userId ? "WHERE user_id=?" : ""} LIMIT ?`, ...(userId ? [userId] : []), limit);
     let count=0, bytes=0;
     for (const job of jobs) {
       const table = job.target;
-      if (!["records","shares","deliveries"].includes(table)) throw Error("Invalid maintenance job.");
+      if (table!=="records") throw Error("Invalid maintenance job.");
       const predicate = table === "records" ? "user_id=? AND name=?" : "id=?";
       const args = table === "records" ? [job.user_id,job.row_key] : [job.row_key];
       const row = await this.stmt(`SELECT payload FROM ${table} WHERE ${predicate}`, ...args).first();
       if (row?.payload != null) {
-        const value = table === "records" ? await this.record(row.payload,job.row_key) : await this.people(row.payload);
+        const value = await this.record(row.payload,job.row_key);
         bytes += enc.encode(canonical(value)).length;
         if (count && bytes > 5*1024*1024) break;
-        const prepared = table === "records" ? await this.prepare(value,{schedule:job.row_key.startsWith("p:")}) : await this.collection(value);
+        const prepared = await this.prepare(value,{schedule:job.row_key.startsWith("p:")});
         await this.stage([prepared]);
-        const verified = table === "records" ? await this.record(prepared.ref,job.row_key) : await this.people(prepared.ref);
+        const verified = await this.record(prepared.ref,job.row_key);
         if (canonical(verified) !== canonical(value)) throw Error("Maintenance round-trip verification failed.");
         // A maintenance conversion never changes sync revisions or resurrects deleted data.
         await this.stmt(`UPDATE ${table} SET payload=? WHERE ${predicate} AND payload=?`, prepared.ref,...args,row.payload).run();
@@ -474,11 +394,7 @@ export class CloudStorage {
     const result = await this.stmt(
       `SELECT
       EXISTS(SELECT 1 FROM records WHERE user_id=? AND payload IS NOT NULL AND substr(payload,1,5)<>'@UF1:' AND CASE WHEN name LIKE 'f:%' AND json_valid(payload) THEN substr(json_extract(payload,'$.person'),1,5) IS NOT '@UF1:' ELSE 1 END)
-      OR EXISTS(SELECT 1 FROM shares WHERE owner_id=? AND substr(payload,1,5)<>'@UF1:')
-      OR EXISTS(SELECT 1 FROM deliveries WHERE sender_id=? AND substr(payload,1,5)<>'@UF1:') AS pending`,
-      userId,
-      userId,
-      userId,
+      AS pending`, userId,
     ).first();
     return !!result.pending;
   }
@@ -522,32 +438,6 @@ export class CloudStorage {
       this.metadata.clear();
       this.parts.clear();
     }
-    for (const table of ["shares", "deliveries"]) {
-      const owner = table === "shares" ? "owner_id" : "sender_id";
-      const rows = await this.all(
-        `SELECT id,payload FROM ${table} WHERE substr(payload,1,5)<>'@UF1:' ${userId ? "AND " + owner + "=?" : ""} LIMIT ?`,
-        ...(userId ? [userId] : []),
-        Math.min(1, Math.max(0, limit - count)),
-      );
-      for (const row of rows) {
-        const bytes = enc.encode(row.payload).length;
-        if (count && processedBytes + bytes > budget) return count;
-        processedBytes += bytes;
-        const p = await this.collection(JSON.parse(row.payload));
-        await this.stage([p]);
-        await this.stmt(
-          `UPDATE ${table} SET payload=? WHERE id=? AND payload=?`,
-          p.ref,
-          row.id,
-          row.payload,
-        ).run();
-        count++;
-        this.encoded.clear();
-        this.reads.clear();
-        this.metadata.clear();
-        this.parts.clear();
-      }
-    }
     return count;
   }
   async collect(now = Date.now()) {
@@ -555,8 +445,6 @@ export class CloudStorage {
     await this.stmt(
       `WITH RECURSIVE roots(id) AS (
     SELECT substr(payload,6) FROM records WHERE substr(payload,1,5)='@UF1:'
-    UNION SELECT substr(payload,6) FROM shares WHERE substr(payload,1,5)='@UF1:'
-    UNION SELECT substr(payload,6) FROM deliveries WHERE substr(payload,1,5)='@UF1:'
     UNION SELECT substr(json_extract(payload,'$.person'),6) FROM records WHERE name LIKE 'f:%' AND json_valid(payload) AND substr(json_extract(payload,'$.person'),1,5)='@UF1:'
     UNION SELECT id FROM cloud_objects WHERE last_used>=?
    ), live(id) AS (SELECT id FROM roots UNION SELECT e.child_id FROM cloud_edges e JOIN live l ON e.parent_id=l.id)
@@ -564,18 +452,4 @@ export class CloudStorage {
       now - HOLD,
     ).run();
   }
-}
-
-// Every populated shared field must agree with the retained source. Class order may differ.
-function compatibleSnapshot(snapshot, original) {
-  if (!Array.isArray(snapshot.classes) || !Array.isArray(original.classes) || snapshot.classes.length!==original.classes.length) return false;
-  const sameFields=(a,b)=>Object.entries(a).every(([key,value]) => value==null || value==="" || (Object.hasOwn(b,key) && canonical(value)===canonical(b[key])));
-  if (!sameFields(Object.fromEntries(Object.entries(snapshot).filter(([k])=>k!=="classes")),original)) return false;
-  const remaining=[...original.classes];
-  for (const row of snapshot.classes) {
-    const index=remaining.findIndex(c=>c.day===row.day && c.start===row.start && c.end===row.end && sameFields(row,c));
-    if (index<0) return false;
-    remaining.splice(index,1);
-  }
-  return true;
 }
