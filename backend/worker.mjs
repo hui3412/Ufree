@@ -8,7 +8,7 @@ const ORIGIN = "https://hui3412.github.io";
 const HOUR = 3600000,
   DAY = HOUR * 24;
 const encoder = new TextEncoder();
-const RELEASE = "complete-cloud-shares-native-auth-v1";
+const RELEASE = "account-deletion-v1";
 const random = () => bytesToHex(crypto.getRandomValues(new Uint8Array(32)));
 const digest = async (value) =>
   bytesToHex(
@@ -416,6 +416,28 @@ export default {
           "DELETE FROM sessions WHERE token_hash=?",
           user.token_hash,
         );
+        return respond({ ok: true });
+      }
+      if (path === "/auth/delete" && input) {
+        if (typeof input.currentPassword !== "string" || !input.currentPassword.length || input.currentPassword.length > 128)
+          fail("Current password required.");
+        if (typeof input.confirmUsername !== "string" || input.confirmUsername.trim().toLowerCase() !== user.username.toLowerCase())
+          fail("Type your username to confirm account deletion.");
+        await loginGate(db, [`delete:${user.id}`]);
+        await failedLogin(db, [`delete:${user.id}`]);
+        if (!(await verify(input.currentPassword, user.password_hash)))
+          fail("Incorrect current password.", 401);
+        // The trigger and foreign-key cascades run inside this one atomic delete.
+        // Recheck credentials and session after scrypt to reject concurrent revocation.
+        const result = await one(db,
+          "DELETE FROM users WHERE id=? AND password_hash=? AND EXISTS(SELECT 1 FROM sessions WHERE token_hash=? AND user_id=users.id AND expires_at>?) RETURNING id",
+          user.id, user.password_hash, user.token_hash, Date.now());
+        if (result?.id !== user.id)
+          fail("Your credentials changed. Sign in again before deleting your account.", 409);
+        // Cleanup never deletes objects reachable from another account or an active upload.
+        // If the daily quota is exhausted, the scheduled collector retries later.
+        try { await storage.collect(); }
+        catch { console.warn("Account deleted; unused storage cleanup deferred."); }
         return respond({ ok: true });
       }
       if (path === "/auth/password" && input) {

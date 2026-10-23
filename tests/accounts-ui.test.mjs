@@ -483,3 +483,47 @@ test("sign-in form merges the phone schedules before uploading and retains downl
   assert.ok(a.calls.some(c=>new URL(c.url).pathname==='/sync'&&c.options?.body&&JSON.parse(c.options.body).changes.some(row=>row.name==='p:Original')));
  }finally{await a.close();}
 });
+
+test('account deletion requires confirmation and removes only the deleted account cache, preserving device schedules',async()=>{
+ const a=await app({account:true,handler:path=>path==='/auth/delete'?{ok:true}:undefined});
+ try{
+  a.w.localStorage.setItem('ufree-test-account-v1:another-account',JSON.stringify({records:{keep:true}}));
+  a.w.localStorage.setItem('ufree-test-account-v1:test-user:personal-change',JSON.stringify({from:'Account person',to:'Account person'}));
+  a.el('mobileMenuButton').click();a.el('accountMenuButton').click();buttonWith(a.w,'Delete account').click();
+  const dialog=a.w.document.querySelector('.account-dialog');
+  const [password,username]=dialog.querySelectorAll('input');
+  password.value='fictional-password-123';username.value='wrong_user';buttonWith(a.w,'Permanently delete account').click();
+  await new Promise(r=>setTimeout(r,10));assert.equal(a.calls.filter(c=>new URL(c.url).pathname==='/auth/delete').length,0);
+  username.value=user.username;buttonWith(a.w,'Permanently delete account').click();await settle(()=>a.w.document.querySelectorAll('.account-dialog').length===2);
+  const confirm=a.w.document.querySelectorAll('.account-dialog')[1];[...confirm.querySelectorAll('button')].find(b=>b.textContent==='Cancel').click();
+  await new Promise(r=>setTimeout(r,10));assert.equal(a.calls.filter(c=>new URL(c.url).pathname==='/auth/delete').length,0);
+  buttonWith(a.w,'Permanently delete account').click();await settle(()=>a.w.document.querySelectorAll('.account-dialog').length===2);
+  const before=JSON.parse(a.w.localStorage.getItem('whos-free-local-schedules')).data;
+  const finalConfirm=a.w.document.querySelectorAll('.account-dialog')[1];[...finalConfirm.querySelectorAll('button')].find(b=>b.textContent==='Confirm').click();
+  await settle(()=>!a.w.localStorage.getItem('ufree-test-session-v1'));
+  const call=a.calls.find(c=>new URL(c.url).pathname==='/auth/delete');assert.ok(call);
+  assert.deepEqual(JSON.parse(call.options.body),{currentPassword:'fictional-password-123',confirmUsername:user.username});
+  assert.equal(a.w.localStorage.getItem('ufree-test-account-v1:test-user'),null);
+  assert.equal(a.w.localStorage.getItem('ufree-test-account-v1:test-user:personal-change'),null);
+  assert.ok(a.w.localStorage.getItem('ufree-test-account-v1:another-account'));
+  assert.deepEqual(JSON.parse(a.w.localStorage.getItem('whos-free-local-schedules')).data,before);
+  const guest=await app({savedStorage:snapshotStorage(a.w)});
+  try {assert.match(guest.el('peopleList').textContent,/Original/);assert.match(guest.el('peopleList').textContent,/Account person/);assert.equal(guest.calls.length,0);}
+  finally{await guest.close();}
+ }finally{await a.close();}
+});
+test('failed account deletion keeps identity and phone data, clears the password and shows translated controls',async()=>{
+ const a=await app({account:true,handler:path=>path==='/auth/delete'?new Response(JSON.stringify({error:'Incorrect current password.'}),{status:401}):undefined});
+ try{
+  a.el('mobileMenuButton').click();a.el('accountMenuButton').click();buttonWith(a.w,'Delete account').click();
+  a.w.UFreeI18n.setLanguage('fr');const dialog=a.w.document.querySelector('.account-dialog');
+  assert.match(dialog.textContent,/Supprimer le compte/);assert.match(dialog.textContent,/copies indépendantes/);
+  const [password,username]=dialog.querySelectorAll('input');password.value='wrong password';username.value=user.username;
+  buttonWith(a.w,'Supprimer définitivement le compte').click();await settle(()=>a.w.document.querySelectorAll('.account-dialog').length===2);
+  const confirmation=a.w.document.querySelectorAll('.account-dialog')[1];[...confirmation.querySelectorAll('button')].find(b=>b.textContent==='Confirmer').click();
+  await settle(()=>password.value==='');assert.ok(a.w.localStorage.getItem('ufree-test-session-v1'));
+  assert.ok(a.w.localStorage.getItem('ufree-test-account-v1:test-user'));
+  assert.ok(JSON.parse(a.w.localStorage.getItem('whos-free-local-schedules')).data.people.Original);
+  assert.match(dialog.textContent,/mot de passe/i);
+ }finally{await a.close();}
+});

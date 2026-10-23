@@ -31,6 +31,7 @@
     engine = null,
     ready = false,
     busy = false,
+    deletingAccount = false,
     verified = "",
     lastInbox = 0,
     inboxTask = null,
@@ -335,7 +336,8 @@
     text(status, "");
   }
   function field(label, type = "text", value = "") {
-    const wrap = element("label", label, main);
+    const wrap = element("label", "", main);
+    element("span", label, wrap);
     const input = element("input", "", wrap, {
       type,
       required: "",
@@ -500,6 +502,7 @@
     action("Change password", controls, passwordForm);
     action("Sign in again", controls, () => authForm(false));
     action("Block or unblock a username", controls, blockForm);
+    action("Delete account", controls, deleteAccountForm).className = "danger-button";
     action("Sign out", controls, async () => {
       ready = false;
       await engine.running;
@@ -662,11 +665,57 @@
     await bridge.reload();
   }
   async function sync(force) {
-    if (!session || !engine) return;
+    if (!session || !engine || deletingAccount) return;
     await engine.check(force);
     await flushPersonalChange();
     await applySync();
     renderStatus();
+  }
+  function deleteAccountForm() {
+    clear();
+    element("h3", "Delete account", main);
+    element("p", "@" + session.user.username, main, { "data-no-translate": "" });
+    element("p", "This permanently deletes your account, cloud schedules, cloud links, deliveries and following connections. Schedules saved on this device and other people’s independent copies are kept.", main);
+    const password = field("Current password", "password");
+    password.autocomplete = "current-password";
+    const confirmation = field("Confirm your username");
+    confirmation.autocomplete = "off";
+    const deleteButton = formButton("Permanently delete account", async () => {
+      if (!password.reportValidity() || !confirmation.reportValidity()) return;
+      if (confirmation.value.trim().toLowerCase() !== session.user.username.toLowerCase())
+        throw Error("Type your username to confirm account deletion.");
+      if (!(await confirmDialog("Delete this account permanently? This cannot be undone. Your device’s saved schedules will stay available without an account."))) return;
+      const accountKey = key();
+      deletingAccount = true;
+      ready = false;
+      try {
+        await engine.running;
+        engine.authBlocked = true;
+        clearTimeout(engine.timer);
+        // Save any last cloud download to the shared phone collection before detaching.
+        await window.UFreeAccounts.restoreDevice(await bridge.localSnapshot(), bridge.writeDevice);
+        clearTimeout(engine.timer);
+        engine.authBlocked = true;
+        await request("/auth/delete", {currentPassword: password.value, confirmUsername: confirmation.value.trim()});
+      } catch (error) {
+        engine.authBlocked = false;
+        deletingAccount = false;
+        ready = true;
+        throw error;
+      } finally {
+        password.value = "";
+      }
+      // Stop stale tabs and remove only this account's sync queue and credentials.
+      localStorage.removeItem(SESSION);
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const name = localStorage.key(i);
+        if (name === accountKey || name?.startsWith(accountKey + ":")) localStorage.removeItem(name);
+      }
+      session = null;
+      location.reload();
+    });
+    deleteButton.className = "danger-button";
+    action("Cancel", main, render);
   }
   function passwordForm() {
     clear();

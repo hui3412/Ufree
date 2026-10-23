@@ -319,7 +319,7 @@ test("admin diagnostics reject guests and ordinary accounts before querying D1",
   assert.equal((await call(secret,true,'GET')).status,405);
   assert.equal(f.db.queries,0);
   const good=await call(secret); assert.equal(good.status,200);
-  assert.equal((await good.json()).migration,'0006_complete_cloud_shares.sql');
+  assert.equal((await good.json()).migration,fs.readdirSync(new URL('../backend/migrations/',import.meta.url)).filter(name=>name.endsWith('.sql')).sort().at(-1));
   assert.equal(f.db.queries,2);
   for (const path of ['/','/health']) {
    const r=await worker.fetch(new Request('https://api.test'+path),{});

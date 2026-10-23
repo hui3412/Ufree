@@ -1,4 +1,4 @@
-const CACHE_NAME = "whos-free-main-shell-v149";
+const CACHE_NAME = "whos-free-main-shell-v150";
 const OCR_CACHE_NAME = "whos-free-ocr-v1";
 const APP_SHELL = [
   "./",
@@ -8,14 +8,14 @@ const APP_SHELL = [
   "./legal.css?v=139",
   "./schedule-image-guide.js?v=132",
   "./assets/examples/schedule-screenshot.jpg",
-  "./i18n-fr.js?v=149",
+  "./i18n-fr.js?v=150",
   "./i18n.js?v=127",
   "./assets/flag-fr.svg",
   "./assets/flag-uk.svg",
   "./styles.css?v=139",
   "./app.js?v=149",
   "./account-sync.js?v=149",
-  "./accounts.js?v=149",
+  "./accounts.js?v=150",
   "./schedule-qr-batches.js?v=126",
   "./schedule-share-code.js?v=120",
   "./assets/qr/qrcodegen.js?v=90",

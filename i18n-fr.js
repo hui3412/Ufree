@@ -768,7 +768,15 @@ window.UFreeFrench = {
     "Signed in: syncing this device": "Connecté : synchronisation de cet appareil",
     "Signed out: saved on this device": "Déconnecté : enregistré sur cet appareil",
     "You now follow each other. Personal schedules will stay updated while signed in.": "Vous vous suivez maintenant mutuellement. Les horaires personnels seront mis à jour lorsque vous êtes connecté.",
-    "Live personal schedules appear while signed in. They refresh when UFree opens, returns online, or you refresh sync. Offline copies may differ until synced.": "Les horaires personnels suivis apparaissent lorsque vous êtes connecté. Ils sont actualisés à l’ouverture d’UFree, au retour en ligne ou à la synchronisation manuelle. Les copies hors ligne peuvent différer avant la synchronisation."
+    "Live personal schedules appear while signed in. They refresh when UFree opens, returns online, or you refresh sync. Offline copies may differ until synced.": "Les horaires personnels suivis apparaissent lorsque vous êtes connecté. Ils sont actualisés à l’ouverture d’UFree, au retour en ligne ou à la synchronisation manuelle. Les copies hors ligne peuvent différer avant la synchronisation.",
+    "Delete account": "Supprimer le compte",
+    "Permanently delete account": "Supprimer définitivement le compte",
+    "Confirm your username": "Confirmez votre nom d’utilisateur",
+    "Type your username to confirm account deletion.": "Saisissez votre nom d’utilisateur pour confirmer la suppression du compte.",
+    "This permanently deletes your account, cloud schedules, cloud links, deliveries and following connections. Schedules saved on this device and other people’s independent copies are kept.": "Cette action supprime définitivement votre compte, vos horaires infonuagiques, vos liens de partage, vos envois et vos relations de suivi. Les horaires enregistrés sur cet appareil et les copies indépendantes des autres personnes sont conservés.",
+    "Delete this account permanently? This cannot be undone. Your device’s saved schedules will stay available without an account.": "Supprimer définitivement ce compte? Cette action est irréversible. Les horaires enregistrés sur cet appareil resteront accessibles sans compte.",
+    "Your credentials changed. Sign in again before deleting your account.": "Vos identifiants ont changé. Reconnectez-vous avant de supprimer votre compte.",
+    "Current password required.": "Le mot de passe actuel est requis."
   },
   "templates": [
     {

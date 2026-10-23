@@ -59,6 +59,7 @@ export const requestRoute = (path) =>
           "/auth/session",
           "/auth/logout",
           "/auth/password",
+          "/auth/delete",
           "/sync",
           "/revision",
           "/shares",
