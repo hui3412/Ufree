@@ -9,7 +9,7 @@ const ORIGIN = "https://hui3412.github.io";
 const HOUR = 3600000,
   DAY = HOUR * 24;
 const encoder = new TextEncoder();
-const RELEASE = "cegep-selection-v1";
+const RELEASE = "college-selection-v2";
 const random = () => bytesToHex(crypto.getRandomValues(new Uint8Array(32)));
 const digest = async (value) =>
   bytesToHex(
@@ -287,7 +287,7 @@ export default {
       if (path === "/auth/signup" && input) {
         const username = credentials(input);
         const school = schoolCatalog.find(input.school);
-        if (!school) fail("Select a CEGEP from the list.");
+        if (!school) fail("Select a CEGEP or college from the list.");
         await throttle(
           db,
           `signup:${request.headers.get("cf-connecting-ip") || "unknown"}`,

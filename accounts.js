@@ -472,19 +472,19 @@
     const selected = element("input", "", section, {type: "hidden", id: "selectedCegep"});
     const details = element("details", "", section, {id: "schoolChooser"});
     const summary = element("summary", "", details);
-    const placeholder = element("span", "Choose your CEGEP", summary);
+    const placeholder = element("span", "Choose your CEGEP or college", summary);
     const selection = element("span", "", summary, {"data-no-translate": ""});
     const content = element("div", "", details, {class: "school-picker-content"});
-    element("label", "Search CEGEPs", content, {for: "cegepSearch"});
+    element("label", "Search CEGEPs and colleges", content, {for: "cegepSearch"});
     const row = element("div", "", content, {class: "school-search-row"});
     const search = element("input", "", row, {type: "search", id: "cegepSearch", "aria-controls": "cegepResults", autocomplete: "off", maxlength: "200"});
     const searchButton = action("Search", row, () => renderResults());
     searchButton.setAttribute("aria-controls", "cegepResults");
     const count = element("p", "", content, {role: "status", "aria-live": "polite", "aria-atomic": "true", class: "school-result-count"});
     const number = element("span", "", count, {"data-no-translate": ""});
-    element("span", "CEGEPs found", count);
+    element("span", "Colleges found", count);
     const results = element("ul", "", content, {id: "cegepResults", class: "school-results"});
-    const empty = element("p", "No matching CEGEPs. Try another search.", content);
+    const empty = element("p", "No matching colleges. Try another search.", content);
     function renderResults() {
       const matches = window.UFreeSchools.search(search.value);
       results.replaceChildren();
@@ -599,7 +599,7 @@
           return;
         }
         if (signup && !school.requireSelection())
-          throw Error("Select a CEGEP from the list.");
+          throw Error("Select a CEGEP or college from the list.");
         if (
           signup &&
           (!personal.value || !consent.checked)

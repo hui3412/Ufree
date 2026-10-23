@@ -13,6 +13,10 @@ test('catalog supports unaccented names, aliases and regions, and separates camp
  assert.equal(catalog.search('EDOUARD montpetit')[0].id,'cegepmontpetit');
  assert.equal(catalog.search('cegep ahuntsic')[0].name,'Collège Ahuntsic');
  assert.equal(catalog.search('heritage')[0].id,'cegep-heritage');
+ assert.equal(catalog.search('Marinopolis')[0].id,'marianopolis');
+ assert.equal(catalog.search('Collège Marianopolis')[0].name,'Marianopolis College');
+ assert.equal(catalog.search('brebeuf')[0].id,'brebeuf');
+ assert.equal(catalog.search('LaSalle College')[0].id,'collegelasalle');
  assert.equal(catalog.search('Lanaudiere').length,3);
  assert.equal(catalog.search('Champlain').length,3);
  assert.equal(catalog.search('Lionel Groulx').length,0);
@@ -30,9 +34,9 @@ test('expandable search selects an existing school, collapses, reopens and repla
  await pause();assert.equal(a.calls.length,0);
  a.w.document.querySelector('[data-school-id="cegepmontpetit"]').click();
  assert.equal(chooser.open,false);assert.equal(a.el('selectedCegep').value,'cegepmontpetit');assert.match(chooser.querySelector('summary').textContent,/Édouard-Montpetit/);
- chooser.open=true;search.value='ahuntsic';button(a.w,'Search').click();
- a.w.document.querySelector('[data-school-id="collegeahuntsic"]').click();
- assert.equal(a.el('selectedCegep').value,'collegeahuntsic');assert.equal(field(a.w,'Username').value,'preserve_me');
+ chooser.open=true;search.value='Marinopolis';button(a.w,'Search').click();
+ a.w.document.querySelector('[data-school-id="marianopolis"]').click();
+ assert.equal(a.el('selectedCegep').value,'marianopolis');assert.equal(field(a.w,'Username').value,'preserve_me');
  chooser.open=true;search.dispatchEvent(new a.w.KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true}));assert.equal(chooser.open,false);
  }finally{await a.close();}
 });
@@ -40,7 +44,7 @@ test('typed search text cannot count as selection; missing or forged selection b
  const a=await signup();try{
  field(a.w,'Username').value='new_owner';field(a.w,'Password').value='fictional-password-123';a.w.document.querySelector('.account-dialog input[type="checkbox"]').checked=true;
  a.el('cegepSearch').value='Ahuntsic';button(a.w,'Create account').click();await pause();
- assert.equal(a.calls.length,0);assert.equal(a.el('schoolChooser').open,true);assert.match(a.w.document.querySelector('.account-dialog').textContent,/Select a CEGEP from the list/);
+ assert.equal(a.calls.length,0);assert.equal(a.el('schoolChooser').open,true);assert.match(a.w.document.querySelector('.account-dialog').textContent,/Select a CEGEP or college from the list/);
  a.el('selectedCegep').value='arbitrary-school';button(a.w,'Create account').click();await pause();assert.equal(a.calls.length,0);
  a.el('cegepSearch').value='no such cegep 9876';button(a.w,'Search').click();assert.equal(a.el('cegepResults').children.length,0);
  assert.equal(a.w.document.querySelector('.school-picker-content > p:last-child').hidden,false);
@@ -55,11 +59,11 @@ test('French chooser translates controls and keeps official institution names in
 });
 test('server rejects arbitrary school values before database use and stores canonical catalog names',async()=>{
  const f=fixture();try{
- const body={username:'school_test',password:'fictional-password-123',school:'collegeahuntsic',personalSchedule:'Personal',people:{Personal:person},consent:true};
+ const body={username:'school_test',password:'fictional-password-123',school:'marianopolis',personalSchedule:'Personal',people:{Personal:person},consent:true};
  for(const school of [undefined,'','Custom School','Collège Ahuntsic','COLLEGEAHUNTSIC','__proto__',{},null]){
- f.db.queries=0;const result=await f.call(null,'/auth/signup',{...body,school});assert.equal(result.status,400);assert.equal(result.data.error,'Select a CEGEP from the list.');assert.equal(f.db.queries,0);
+ f.db.queries=0;const result=await f.call(null,'/auth/signup',{...body,school});assert.equal(result.status,400);assert.equal(result.data.error,'Select a CEGEP or college from the list.');assert.equal(f.db.queries,0);
  }
- const valid=await f.call(null,'/auth/signup',body);assert.equal(valid.status,201);assert.equal(valid.data.user.school,'Collège Ahuntsic');assert.equal(f.sql.prepare('SELECT school FROM users WHERE id=?').get(valid.data.user.id).school,'Collège Ahuntsic');
- const login=await f.call(null,'/auth/login',{username:body.username,password:body.password});assert.equal(login.data.user.school,'Collège Ahuntsic');
+ const valid=await f.call(null,'/auth/signup',body);assert.equal(valid.status,201);assert.equal(valid.data.user.school,'Marianopolis College');assert.equal(f.sql.prepare('SELECT school FROM users WHERE id=?').get(valid.data.user.id).school,'Marianopolis College');
+ const login=await f.call(null,'/auth/login',{username:body.username,password:body.password});assert.equal(login.data.user.school,'Marianopolis College');
  }finally{f.sql.close();}
 });

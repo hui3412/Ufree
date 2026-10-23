@@ -41,9 +41,9 @@ test('profile blocks incomplete classes, saves nickname plus one full attached s
 });
 test('signup sends only the selected own schedule, never the rest of Local',async()=>{
  const a=await app({localRecord:local,handler:(path)=>path==='/auth/signup'?new Response(JSON.stringify({error:'stop after request capture'}),{status:400}):undefined});try{
- open(a);button(a.w,'Create account').click();field(a.w,'Username').value='new_owner';field(a.w,'Password').value='test-password-123';a.el("schoolChooser").open=true;a.w.document.querySelector('[data-school-id="collegeahuntsic"]').click();field(a.w,'Account nickname').value='Nickname';
+ open(a);button(a.w,'Create account').click();field(a.w,'Username').value='new_owner';field(a.w,'Password').value='test-password-123';a.el("schoolChooser").open=true;a.w.document.querySelector('[data-school-id="marianopolis"]').click();field(a.w,'Account nickname').value='Nickname';
  const consent=a.w.document.querySelector('.account-dialog input[type="checkbox"]');consent.checked=true;
- button(a.w,'Create account').click();await pause();const sent=a.calls.find(c=>c.url.endsWith('/auth/signup'));assert.ok(sent);const body=JSON.parse(sent.options.body);assert.deepEqual(body.people,{Personal:person});assert.equal(body.school,'collegeahuntsic');assert.equal(body.nickname,'Nickname');assert.equal(body.personalSchedule,'Personal');assert.equal(a.w.localStorage.getItem('whos-free-local-schedules'),a.original);
+ button(a.w,'Create account').click();await pause();const sent=a.calls.find(c=>c.url.endsWith('/auth/signup'));assert.ok(sent);const body=JSON.parse(sent.options.body);assert.deepEqual(body.people,{Personal:person});assert.equal(body.school,'marianopolis');assert.equal(body.nickname,'Nickname');assert.equal(body.personalSchedule,'Personal');assert.equal(a.w.localStorage.getItem('whos-free-local-schedules'),a.original);
  }finally{await a.close();}
 });
 test('offline profile changes remain queued and a followed row can never be uploaded by a client edit',async()=>{

@@ -1,6 +1,11 @@
 // Presentation catalogue. Never translate saved schedules or transport payloads.
 window.UFreeFrench = {
   "exact": {
+    "Choose your CEGEP or college": "Choisissez votre cégep ou collège",
+    "Search CEGEPs and colleges": "Rechercher un cégep ou un collège",
+    "Colleges found": "établissements trouvés",
+    "No matching colleges. Try another search.": "Aucun établissement trouvé. Essayez une autre recherche.",
+    "Select a CEGEP or college from the list.": "Sélectionnez un cégep ou un collège dans la liste.",
     "Search": "Rechercher",
     "Choose your CEGEP": "Choisissez votre cégep",
     "Search CEGEPs": "Rechercher un cégep",
