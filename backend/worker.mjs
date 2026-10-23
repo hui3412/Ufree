@@ -1,14 +1,15 @@
 import { measureDatabase, requestRoute } from "./request-metrics.mjs";
 import { CloudStorage } from "./cloud-storage.mjs";
 import { following, followRequests } from "./following.mjs";
-import { scrypt } from "node:crypto";
-import { bytesToHex, hexToBytes } from "@noble/hashes/utils";
+import { passwordHash } from "./native-passwords.mjs";
+export { passwordHash } from "./native-passwords.mjs";
+import { bytesToHex } from "@noble/hashes/utils";
 
 const ORIGIN = "https://hui3412.github.io";
 const HOUR = 3600000,
   DAY = HOUR * 24;
 const encoder = new TextEncoder();
-const RELEASE = "account-deletion-v1";
+const RELEASE = "account-deletion-free-crypto-v2";
 const random = () => bytesToHex(crypto.getRandomValues(new Uint8Array(32)));
 const digest = async (value) =>
   bytesToHex(
@@ -30,26 +31,20 @@ function safeEqual(a, b) {
   for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
   return diff === 0;
 }
-export async function passwordHash(password, salt = random()) {
-  // Preserve the existing scrypt profile and hash format, using the runtime's native implementation.
-  const value = await new Promise((resolve, reject) => {
-    scrypt(password, hexToBytes(salt), 32, {
-      N: 32768,
-      r: 8,
-      p: 3,
-      maxmem: 64 * 1024 * 1024,
-    }, (error, key) => error ? reject(error) : resolve(key));
-  });
-  return `scrypt$32768$8$3$${salt}$${bytesToHex(value)}`;
+async function requestPasswordHash(env, username, password, salt = random()) {
+  // Production uses the bound coordinator; local Node tests can use the same native implementation.
+  if (!env.PASSWORD_CRYPTO) return passwordHash(password, salt);
+  const scope = await digest(username.toLowerCase());
+  return env.PASSWORD_CRYPTO.getByName(scope).derive(password, salt);
 }
-async function verify(password, stored) {
+async function verify(password, stored, env, username) {
   const pieces = stored.split("$");
   if (
     pieces.length !== 6 ||
     pieces.slice(0, 4).join("$") !== "scrypt$32768$8$3"
   )
     return false;
-  return safeEqual(await passwordHash(password, pieces[4]), stored);
+  return safeEqual(await requestPasswordHash(env, username, password, pieces[4]), stored);
 }
 function credentials(body) {
   if (
@@ -302,7 +297,7 @@ export default {
           fail("Confirm the initial upload of your local collection.");
         const id = crypto.randomUUID(),
           now = Date.now(),
-          hash = await passwordHash(input.password);
+          hash = await requestPasswordHash(env, username, input.password);
         try {
           await run(
             db,
@@ -359,6 +354,7 @@ export default {
           input.password,
           user?.password_hash ||
             `scrypt$32768$8$3$${"0".repeat(64)}$${"0".repeat(64)}`,
+          env, username,
         );
         if (!valid || !user) fail("Incorrect username or password.", 401);
         await db.batch(
@@ -425,7 +421,7 @@ export default {
           fail("Type your username to confirm account deletion.");
         await loginGate(db, [`delete:${user.id}`]);
         await failedLogin(db, [`delete:${user.id}`]);
-        if (!(await verify(input.currentPassword, user.password_hash)))
+        if (!(await verify(input.currentPassword, user.password_hash, env, user.username)))
           fail("Incorrect current password.", 401);
         // The trigger and foreign-key cascades run inside this one atomic delete.
         // Recheck credentials and session after scrypt to reject concurrent revocation.
@@ -448,10 +444,10 @@ export default {
           fail("Current password required.");
         await loginGate(db, [`password:${user.id}`]);
         await failedLogin(db, [`password:${user.id}`]);
-        if (!(await verify(input.currentPassword, user.password_hash)))
+        if (!(await verify(input.currentPassword, user.password_hash, env, user.username)))
           fail("Incorrect current password.", 401);
         credentials({ username: user.username, password: input.newPassword });
-        const hash = await passwordHash(input.newPassword);
+        const hash = await requestPasswordHash(env, user.username, input.newPassword);
         await db.batch([
           statement(
             db,

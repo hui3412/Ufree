@@ -1,7 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "youfreetest",
-  "main": "backend/worker.mjs",
+  "main": "backend/entry.mjs",
   "compatibility_date": "2026-10-20",
   "workers_dev": true,
   "preview_urls": false,
@@ -23,5 +23,21 @@
   },
   "compatibility_flags": [
     "nodejs_compat"
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "PASSWORD_CRYPTO",
+        "class_name": "PasswordCrypto"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "password-crypto-v1",
+      "new_sqlite_classes": [
+        "PasswordCrypto"
+      ]
+    }
   ]
 }
