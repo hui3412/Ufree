@@ -776,7 +776,12 @@ window.UFreeFrench = {
     "This permanently deletes your account, cloud schedules, cloud links, deliveries and following connections. Schedules saved on this device and other people’s independent copies are kept.": "Cette action supprime définitivement votre compte, vos horaires infonuagiques, vos liens de partage, vos envois et vos relations de suivi. Les horaires enregistrés sur cet appareil et les copies indépendantes des autres personnes sont conservés.",
     "Delete this account permanently? This cannot be undone. Your device’s saved schedules will stay available without an account.": "Supprimer définitivement ce compte? Cette action est irréversible. Les horaires enregistrés sur cet appareil resteront accessibles sans compte.",
     "Your credentials changed. Sign in again before deleting your account.": "Vos identifiants ont changé. Reconnectez-vous avant de supprimer votre compte.",
-    "Current password required.": "Le mot de passe actuel est requis."
+    "Current password required.": "Le mot de passe actuel est requis.",
+    "Choose your CEGEP or college": "Choisissez votre cégep ou collège",
+    "Search CEGEPs and colleges": "Rechercher un cégep ou un collège",
+    "Colleges found": "établissements trouvés",
+    "No matching colleges. Try another search.": "Aucun établissement trouvé. Essayez une autre recherche.",
+    "Select a CEGEP or college from the list.": "Sélectionnez un cégep ou un collège dans la liste."
   },
   "templates": [
     {

@@ -43,7 +43,7 @@ test('fresh databases and existing version-0006 shares survive the compatibility
  const a=await f.seed('fresh_restore');const people={Original:person('Original')};const share=await f.call(a,'/shares',{people});assert.equal(share.status,201);
  f.sql.exec(repair);f.sql.exec(repair);
  assert.deepEqual((await f.call(null,'/shares/'+share.data.code.slice(5))).data.people,people);
- const signup=await f.call(null,'/auth/signup',{username:'new_after_repair',password:'fictional-password-123',school:'Test school',personalSchedule:'Personal',people:{Personal:person('New account')},consent:true});assert.equal(signup.status,201);
+ const signup=await f.call(null,'/auth/signup',{username:'new_after_repair',password:'fictional-password-123',school:'marianopolis',personalSchedule:'Personal',people:{Personal:person('New account')},consent:true});assert.equal(signup.status,201);
  assert.equal((await f.call(null,'/auth/login',{username:'new_after_repair',password:'fictional-password-123'})).status,200);
  assert.equal(f.sql.prepare('PRAGMA foreign_key_check').all().length,0);
  }finally{f.sql.close();}

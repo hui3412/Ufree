@@ -12,7 +12,7 @@ test('all password operations dispatch through the private binding and retain th
  };
  try{
  const username='private_crypto',password='fictional-original-123',next='fictional-changed-123';
- const signup=await call('/auth/signup',{username,password,school:'Test',personalSchedule:'Personal',people:{Personal:{classes:[]}},consent:true});assert.equal(signup.status,201);
+ const signup=await call('/auth/signup',{username,password,school:'marianopolis',personalSchedule:'Personal',people:{Personal:{classes:[]}},consent:true});assert.equal(signup.status,201);
  assert.equal((await call('/auth/login',{username,password})).status,200);
  const stored=f.sql.prepare('SELECT password_hash FROM users WHERE id=?').get(signup.data.user.id).password_hash;
  assert.match(stored,/^scrypt\$32768\$8\$3\$[a-f0-9]{64}\$[a-f0-9]{64}$/);

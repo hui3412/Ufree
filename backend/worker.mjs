@@ -1,3 +1,4 @@
+import schoolCatalog from "../schools.js";
 import { measureDatabase, requestRoute } from "./request-metrics.mjs";
 import { CloudStorage } from "./cloud-storage.mjs";
 import { following, followRequests } from "./following.mjs";
@@ -278,18 +279,14 @@ export default {
       const input = request.method === "POST" ? await bodyJSON(request) : null;
       if (path === "/auth/signup" && input) {
         const username = credentials(input);
+        const school = schoolCatalog.find(input.school);
+        if (!school) fail("Select a CEGEP or college from the list.");
         await throttle(
           db,
           `signup:${request.headers.get("cf-connecting-ip") || "unknown"}`,
           5,
           HOUR,
         );
-        if (
-          typeof input.school !== "string" ||
-          !input.school.trim() ||
-          input.school.length > 200
-        )
-          fail("School is required.");
         validatePeople(input.people);
         if (!Object.hasOwn(input.people, input.personalSchedule))
           fail("Select your personal schedule.");
@@ -305,7 +302,7 @@ export default {
             id,
             username,
             hash,
-            input.school.trim(),
+            school.name,
             input.personalSchedule,
             now,
             now,
@@ -323,7 +320,7 @@ export default {
             user: {
               id,
               username,
-              school: input.school.trim(),
+              school: school.name,
               personalSchedule: input.personalSchedule,
             },
           },

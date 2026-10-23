@@ -1,0 +1,793 @@
+{
+  "verifiedOn": "2026-10-23",
+  "scope": "Québec public CEGEPs, private colleges, and other collegiate institutions with verified student Omnivox portals. Public/private status is not an eligibility restriction. Shared network portals are listed once with campus and institution aliases; the original distinct Champlain and Lanaudière portals remain separate.",
+  "directory": "https://www.quebec.ca/education/cegeps-colleges-prives/etudier/liste-colleges",
+  "schools": [
+    {
+      "id": "cndf",
+      "name": "Campus Notre-Dame-de-Foy",
+      "region": "Capitale-Nationale",
+      "aliases": [
+        "CNDF",
+        "Collège Notre-Dame-de-Foy",
+        "Collège BCM"
+      ],
+      "source": "https://www.cndf.qc.ca/",
+      "portal": "https://cndf.omnivox.ca/"
+    },
+    {
+      "id": "cargair",
+      "name": "Cargair",
+      "region": "Montérégie",
+      "aliases": [
+        "Cargair Ltée",
+        "Académie de vol Cargair"
+      ],
+      "source": "https://cargair.omnivox.ca/",
+      "portal": "https://cargair.omnivox.ca/"
+    },
+    {
+      "id": "claurendeau",
+      "name": "Cégep André-Laurendeau",
+      "region": "Montréal",
+      "aliases": [],
+      "source": "https://claurendeau.omnivox.ca/",
+      "portal": "https://claurendeau.omnivox.ca/"
+    },
+    {
+      "id": "cegepba",
+      "name": "Cégep Beauce-Appalaches",
+      "region": "Chaudière-Appalaches",
+      "aliases": [],
+      "source": "https://cegepba.omnivox.ca/",
+      "portal": "https://cegepba.omnivox.ca/"
+    },
+    {
+      "id": "champlaincollege-st-lawrence",
+      "name": "Cégep Champlain – Campus Saint-Lawrence",
+      "region": "Capitale-Nationale",
+      "aliases": [],
+      "source": "https://slc.qc.ca/",
+      "portal": "https://champlaincollege-st-lawrence.omnivox.ca/"
+    },
+    {
+      "id": "champlaincollege-lennoxville",
+      "name": "Cégep Champlain – Lennoxville",
+      "region": "Estrie",
+      "aliases": [],
+      "source": "https://www.crc-lennox.qc.ca/",
+      "portal": "https://champlaincollege-lennoxville.omnivox.ca/"
+    },
+    {
+      "id": "champlaincollege-st-lambert",
+      "name": "Cégep Champlain – Saint-Lambert",
+      "region": "Montérégie",
+      "aliases": [],
+      "source": "https://champlainsaintlambert.ca/",
+      "portal": "https://champlaincollege-st-lambert.omnivox.ca/"
+    },
+    {
+      "id": "cegep-baie-comeau",
+      "name": "Cégep de Baie-Comeau",
+      "region": "Côte-Nord",
+      "aliases": [],
+      "source": "https://cegepbc.ca/",
+      "portal": "https://cegep-baie-comeau.omnivox.ca/"
+    },
+    {
+      "id": "bdeb",
+      "name": "Cégep de Bois-de-Boulogne",
+      "region": "Montréal",
+      "aliases": [],
+      "source": "https://www.bdeb.qc.ca/",
+      "portal": "https://bdeb.omnivox.ca/"
+    },
+    {
+      "id": "cchic",
+      "name": "Cégep de Chicoutimi",
+      "region": "Saguenay–Lac-Saint-Jean",
+      "aliases": [],
+      "source": "https://cchic.ca/",
+      "portal": "https://cchic.omnivox.ca/"
+    },
+    {
+      "id": "cegepdrummond",
+      "name": "Cégep de Drummondville",
+      "region": "Centre-du-Québec",
+      "aliases": [],
+      "source": "https://www.cegepdrummond.ca/",
+      "portal": "https://cegepdrummond.omnivox.ca/"
+    },
+    {
+      "id": "cegepgranby",
+      "name": "Cégep de Granby",
+      "region": "Estrie",
+      "aliases": [],
+      "source": "https://cegepgranby.ca/",
+      "portal": "https://cegepgranby.omnivox.ca/"
+    },
+    {
+      "id": "cegepgim",
+      "name": "Cégep de la Gaspésie et des Îles",
+      "region": "Gaspésie–Îles-de-la-Madeleine",
+      "aliases": [],
+      "source": "https://cegepgim.ca/",
+      "portal": "https://cegepgim.omnivox.ca/"
+    },
+    {
+      "id": "cegepat",
+      "name": "Cégep de l’Abitibi-Témiscamingue",
+      "region": "Abitibi-Témiscamingue",
+      "aliases": [],
+      "source": "https://www.cegepat.qc.ca/",
+      "portal": "https://cegepat.omnivox.ca/"
+    },
+    {
+      "id": "cegeplevis",
+      "name": "Cégep de Lévis",
+      "region": "Chaudière-Appalaches",
+      "aliases": [],
+      "source": "https://www.cegeplevis.ca/",
+      "portal": "https://cegeplevis.omnivox.ca/"
+    },
+    {
+      "id": "cegepoutaouais",
+      "name": "Cégep de l’Outaouais",
+      "region": "Outaouais",
+      "aliases": [],
+      "source": "https://cegepoutaouais.qc.ca/",
+      "portal": "https://cegepoutaouais.omnivox.ca/"
+    },
+    {
+      "id": "cegep-matane",
+      "name": "Cégep de Matane",
+      "region": "Bas-Saint-Laurent",
+      "aliases": [],
+      "source": "https://www.cegep-matane.qc.ca/",
+      "portal": "https://cegep-matane.omnivox.ca/"
+    },
+    {
+      "id": "cegep-rimouski",
+      "name": "Cégep de Rimouski",
+      "region": "Bas-Saint-Laurent",
+      "aliases": [],
+      "source": "https://www.cegep-rimouski.qc.ca/",
+      "portal": "https://cegep-rimouski.omnivox.ca/"
+    },
+    {
+      "id": "cegeprdl",
+      "name": "Cégep de Rivière-du-Loup",
+      "region": "Bas-Saint-Laurent",
+      "aliases": [],
+      "source": "https://www.cegeprdl.ca/",
+      "portal": "https://cegeprdl.omnivox.ca/"
+    },
+    {
+      "id": "crosemont",
+      "name": "Cégep de Rosemont",
+      "region": "Montréal",
+      "aliases": [],
+      "source": "https://crosemont.omnivox.ca/",
+      "portal": "https://crosemont.omnivox.ca/"
+    },
+    {
+      "id": "cegepsth",
+      "name": "Cégep de Saint-Hyacinthe",
+      "region": "Montérégie",
+      "aliases": [
+        "Cégep de St-Hyacinthe"
+      ],
+      "source": "https://www.cegepsth.qc.ca/",
+      "portal": "https://cegepsth.omnivox.ca/"
+    },
+    {
+      "id": "cstj",
+      "name": "Cégep de Saint-Jérôme",
+      "region": "Laurentides",
+      "aliases": [],
+      "source": "https://www.cstj.qc.ca/",
+      "portal": "https://cstj.omnivox.ca/"
+    },
+    {
+      "id": "cegep-st-laurent",
+      "name": "Cégep de Saint-Laurent",
+      "region": "Montréal",
+      "aliases": [],
+      "source": "https://www.cegepsl.qc.ca/",
+      "portal": "https://cegep-st-laurent.omnivox.ca/"
+    },
+    {
+      "id": "csfoy",
+      "name": "Cégep de Sainte-Foy",
+      "region": "Capitale-Nationale",
+      "aliases": [],
+      "source": "https://www.csfoy.ca/etudiants/employes",
+      "portal": "https://csfoy.omnivox.ca/"
+    },
+    {
+      "id": "cegep-sept-iles",
+      "name": "Cégep de Sept-Îles",
+      "region": "Côte-Nord",
+      "aliases": [],
+      "source": "https://cegepsi.ca/",
+      "portal": "https://cegep-sept-iles.omnivox.ca/"
+    },
+    {
+      "id": "cshawi",
+      "name": "Cégep de Shawinigan",
+      "region": "Mauricie",
+      "aliases": [],
+      "source": "https://www.cegepshawinigan.ca/",
+      "portal": "https://cshawi.omnivox.ca/"
+    },
+    {
+      "id": "cegepsherbrooke",
+      "name": "Cégep de Sherbrooke",
+      "region": "Estrie",
+      "aliases": [],
+      "source": "https://cegepsherbrooke.qc.ca/",
+      "portal": "https://cegepsherbrooke.omnivox.ca/"
+    },
+    {
+      "id": "cegepst",
+      "name": "Cégep de Sorel-Tracy",
+      "region": "Montérégie",
+      "aliases": [],
+      "source": "https://www.cegepst.qc.ca/",
+      "portal": "https://cegepst.omnivox.ca/"
+    },
+    {
+      "id": "cegepth",
+      "name": "Cégep de Thetford",
+      "region": "Chaudière-Appalaches",
+      "aliases": [],
+      "source": "https://www.cegepthetford.ca/admission/",
+      "portal": "https://cegepth.omnivox.ca/"
+    },
+    {
+      "id": "cegeptr",
+      "name": "Cégep de Trois-Rivières",
+      "region": "Mauricie",
+      "aliases": [],
+      "source": "https://www.cegeptr.qc.ca/",
+      "portal": "https://cegeptr.omnivox.ca/"
+    },
+    {
+      "id": "colval",
+      "name": "Cégep de Valleyfield",
+      "region": "Montérégie",
+      "aliases": [],
+      "source": "https://www.cegepvalleyfield.ca/",
+      "portal": "https://colval.omnivox.ca/"
+    },
+    {
+      "id": "cegepvicto",
+      "name": "Cégep de Victoriaville",
+      "region": "Centre-du-Québec",
+      "aliases": [],
+      "source": "https://www.cegepvicto.ca/eleves-actuels/guide-etudiant/",
+      "portal": "https://cegepvicto.omnivox.ca/"
+    },
+    {
+      "id": "cvm",
+      "name": "Cégep du Vieux Montréal",
+      "region": "Montréal",
+      "aliases": [
+        "Cégep du Vieux Montréal"
+      ],
+      "source": "https://www.cvm.qc.ca/",
+      "portal": "https://cvm.omnivox.ca/"
+    },
+    {
+      "id": "cegepmontpetit",
+      "name": "Cégep Édouard-Montpetit",
+      "region": "Montérégie",
+      "aliases": [
+        "Cégep Édouard Montpetit"
+      ],
+      "source": "https://www.cegepmontpetit.ca/",
+      "portal": "https://cegepmontpetit.omnivox.ca/"
+    },
+    {
+      "id": "cegepgarneau",
+      "name": "Cégep Garneau",
+      "region": "Capitale-Nationale",
+      "aliases": [],
+      "source": "https://cegepgarneau.ca/",
+      "portal": "https://cegepgarneau.omnivox.ca/"
+    },
+    {
+      "id": "cgodin",
+      "name": "Cégep Gérald-Godin",
+      "region": "Montréal",
+      "aliases": [],
+      "source": "https://www.cgodin.qc.ca/",
+      "portal": "https://cgodin.omnivox.ca/"
+    },
+    {
+      "id": "cegep-heritage",
+      "name": "Cégep Heritage College",
+      "region": "Outaouais",
+      "aliases": [
+        "Collège Héritage"
+      ],
+      "source": "https://www.cegep-heritage.qc.ca/fr/etudiantes-actuelles/pour-commencer",
+      "portal": "https://cegep-heritage.omnivox.ca/"
+    },
+    {
+      "id": "climoilou",
+      "name": "Cégep Limoilou",
+      "region": "Capitale-Nationale",
+      "aliases": [],
+      "source": "https://www.cegeplimoilou.ca/connexion/",
+      "portal": "https://climoilou.omnivox.ca/"
+    },
+    {
+      "id": "collegemv",
+      "name": "Cégep Marie-Victorin",
+      "region": "Montréal",
+      "aliases": [],
+      "source": "https://cegepmv.ca/",
+      "portal": "https://collegemv.omnivox.ca/"
+    },
+    {
+      "id": "cegep-lanaudiere-joliette",
+      "name": "Cégep régional de Lanaudière à Joliette",
+      "region": "Lanaudière",
+      "aliases": [],
+      "source": "https://cegep-lanaudiere.qc.ca/joliette/",
+      "portal": "https://cegep-lanaudiere-joliette.omnivox.ca/"
+    },
+    {
+      "id": "cegep-lanaudiere-assomption",
+      "name": "Cégep régional de Lanaudière à L’Assomption",
+      "region": "Lanaudière",
+      "aliases": [],
+      "source": "https://cegep-lanaudiere.qc.ca/lassomption/",
+      "portal": "https://cegep-lanaudiere-assomption.omnivox.ca/"
+    },
+    {
+      "id": "cegep-lanaudiere-terrebonne",
+      "name": "Cégep régional de Lanaudière à Terrebonne",
+      "region": "Lanaudière",
+      "aliases": [],
+      "source": "https://cegep-lanaudiere.qc.ca/terrebonne/",
+      "portal": "https://cegep-lanaudiere-terrebonne.omnivox.ca/"
+    },
+    {
+      "id": "cstjean",
+      "name": "Cégep Saint-Jean-sur-Richelieu",
+      "region": "Montérégie",
+      "aliases": [],
+      "source": "https://www.cstjean.qc.ca/",
+      "portal": "https://cstjean.omnivox.ca/"
+    },
+    {
+      "id": "collegeahuntsic",
+      "name": "Collège Ahuntsic",
+      "region": "Montréal",
+      "aliases": [
+        "Cégep d’Ahuntsic"
+      ],
+      "source": "https://www.collegeahuntsic.qc.ca/",
+      "portal": "https://collegeahuntsic.omnivox.ca/"
+    },
+    {
+      "id": "airrichelieu",
+      "name": "Collège Air Richelieu",
+      "region": "Montérégie",
+      "aliases": [],
+      "source": "https://www.airrichelieu.com/",
+      "portal": "https://airrichelieu.omnivox.ca/"
+    },
+    {
+      "id": "grasset",
+      "name": "Collège André-Grasset",
+      "region": "Montréal",
+      "aliases": [],
+      "source": "https://www.grasset.qc.ca/",
+      "portal": "https://grasset.omnivox.ca/"
+    },
+    {
+      "id": "collegeavalon",
+      "name": "Collège Avalon",
+      "region": "Capitale-Nationale et Montréal",
+      "aliases": [
+        "Avalon College"
+      ],
+      "source": "https://collegeavalon.omnivox.ca/Login/Account/Login",
+      "portal": "https://collegeavalon.omnivox.ca/"
+    },
+    {
+      "id": "bart",
+      "name": "Collège Bart",
+      "region": "Capitale-Nationale",
+      "aliases": [],
+      "source": "https://bart.omnivox.ca/Login/Account/Login",
+      "portal": "https://bart.omnivox.ca/"
+    },
+    {
+      "id": "collegecanada",
+      "name": "Collège Canada",
+      "region": "Montréal, Estrie et Outaouais",
+      "aliases": [
+        "Canada College"
+      ],
+      "source": "https://www.collegecanada.com",
+      "portal": "https://collegecanada.omnivox.ca/"
+    },
+    {
+      "id": "academyofaeronautics",
+      "name": "Collège d’aéronautique",
+      "region": "Montréal",
+      "aliases": [
+        "Academy of Aeronautics"
+      ],
+      "source": "https://academyofaeronautics.omnivox.ca/intr/",
+      "portal": "https://academyofaeronautics.omnivox.ca/"
+    },
+    {
+      "id": "matrixcollege",
+      "name": "Collège de gestion, technologie et santé Matrix inc.",
+      "region": "Montréal",
+      "aliases": [
+        "Matrix College",
+        "Collège Matrix"
+      ],
+      "source": "https://www.matrixcollege.ca/",
+      "portal": "https://matrixcollege.omnivox.ca/"
+    },
+    {
+      "id": "collegeimmobilier",
+      "name": "Collège de l’immobilier du Québec",
+      "region": "Montréal",
+      "aliases": [],
+      "source": "https://www.collegeimmobilier.com/",
+      "portal": "https://collegeimmobilier.omnivox.ca/"
+    },
+    {
+      "id": "cmaisonneuve",
+      "name": "Collège de Maisonneuve",
+      "region": "Montréal",
+      "aliases": [
+        "Cégep de Maisonneuve"
+      ],
+      "source": "https://www.cmaisonneuve.qc.ca/",
+      "portal": "https://cmaisonneuve.omnivox.ca/"
+    },
+    {
+      "id": "collegedecarie",
+      "name": "Collège Décarie",
+      "region": "Montréal",
+      "aliases": [],
+      "source": "https://www.collegedecarie.ca/",
+      "portal": "https://collegedecarie.omnivox.ca/"
+    },
+    {
+      "id": "cei",
+      "name": "Collège d’enseignement en immobilier inc.",
+      "region": "Montréal",
+      "aliases": [
+        "Collège CEI"
+      ],
+      "source": "https://www.college-cei.com/",
+      "portal": "https://cei.omnivox.ca/"
+    },
+    {
+      "id": "montrealcollege",
+      "name": "Collège des Technologies de l'Information de Montréal",
+      "region": "Montréal",
+      "aliases": [
+        "Montreal College of Information Technology",
+        "MCIT"
+      ],
+      "source": "https://www.montrealcollege.ca/",
+      "portal": "https://montrealcollege.omnivox.ca/"
+    },
+    {
+      "id": "ellis",
+      "name": "Collège Ellis",
+      "region": "Centre-du-Québec, Mauricie et Montérégie",
+      "aliases": [
+        "Collège Ellis Drummondville",
+        "Collège Ellis Trois-Rivières",
+        "Collège Ellis Longueuil"
+      ],
+      "source": "https://www.ellis.qc.ca/",
+      "portal": "https://ellis.omnivox.ca/"
+    },
+    {
+      "id": "brebeuf",
+      "name": "Collège Jean-de-Brébeuf",
+      "region": "Montréal",
+      "aliases": [],
+      "source": "https://www.brebeuf.qc.ca/",
+      "portal": "https://brebeuf.omnivox.ca/"
+    },
+    {
+      "id": "kensleycollege",
+      "name": "Collège Kensley",
+      "region": "Montréal",
+      "aliases": [
+        "Kensley College"
+      ],
+      "source": "https://kensleycollege.omnivox.ca/Login/Account/Login",
+      "portal": "https://kensleycollege.omnivox.ca/"
+    },
+    {
+      "id": "clafleche",
+      "name": "Collège Laflèche",
+      "region": "Mauricie",
+      "aliases": [],
+      "source": "https://clafleche.qc.ca/",
+      "portal": "https://clafleche.omnivox.ca/"
+    },
+    {
+      "id": "collegelasalle",
+      "name": "Collège LaSalle",
+      "region": "Montréal et Laval",
+      "aliases": [
+        "LaSalle College",
+        "Collège LaSalle Montréal",
+        "Collège LaSalle Laval"
+      ],
+      "source": "https://collegelasalle.lcieducation.com/fr",
+      "portal": "https://collegelasalle.omnivox.ca/"
+    },
+    {
+      "id": "cmrsj-rmcsj",
+      "name": "Collège militaire royal de Saint-Jean",
+      "region": "Montérégie",
+      "aliases": [
+        "Royal Military College Saint-Jean",
+        "CMR Saint-Jean",
+        "RMC Saint-Jean"
+      ],
+      "source": "https://cmrsj-rmcsj.omnivox.ca/intr/",
+      "portal": "https://cmrsj-rmcsj.omnivox.ca/"
+    },
+    {
+      "id": "collegemultihexa",
+      "name": "Collège Multihexa",
+      "region": "Saguenay–Lac-Saint-Jean",
+      "aliases": [],
+      "source": "https://collegemultihexa.omnivox.ca/Login/Account/Login",
+      "portal": "https://collegemultihexa.omnivox.ca/"
+    },
+    {
+      "id": "collegenational",
+      "name": "Collège national de science et technologie inc.",
+      "region": "Montréal",
+      "aliases": [
+        "College National of Science and Technology"
+      ],
+      "source": "https://collegenational.ca/",
+      "portal": "https://collegenational.omnivox.ca/"
+    },
+    {
+      "id": "osullivan",
+      "name": "Collège O’Sullivan de Montréal",
+      "region": "Montréal",
+      "aliases": [
+        "O'Sullivan College of Montreal"
+      ],
+      "source": "https://osullivan.edu/",
+      "portal": "https://osullivan.omnivox.ca/"
+    },
+    {
+      "id": "collegest-michel",
+      "name": "Collège St-Michel, Pavillon Sauvé",
+      "region": "Montréal",
+      "aliases": [],
+      "source": "https://collegest-michel.omnivox.ca/Login/Account/Login",
+      "portal": "https://collegest-michel.omnivox.ca/"
+    },
+    {
+      "id": "tav",
+      "name": "Collège TAV",
+      "region": "Montréal",
+      "aliases": [
+        "TAV College"
+      ],
+      "source": "https://www.tav.ca/",
+      "portal": "https://tav.omnivox.ca/"
+    },
+    {
+      "id": "collegeuniversel",
+      "name": "Collège Universel",
+      "region": "Estrie, Montréal et Outaouais",
+      "aliases": [
+        "Collège Universel Gatineau",
+        "Collège Universel Montréal",
+        "Collège Universel Sherbrooke"
+      ],
+      "source": "https://collegeuniversel.ca/",
+      "portal": "https://collegeuniversel.omnivox.ca/"
+    },
+    {
+      "id": "sainteanne",
+      "name": "Collégial international Sainte-Anne",
+      "region": "Montréal",
+      "aliases": [],
+      "source": "https://collegial.sainteanne.ca/",
+      "portal": "https://sainteanne.omnivox.ca/"
+    },
+    {
+      "id": "conservatoire",
+      "name": "Conservatoire de musique et d’art dramatique du Québec",
+      "region": "Plusieurs régions du Québec",
+      "aliases": [
+        "Conservatoire de musique de Val-d’Or",
+        "Conservatoire de musique de Rimouski",
+        "Conservatoire de musique de Québec",
+        "Conservatoire de musique de Trois-Rivières",
+        "Conservatoire de musique de Montréal",
+        "Conservatoire de musique de Gatineau",
+        "Conservatoire de musique de Saguenay",
+        "Abitibi-Témiscamingue",
+        "Bas-Saint-Laurent",
+        "Capitale-Nationale",
+        "Mauricie",
+        "Montréal",
+        "Outaouais",
+        "Saguenay–Lac-Saint-Jean",
+        "CMADQ"
+      ],
+      "source": "https://www.conservatoire.gouv.qc.ca/",
+      "portal": "https://conservatoire.omnivox.ca/"
+    },
+    {
+      "id": "dawsoncollege",
+      "name": "Dawson College",
+      "region": "Montréal",
+      "aliases": [
+        "Collège Dawson"
+      ],
+      "source": "https://www.dawsoncollege.qc.ca/",
+      "portal": "https://dawsoncollege.omnivox.ca/"
+    },
+    {
+      "id": "em-insa",
+      "name": "École de management INSA",
+      "region": "Montréal",
+      "aliases": [],
+      "source": "https://en.em-insa.com/",
+      "portal": "https://em-insa.omnivox.ca/"
+    },
+    {
+      "id": "ecolenationaledecirque",
+      "name": "École nationale de cirque",
+      "region": "Montréal",
+      "aliases": [],
+      "source": "https://ecolenationaledecirque.omnivox.ca/Login/Account/Login",
+      "portal": "https://ecolenationaledecirque.omnivox.ca/"
+    },
+    {
+      "id": "enh",
+      "name": "École nationale de l’humour",
+      "region": "Montréal",
+      "aliases": [],
+      "source": "https://enh.omnivox.ca/Login/Account/Login",
+      "portal": "https://enh.omnivox.ca/"
+    },
+    {
+      "id": "esidem",
+      "name": "École Supérieure Internationale de Montréal",
+      "region": "Montréal",
+      "aliases": [
+        "ESIDEM"
+      ],
+      "source": "https://esidem.omnivox.ca/",
+      "portal": "https://esidem.omnivox.ca/"
+    },
+    {
+      "id": "itaq",
+      "name": "Institut de technologie agroalimentaire du Québec",
+      "region": "Bas-Saint-Laurent et Montérégie",
+      "aliases": [
+        "ITAQ",
+        "ITA",
+        "Campus de La Pocatière",
+        "Campus de Saint-Hyacinthe"
+      ],
+      "source": "https://itaq.omnivox.ca/Login/Account/Login",
+      "portal": "https://itaq.omnivox.ca/"
+    },
+    {
+      "id": "teccart",
+      "name": "Institut Teccart",
+      "region": "Montréal et Montérégie",
+      "aliases": [],
+      "source": "https://teccart.omnivox.ca/Login/Account/Login",
+      "portal": "https://teccart.omnivox.ca/"
+    },
+    {
+      "id": "isartdigital",
+      "name": "ISART Digital Montréal",
+      "region": "Montréal",
+      "aliases": [
+        "Isart Digital"
+      ],
+      "source": "https://isartdigital.omnivox.ca/Login/Account/Login",
+      "portal": "https://isartdigital.omnivox.ca/"
+    },
+    {
+      "id": "johnabbott",
+      "name": "John Abbott College",
+      "region": "Montréal",
+      "aliases": [
+        "Cégep John Abbott"
+      ],
+      "source": "https://johnabbott.qc.ca/",
+      "portal": "https://johnabbott.omnivox.ca/"
+    },
+    {
+      "id": "marianopolis",
+      "name": "Marianopolis College",
+      "region": "Montréal",
+      "aliases": [
+        "Collège Marianopolis",
+        "Marinopolis",
+        "Marianopolis"
+      ],
+      "source": "https://www.marianopolis.edu/life-on-campus/support-services/",
+      "portal": "https://marianopolis.omnivox.ca/"
+    },
+    {
+      "id": "college-merici",
+      "name": "Mérici Collégial Privé",
+      "region": "Capitale-Nationale",
+      "aliases": [
+        "Collège Mérici",
+        "Mérici Collégial Privé"
+      ],
+      "source": "https://college-merici.omnivox.ca/Login/Account/Login",
+      "portal": "https://college-merici.omnivox.ca/"
+    },
+    {
+      "id": "seminaire-sherbrooke",
+      "name": "Séminaire de Sherbrooke",
+      "region": "Estrie",
+      "aliases": [],
+      "source": "https://seminaire-sherbrooke.omnivox.ca/Login/Account/Login",
+      "portal": "https://seminaire-sherbrooke.omnivox.ca/"
+    },
+    {
+      "id": "vaniercollege",
+      "name": "Vanier College",
+      "region": "Montréal",
+      "aliases": [
+        "Cégep Vanier"
+      ],
+      "source": "https://www.vaniercollege.qc.ca/",
+      "portal": "https://vaniercollege.omnivox.ca/"
+    }
+  ],
+  "excludedColnet": [
+    {
+      "name": "Cégep de La Pocatière",
+      "source": "https://www.cegeplapocatiere.qc.ca/acces-rapide/colnet-temis/"
+    },
+    {
+      "name": "Cégep Lionel Groulx",
+      "source": "https://clg.qc.ca/colnet/"
+    },
+    {
+      "name": "Cégep Montmorency",
+      "source": "https://www.cmontmorency.qc.ca/etudiants/carrefour-info/se-connecter/"
+    },
+    {
+      "name": "Cégep de Jonquière",
+      "source": "https://enligne.cegepjonquiere.ca/"
+    },
+    {
+      "name": "Cégep de St-Félicien",
+      "source": "https://cegepstfe.ca/acces-aux-etudiants/"
+    },
+    {
+      "name": "Collège d’Alma",
+      "source": "https://www.collegealma.ca/plateformes-etudiants/"
+    }
+  ],
+  "coverageNotes": "The Québec government directory was checked across its public, private subsidized, private non-subsidized and government-network categories. Only verified student portals are included; an admission-only, placement or activity-registration portal is not sufficient. Missing search results do not prove a school does not use Omnivox. See college-directory-audit.json for the research coverage and unresolved entries."
+}

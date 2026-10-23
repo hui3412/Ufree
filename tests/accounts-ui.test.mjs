@@ -107,6 +107,7 @@ async function app({
     "schedule-groups.js",
     "schedule-share-code.js",
     "account-sync.js",
+    "schools.js",
     "accounts.js",
     "app.js",
   ])
@@ -525,5 +526,48 @@ test('failed account deletion keeps identity and phone data, clears the password
   assert.ok(a.w.localStorage.getItem('ufree-test-account-v1:test-user'));
   assert.ok(JSON.parse(a.w.localStorage.getItem('whos-free-local-schedules')).data.people.Original);
   assert.match(dialog.textContent,/mot de passe/i);
+ }finally{await a.close();}
+});
+
+const signupField=(w,label)=>[...w.document.querySelectorAll('.account-dialog label')].find(n=>w.UFreeI18n.sourceText(n.firstChild)===label)?.querySelector('input,select');
+async function signupPicker(){const a=await app();a.el('mobileMenuButton').click();a.el('accountMenuButton').click();buttonWith(a.w,'Create account').click();return a;}
+test('expandable college chooser filters accents, selects Marianopolis and preserves signup fields in both languages',async()=>{
+ const a=await signupPicker();try{
+ const chooser=a.el('schoolChooser'),search=a.el('cegepSearch');
+ assert.equal(chooser.open,false);assert.equal(a.el('selectedCegep').type,'hidden');
+ signupField(a.w,'Username').value='preserve_me';chooser.open=true;
+ search.value='EDOUARD';search.dispatchEvent(new a.w.Event('input'));assert.equal(a.el('cegepResults').querySelectorAll('button').length,1);
+ search.dispatchEvent(new a.w.KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true}));await new Promise(r=>setTimeout(r,10));assert.equal(a.calls.length,0);
+ a.w.document.querySelector('[data-school-id="cegepmontpetit"]').click();assert.equal(chooser.open,false);assert.match(chooser.querySelector('summary').textContent,/Édouard-Montpetit/);
+ chooser.open=true;search.value='Marinopolis';buttonWith(a.w,'Search').click();a.w.document.querySelector('[data-school-id="marianopolis"]').click();
+ assert.equal(a.el('selectedCegep').value,'marianopolis');assert.equal(signupField(a.w,'Username').value,'preserve_me');
+ a.w.UFreeI18n.setLanguage('fr');assert.match(chooser.textContent,/Rechercher un cégep/);assert.equal(a.el('selectedCegep').value,'marianopolis');assert.equal(signupField(a.w,'Username').value,'preserve_me');
+ assert.equal(chooser.querySelector('summary [data-no-translate]').textContent,'Marianopolis College');
+ chooser.open=true;search.dispatchEvent(new a.w.KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true}));assert.equal(chooser.open,false);
+ }finally{await a.close();}
+});
+test('typing or forging a college cannot submit signup and an empty search shows helpful feedback',async()=>{
+ const a=await signupPicker();try{
+ signupField(a.w,'Username').value='new_owner';signupField(a.w,'Password').value='fictional-password-123';a.w.document.querySelector('.account-dialog input[type="checkbox"]').checked=true;
+ a.el('cegepSearch').value='Ahuntsic';buttonWith(a.w,'Create account').click();await new Promise(r=>setTimeout(r,10));assert.equal(a.calls.length,0);assert.equal(a.el('schoolChooser').open,true);
+ a.el('selectedCegep').value='forged-school';buttonWith(a.w,'Create account').click();await new Promise(r=>setTimeout(r,10));assert.equal(a.calls.length,0);
+ a.el('cegepSearch').value='no such college 9876';buttonWith(a.w,'Search').click();assert.equal(a.el('cegepResults').children.length,0);
+ assert.equal(a.w.document.querySelector('.school-picker-content > p:last-child').hidden,false);
+ }finally{await a.close();}
+});
+test('signup sends the selected college ID after switching languages without losing personal selection or consent',async()=>{
+ const a=await app({handler:path=>path==='/auth/signup'?{user:{...user,school:'Marianopolis College',personalSchedule:'Original'},token:'b'.repeat(64)}:undefined});
+ try{
+ a.el('mobileMenuButton').click();a.el('accountMenuButton').click();buttonWith(a.w,'Create account').click();
+ signupField(a.w,'Username').value='new_owner';signupField(a.w,'Password').value='fictional-password-123';
+ const personal=signupField(a.w,'Your personal schedule');personal.value='Original';
+ const consent=a.w.document.querySelector('.account-dialog input[type="checkbox"]');consent.checked=true;
+ a.w.document.querySelector('[data-school-id="marianopolis"]').click();a.w.UFreeI18n.setLanguage('fr');
+ assert.ok(personal.isConnected);assert.ok(consent.isConnected);assert.equal(consent.checked,true);assert.equal(personal.value,'Original');
+ buttonWith(a.w,'Créer un compte').click();
+ await settle(()=>a.calls.some(c=>new URL(c.url).pathname==='/auth/signup'));
+ const call=a.calls.find(c=>new URL(c.url).pathname==='/auth/signup');const body=JSON.parse(call.options.body);
+ assert.equal(body.school,'marianopolis');assert.equal(body.personalSchedule,'Original');assert.equal(body.consent,true);
+ await settle(()=>a.calls.some(c=>new URL(c.url).pathname==='/sync'&&c.options?.body));
  }finally{await a.close();}
 });
