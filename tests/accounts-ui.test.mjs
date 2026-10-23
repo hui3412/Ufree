@@ -20,6 +20,7 @@ async function app({
   cloud = false,
   extraRecords = {},
   handler,
+  savedStorage,
 } = {}) {
   const w = new Window({
     url:
@@ -66,15 +67,31 @@ async function app({
       }),
     );
   }
+  if (savedStorage) {
+    w.localStorage.clear();
+    for (const [key, value] of Object.entries(savedStorage)) w.localStorage.setItem(key, value);
+  }
+  let revision = account ? 1 : 0;
+  const cloudRecords = account ? { "p:Account person": { semester: "Fall 2026", classes: [] }, ...extraRecords } : {};
   let calls = [];
   w.fetch = async (url, options) => {
     calls.push({ url, options });
     const path = new URL(url).pathname;
     const custom = handler?.(path, options);
     if (custom !== undefined) { const resolved = await custom; return resolved instanceof Response ? resolved : new Response(JSON.stringify(resolved)); }
+    if (path === "/sync") {
+      const body = JSON.parse(options?.body || "null");
+      if (body) {
+        for (const row of body.changes) {
+          if (row.value === null) delete cloudRecords[row.name]; else cloudRecords[row.name] = row.value;
+        }
+        return new Response(JSON.stringify({ revision: ++revision }));
+      }
+      return new Response(JSON.stringify({ revision, changes: Object.entries(cloudRecords).map(([name, value]) => ({ name, value })) }));
+    }
     return new Response(JSON.stringify(
         path === "/revision"
-          ? { revision: account ? 1 : 0 }
+          ? { revision }
           : path === "/deliveries"
             ? { deliveries: [] }
             : {
@@ -107,10 +124,7 @@ test("signed-out introduction adds only an account entry and preserves saved Loc
   const a = await app();
   try {
     assert.ok(a.el("peopleList").textContent.includes("Original"));
-    assert.equal(
-      a.w.localStorage.getItem("whos-free-local-schedules"),
-      a.original,
-    );
+    assert.deepEqual(JSON.parse(a.w.localStorage.getItem("whos-free-local-schedules")).data.people.Original, record.data.people.Original);
     assert.equal(a.calls.length, 0);
     assert.equal(a.w.document.querySelector(".account-collection-label"), null);
     a.el("mobileMenuButton").click();
@@ -133,38 +147,19 @@ test("signed-out introduction adds only an account entry and preserves saved Loc
     await a.close();
   }
 });
-test("Account view reads its independent copy and removal never changes the legacy Local record", async () => {
+test("signing in merges phone and cached account schedules into the same saved collection", async () => {
   const a = await app({ account: true });
   try {
     assert.match(a.el("peopleList").textContent, /Account person/);
-    assert.doesNotMatch(a.el("peopleList").textContent, /Original/);
-    await a.w.UFreeAccounts.save({
-      data: { people: { Changed: { semester: "Fall 2026", classes: [] } } },
-      meta: {},
-    });
-    assert.equal(
-      a.w.localStorage.getItem("whos-free-local-schedules"),
-      a.original,
-    );
-    await a.w.UFreeAccounts.save({
-      data: {
-        people: { "@preferences": { semester: "Fall 2026", classes: [] } },
-      },
-      meta: {},
-    });
-    assert.equal(
-      a.w.UFreeAccounts.read().data.people["@preferences"].classes.length,
-      0,
-    );
-    a.w.UFreeAccounts.clear();
-    assert.equal(
-      a.w.localStorage.getItem("whos-free-local-schedules"),
-      a.original,
-    );
-    assert.equal(a.w.UFreeAccounts.read().data.people.Changed, undefined);
-  } finally {
-    await a.close();
-  }
+    assert.match(a.el("peopleList").textContent, /Original/);
+    await a.w.UFreeAccounts.save({data:{people:{Changed:{semester:"Fall 2026",classes:[]}}},meta:{}});
+    assert.deepEqual(Object.keys(JSON.parse(a.w.localStorage.getItem("whos-free-local-schedules")).data.people), ["Changed"]);
+    await a.w.UFreeAccounts.clear();
+    assert.deepEqual(JSON.parse(a.w.localStorage.getItem("whos-free-local-schedules")).data.people, {});
+    a.el("mobileMenuButton").click(); a.el("accountMenuButton").click();
+    const text = a.w.document.querySelector(".account-dialog").textContent;
+    assert.doesNotMatch(text, /Local view|Account view|Copy Local to Account/);
+  } finally { await a.close(); }
 });
 test("a guest cloud snapshot waits for the dismissible account prompt, then imports without signup", async () => {
   const a = await app({ cloud: true });
@@ -243,17 +238,14 @@ test("account search caps results and sends no follow request before explicit co
     );
     const request = a.calls.find((c) => c.url.endsWith("/connections/request"));
     assert.equal(JSON.parse(request.options.body).sharePersonal, true);
-    assert.equal(
-      a.w.localStorage.getItem("whos-free-local-schedules"),
-      a.original,
-    );
+    assert.deepEqual(JSON.parse(a.w.localStorage.getItem("whos-free-local-schedules")).data.people.Original, record.data.people.Original);
     a.w.UFreeI18n.setLanguage("fr");
     assert.ok(buttonWith(a.w, "Rechercher des comptes"));
   } finally {
     await a.close();
   }
 });
-test("cached followed schedules remain read-only and separate from own records and Local data", async () => {
+test("cached followed schedules remain read-only in the shared phone collection", async () => {
   const payload = {
     username: "fictional_friend",
     person: { semester: "Fall 2026", classes: [] },
@@ -261,7 +253,7 @@ test("cached followed schedules remain read-only and separate from own records a
   const a = await app({ account: true, extraRecords: { "f:peer": payload } });
   try {
     assert.equal(a.w.UFreeAccounts.isLive("@fictional_friend"), true);
-    const saved = a.w.UFreeAccounts.save({
+    const saved = await a.w.UFreeAccounts.save({
       data: {
         people: {
           "@fictional_friend": { semester: "tampered", classes: [] },
@@ -276,13 +268,10 @@ test("cached followed schedules remain read-only and separate from own records a
     );
     assert.equal(state.records["p:@fictional_friend"], undefined);
     assert.equal(state.records["f:peer"].person.semester, "Fall 2026");
-    a.w.UFreeAccounts.clear();
+    await a.w.UFreeAccounts.clear();
     assert.equal(a.w.UFreeAccounts.read().data.people.Own, undefined);
     assert.ok(a.w.UFreeAccounts.read().data.people["@fictional_friend"]);
-    assert.equal(
-      a.w.localStorage.getItem("whos-free-local-schedules"),
-      a.original,
-    );
+    assert.ok(JSON.parse(a.w.localStorage.getItem("whos-free-local-schedules")).data.people["@fictional_friend"]);
   } finally {
     await a.close();
   }
@@ -322,10 +311,7 @@ test("follow inbox acceptance requires a second consent confirmation and preserv
     assert.equal(payload.id, "request-id");
     assert.equal(payload.decision, "accepted");
     assert.equal(payload.sharePersonal, true);
-    assert.equal(
-      a.w.localStorage.getItem("whos-free-local-schedules"),
-      a.original,
-    );
+    assert.deepEqual(JSON.parse(a.w.localStorage.getItem("whos-free-local-schedules")).data.people.Original, record.data.people.Original);
   } finally {
     await a.close();
   }
@@ -351,10 +337,7 @@ test("an empty unchanged inbox does not need its own automatic request; manual I
       a.calls.filter((c) => c.url.endsWith("/deliveries")).length,
       1,
     );
-    assert.equal(
-      a.w.localStorage.getItem("whos-free-local-schedules"),
-      a.original,
-    );
+    assert.deepEqual(JSON.parse(a.w.localStorage.getItem("whos-free-local-schedules")).data.people.Original, record.data.people.Original);
   } finally {
     await a.close();
   }
@@ -400,7 +383,7 @@ test('structured and edge HTML daily quota errors pause cloud requests across re
    a.el('mobileMenuButton').click();a.el('accountMenuButton').click();
    for(let i=0;i<10;i++){buttonWith(a.w, 'Inbox').click();await new Promise(r=>setTimeout(r,5));}
    assert.equal(a.calls.length,count,'paused cloud requests never reach fetch');
-   assert.equal(a.w.localStorage.getItem('whos-free-local-schedules'),a.original);
+   assert.deepEqual(JSON.parse(a.w.localStorage.getItem('whos-free-local-schedules')).data.people.Original, record.data.people.Original);
    assert.ok(a.w.localStorage.getItem('ufree-test-account-v1:test-user'));
   } finally {await a.close();}
  }
@@ -415,5 +398,88 @@ test('cloud-sharing controls send all saved details without a filtering checkbox
  buttonWith(a.w,'Create 48-hour link / code').click();await new Promise(r=>setTimeout(r,30));
  const request=a.calls.find(call=>new URL(call.url).pathname==='/shares');assert.ok(request);assert.deepEqual(JSON.parse(request.options.body).people,{Complete:full});
  a.w.UFreeI18n.setLanguage('fr');assert.match(a.w.document.querySelector('.account-dialog').textContent,/Comprend l’horaire complet/);
+ }finally{await a.close();}
+});
+
+const snapshotStorage = w => Object.fromEntries(Array.from({length:w.localStorage.length}, (_,i) => {const key=w.localStorage.key(i);return [key,w.localStorage.getItem(key)];}));
+test("signing out reads the same phone collection and signed-out edits merge on return", async () => {
+  let a = await app({account:true});
+  let storage;
+  try {
+    storage = snapshotStorage(a.w);
+    delete storage["ufree-test-session-v1"];
+  } finally { await a.close(); }
+  a = await app({savedStorage:storage});
+  try {
+    assert.match(a.el("peopleList").textContent, /Original/);
+    assert.match(a.el("peopleList").textContent, /Account person/);
+    assert.equal(a.calls.length, 0);
+    storage = snapshotStorage(a.w);
+    const phone=JSON.parse(storage["whos-free-local-schedules"]);
+    delete phone.data.people.Original;
+    phone.data.people["Account person"].note="Edited while signed out";
+    storage["whos-free-local-schedules"]=JSON.stringify(phone);
+    storage["ufree-test-session-v1"]=JSON.stringify({user,token:"b".repeat(64)});
+    // A simultaneous remote edit must coexist with the signed-out edit.
+    const account=JSON.parse(storage["ufree-test-account-v1:test-user"]);
+    account.records["p:Account person"].note="Edited on another device";
+    storage["ufree-test-account-v1:test-user"]=JSON.stringify(account);
+  } finally { await a.close(); }
+  a = await app({savedStorage:storage,handler:()=>{throw Error("Offline");}});
+  try {
+    const people=JSON.parse(a.w.localStorage.getItem("whos-free-local-schedules")).data.people;
+    assert.equal(people.Original,undefined);
+    assert.deepEqual(Object.values(people).map(p=>p.note).sort(),["Edited on another device","Edited while signed out"]);
+    assert.match(a.el("peopleList").textContent,/sync conflict/);
+  } finally { await a.close(); }
+});
+
+test("cloud downloads and deletions are saved to the phone while device-only schedules upload", async () => {
+  const a=await app({account:true,handler:(path,options)=>{
+    if(path==='/revision')return {revision:2};
+    if(path==='/sync'&&!options?.body)return {revision:2,changes:[{name:'p:Account person',value:null},{name:'p:Remote',value:{semester:'Fall 2026',classes:[],note:'Downloaded'}}]};
+  }});
+  try {
+    await settle(()=>JSON.parse(a.w.localStorage.getItem('whos-free-local-schedules')).data.people.Remote);
+    const phone=JSON.parse(a.w.localStorage.getItem('whos-free-local-schedules')).data.people;
+    assert.equal(phone['Account person'],undefined);
+    assert.equal(phone.Remote.note,'Downloaded');
+    assert.ok(phone.Original);
+    assert.ok(a.calls.some(c=>new URL(c.url).pathname==='/sync'&&c.options?.body&&JSON.parse(c.options.body).changes.some(row=>row.name==='p:Original')));
+    const storage=snapshotStorage(a.w);delete storage['ufree-test-session-v1'];
+    const guest=await app({savedStorage:storage});
+    try { assert.match(guest.el('peopleList').textContent,/Remote/);assert.equal(guest.calls.length,0); }
+    finally {await guest.close();}
+  } finally {await a.close();}
+});
+test("signed-in offline changes persist on the phone and upload on reconnection", async () => {
+  let offline=true;
+  const a=await app({account:true,handler:()=>{if(offline)throw Error('Offline');}});
+  try {
+    await a.w.UFreeAccounts.save({data:{people:{Offline:{semester:'Fall 2026',classes:[],note:'Saved without network'}}}});
+    assert.equal(JSON.parse(a.w.localStorage.getItem('whos-free-local-schedules')).data.people.Offline.note,'Saved without network');
+    offline=false;
+    a.el('mobileMenuButton').click();a.el('accountMenuButton').click();buttonWith(a.w,'Refresh sync').click();
+    await settle(()=>a.calls.some(c=>new URL(c.url).pathname==='/sync'&&c.options?.body&&JSON.parse(c.options.body).changes.some(row=>row.name==='p:Offline')));
+    const state=JSON.parse(a.w.localStorage.getItem('ufree-test-account-v1:test-user'));
+    assert.equal(state.records['p:Offline'].note,'Saved without network');
+  }finally{await a.close();}
+});
+
+test("sign-in form merges the phone schedules before uploading and retains downloaded schedules", async () => {
+ const a=await app({handler:(path,options)=>{
+  if(path==='/auth/login')return {user,token:'b'.repeat(64)};
+  if(path==='/revision')return {revision:1};
+  if(path==='/sync'&&!options?.body)return {revision:1,changes:[{name:'p:Remote',value:{semester:'Fall 2026',classes:[]}}]};
+ }});
+ try {
+  a.el('mobileMenuButton').click();a.el('accountMenuButton').click();
+  const fields=a.w.document.querySelectorAll('.account-dialog input');fields[0].value='fictional_user';fields[1].value='a long test password';
+  buttonWith(a.w,'Sign in').click();
+  await settle(()=>JSON.parse(a.w.localStorage.getItem('whos-free-local-schedules')).data.people.Remote);
+  const phone=JSON.parse(a.w.localStorage.getItem('whos-free-local-schedules')).data.people;
+  assert.ok(phone.Original);assert.ok(phone.Remote);
+  assert.ok(a.w.localStorage.getItem('ufree-test-session-v1'));
+  assert.ok(a.calls.some(c=>new URL(c.url).pathname==='/sync'&&c.options?.body&&JSON.parse(c.options.body).changes.some(row=>row.name==='p:Original')));
  }finally{await a.close();}
 });

@@ -347,3 +347,30 @@ test('daily quota pauses survive reloads and foreground events without schedulin
  for(let i=0;i<100;i++)await sync.check();
  assert.equal(calls,1);assert.equal(sync.pending(),1);assert.equal(sync.state.retryAt,retryAt);
 });
+
+test("device baselines merge offline edits and remote changes without resurrecting deletions", async () => {
+  const {deviceBaseline, reconcileDevice} = require('../account-sync.js');
+  const initial = {'p:Alex':person('old'), 'p:Remove':person('remove'), '@preferences':{theme:'light',order:'old'}};
+  const baseline = await deviceBaseline(initial);
+  const phone = {'p:Alex':person('offline'), '@preferences':{theme:'dark',order:'old'}};
+  const cloud = {...initial,'p:New':person('cloud'), '@preferences':{theme:'light',order:'new'}};
+  let merged = await reconcileDevice(baseline,phone,cloud);
+  assert.equal(merged.records['p:Alex'].note,'offline');
+  assert.equal(merged.records['p:New'].note,'cloud');
+  assert.equal(merged.records['p:Remove'],undefined);
+  assert.deepEqual({...merged.records['@preferences']},{theme:'dark',order:'new'});
+  const next = await deviceBaseline(merged.records);
+  const remote = {...merged.records}; delete remote['p:Alex'];
+  merged = await reconcileDevice(next,merged.records,remote);
+  assert.equal(merged.records['p:Alex'],undefined);
+  assert.equal(merged.conflicts.length,0);
+});
+test("first device merge preserves both same-name schedules and hashes ignore object key order", async () => {
+  const {deviceBaseline,reconcileDevice} = require('../account-sync.js');
+  const merged=await reconcileDevice(null,{'p:Alex':person('phone')},{'p:Alex':person('account')});
+  assert.equal(merged.records['p:Alex'].note,'account');
+  assert.equal(merged.records['p:Alex (sync conflict 1)'].note,'phone');
+  const a=await deviceBaseline({'p:A':{classes:[],semester:'Fall 2026'}});
+  const b=await deviceBaseline({'p:A':{semester:'Fall 2026',classes:[]}});
+  assert.deepEqual(a,b);
+});

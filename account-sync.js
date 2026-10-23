@@ -1,4 +1,4 @@
-/* Account sync has its own storage. It never opens or writes the legacy Local database. */
+/* Revision-based cloud sync and shared-device reconciliation. */
 (function (root) {
   "use strict";
   const copy = (value) =>
@@ -26,7 +26,7 @@
   };
   const safe = (name) =>
     !["__proto__", "constructor", "prototype"].includes(name);
-  function reconcile(base, local, cloud) {
+  function reconcile(base, local, cloud, unchanged = (name, side) => same((side === "local" ? local : cloud)[name], base[name])) {
     const result = Object.create(null),
       conflicts = [];
     const names = new Set([
@@ -45,8 +45,8 @@
         put(name, r);
         continue;
       }
-      if (same(l, b)) put(name, r);
-      else if (same(r, b) || same(l, r)) put(name, l);
+      if (unchanged(name, "local")) put(name, r);
+      else if (unchanged(name, "cloud") || same(l, r)) put(name, l);
       else if (name === "@preferences") {
         const merged = Object.create(null);
         for (const key of new Set([
@@ -304,7 +304,21 @@
       else await work();
     }
   }
-  const api = { reconcile, differences, Sync, copy };
+  async function deviceBaseline(records) {
+    const signatures = Object.fromEntries(await Promise.all(Object.entries(records).map(async ([name, value]) => {
+      const bytes = new TextEncoder().encode(JSON.stringify(ordered(value)));
+      const digest = await root.crypto.subtle.digest("SHA-256", bytes);
+      return [name, Array.from(new Uint8Array(digest), n => n.toString(16).padStart(2, "0")).join("")];
+    })));
+    return { signatures, preferences: copy(records["@preferences"] || {}) };
+  }
+  async function reconcileDevice(baseline, phone, account) {
+    const [local, cloud] = await Promise.all([deviceBaseline(phone), deviceBaseline(account)]);
+    const signatures = baseline?.signatures || {};
+    return reconcile({ ...signatures, "@preferences": baseline?.preferences || {} }, phone, account,
+      (name, side) => (side === "local" ? local : cloud).signatures[name] === signatures[name]);
+  }
+  const api = { reconcile, reconcileDevice, deviceBaseline, differences, Sync, copy };
   if (typeof module === "object" && module.exports) module.exports = api;
   else root.UFreeAccountSync = api;
 })(typeof window === "undefined" ? globalThis : window);

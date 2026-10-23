@@ -61,7 +61,7 @@ test('all static site text and accessible labels have catalogue coverage, includ
  for(const key of ['aria-label','title','placeholder','alt']){const source=a.w.UFreeI18n.sourceAttribute(n,key);if(source&&/[A-Za-z]{2}/.test(source)&&!allowed.has(source)&&!Object.hasOwn(a.w.UFreeFrench.exact,source)&&a.w.UFreeI18n.translate(source)===source)missing.push(source);}
  for(const child of n.childNodes)walk(child);if(n.tagName==='TEMPLATE')for(const child of n.content.childNodes)walk(child);
  }};walk(a.w.document.documentElement);assert.deepEqual([...new Set(missing)],[]);
- assert.match(a.el('helpModal').textContent,/Avis de confidentialité/);assert.match(a.el('helpModal').textContent,/comptes facultatifs/);
+ assert.match(a.el('helpModal').textContent,/Avis de confidentialité/);assert.match(a.el('helpModal').textContent,/connexion synchronise/);
  a.lang('en');assert.match(a.el('peopleList').textContent,/Add your first schedule/);assert.match(a.el('helpModal').textContent,/Privacy Notice/);
  }finally{await a.close();}
 });

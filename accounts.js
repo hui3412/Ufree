@@ -10,9 +10,8 @@
     )
   )
     return;
-  const { Sync, copy } = window.UFreeAccountSync;
+  const { Sync, copy, reconcileDevice, deviceBaseline } = window.UFreeAccountSync;
   const SESSION = "ufree-test-session-v1",
-    VIEW = "ufree-test-view-v1",
     PREFIX = "ufree-test-account-v1:";
   const liveNames = new Map();
   let personalChangeTask = null;
@@ -28,7 +27,6 @@
     "ufree-has-had-schedules-v1",
   ];
   let session = null,
-    mode = "local",
     bridge = null,
     engine = null,
     ready = false,
@@ -40,13 +38,9 @@
     lastActivityCheck = Date.now();
   try {
     session = JSON.parse(localStorage.getItem(SESSION) || "null");
-    mode =
-      localStorage.getItem(VIEW) === "account" && session?.user?.id
-        ? "account"
-        : "local";
   } catch {}
-  const active = () => mode === "account" && !!session?.user?.id;
-  const prefix = () => (active() ? PREFIX + session.user.id + ":pref:" : "");
+  const active = () => !!session?.user?.id;
+  const prefix = () => "";
   const key = () => PREFIX + session.user.id;
   const tr = (s) => window.UFreeI18n?.translate?.(s) || s;
   const text = (node, s) =>
@@ -182,7 +176,7 @@
     }
     return {
       data: { people },
-      meta: { filename: "Account", peopleCount: Object.keys(people).length },
+      meta: { filename: "Schedule collection", peopleCount: Object.keys(people).length, liveSchedules: Object.fromEntries(liveNames), liveAccount: session.user.id },
     };
   }
   function setupEngine() {
@@ -201,13 +195,12 @@
         );
       },
     });
-    hydrate();
   }
   setupEngine();
   window.UFreeAccounts = {
     active,
     prefix,
-    isLive: (name) => active() && liveNames.has(name),
+    isLive: (name) => liveNames.has(name),
     renamed: (from, to) => {
       if (!active()) return;
       const pending = pendingPersonal();
@@ -226,12 +219,36 @@
       if (needsReload) queueMicrotask(applySync);
     },
     read: () => accountRecord(),
-    save: (record) => {
-      engine.save(records(record));
-      return { ...record, data: accountRecord().data };
+    async restoreDevice(record, write) {
+      liveNames.clear();
+      for (const [name, value] of Object.entries(record?.meta?.liveSchedules || {}))
+        if (!active() || record.meta.liveAccount === session.user.id) liveNames.set(name, value);
+      if (!active()) return record;
+      let baseline;
+      try { baseline = JSON.parse(localStorage.getItem(key() + ":device-base-v1") || "null"); } catch {}
+      const account = copy(engine.state.records);
+      const merged = await reconcileDevice(baseline, records(record), account);
+      // A cloud response may arrive while hashing. Reconcile against its new revision.
+      if (JSON.stringify(account) !== JSON.stringify(engine.state.records))
+        return window.UFreeAccounts.restoreDevice(record, write);
+      engine.save(merged.records);
+      if (merged.conflicts.length) engine.persist({ ...engine.state, conflicts: [...(engine.state.conflicts || []), ...merged.conflicts] });
+      hydrate();
+      const saved = await write(accountRecord());
+      await markDevice(saved);
+      return saved;
     },
-    clear: () => {
+    async save(record, write = bridge.writeDevice) {
+      try { engine.save(records(record)); }
+      catch (error) { await write(record); throw error; }
+      const saved = await write(accountRecord());
+      await markDevice(saved);
+      return saved;
+    },
+    async clear(write = bridge.writeDevice) {
       engine.save({ ...linkedRecords(), "@preferences": prefs() });
+      const saved = await write(accountRecord());
+      await markDevice(saved);
       return true;
     },
     preferences: () => {
@@ -270,6 +287,10 @@
       return true;
     },
   };
+  async function markDevice(record) {
+    // Only advance the baseline after the shared phone copy was saved successfully.
+    localStorage.setItem(key() + ":device-base-v1", JSON.stringify(await deviceBaseline(records(record))));
+  }
   let panel, button, status, main, focusBefore;
   function element(tag, content, parent, attrs = {}) {
     const node = document.createElement(tag);
@@ -347,7 +368,7 @@
     if (!status) return;
     if (!session) return;
     const parts = [
-      active() ? "Import destination: Account" : "Import destination: Local",
+      active() ? "Signed in: syncing this device" : "Signed out: saved on this device",
     ];
     if (engine) {
       parts.push(
@@ -409,7 +430,7 @@
     document.addEventListener("keydown", authenticatedActivity);
     window.addEventListener("hashchange", cloudHash);
     window.addEventListener("storage", (event) => {
-      if (event.key === SESSION || event.key === VIEW) location.reload();
+      if (event.key === SESSION) location.reload();
       else if (session && event.key === key()) {
         try {
           const before = JSON.parse(event.oldValue || "null"),
@@ -433,21 +454,7 @@
     renderStatus();
   }
   function updateCollectionLabels() {
-    if (!session) return;
-    for (const parent of [
-      document.querySelector(".people-panel"),
-      document.getElementById("scheduleModal").querySelector("[role=dialog]"),
-    ]) {
-      let label = parent.querySelector(".account-collection-label");
-      if (!label) {
-        label = element("p", "", null, { class: "account-collection-label" });
-        parent.prepend(label);
-      }
-      text(
-        label,
-        active() ? "Import destination: Account" : "Import destination: Local",
-      );
-    }
+    document.querySelectorAll(".account-collection-label").forEach(node => node.remove());
   }
   async function notice(message) {
     return new Promise((resolve) => {
@@ -480,14 +487,11 @@
     });
     element(
       "p",
-      "Local and Account are separate collections. Signing out keeps both saved copies on this device.",
+      "Schedules on this device sync with your account while signed in. Signing out keeps them on this device.",
       main,
     );
     const controls = element("div", "", main, { class: "account-actions" });
-    action("Local view", controls, () => switchView("local"));
-    action("Account view", controls, () => switchView("account"));
     action("Refresh sync", controls, () => sync(true));
-    action("Copy Local to Account", controls, copyLocal);
     action("Find accounts", controls, searchAccounts);
     action("Following", controls, followingForm);
     action("Your personal schedule", controls, personalForm);
@@ -497,11 +501,15 @@
     action("Sign in again", controls, () => authForm(false));
     action("Block or unblock a username", controls, blockForm);
     action("Sign out", controls, async () => {
+      ready = false;
+      await engine.running;
+      clearTimeout(engine.timer);
+      await window.UFreeAccounts.restoreDevice(await bridge.localSnapshot(), bridge.writeDevice);
+      clearTimeout(engine.timer);
       try {
         await request("/auth/logout", {});
       } catch {}
       localStorage.removeItem(SESSION);
-      localStorage.setItem(VIEW, "local");
       location.reload();
     });
     element(
@@ -541,6 +549,7 @@
     password.autocomplete = signup ? "new-password" : "current-password";
     username.pattern = "[A-Za-z0-9_]{3,24}";
     username.maxLength = 24;
+    if (!signup) element("p", "Signing in syncs this device’s schedules and preferences with your account. Conflicting schedule edits are kept as separate copies.", main);
     let school, personal, consent;
     if (signup) {
       element(
@@ -550,7 +559,7 @@
       );
       element(
         "p",
-        "Creating an account copies all existing Local schedules and preferences to your private Account collection. Your Local collection stays on this device. Later changes are separate.",
+        "Signing in syncs this device’s schedules and preferences with your account. Conflicting schedule edits are kept as separate copies.",
         main,
       );
       element(
@@ -579,7 +588,7 @@
       });
       const l = element(
         "label",
-        "I agree to copy my Local collection to my private Account.",
+        "I agree to sync this device’s schedules and preferences with my account.",
         main,
       );
       consent = element("input", "", l, { type: "checkbox" });
@@ -602,7 +611,7 @@
         const probe = "ufree-account-write-check";
         localStorage.setItem(probe, "1");
         localStorage.removeItem(probe);
-        const snapshot = signup ? bridge.snapshot() : null;
+        const snapshot = bridge.snapshot();
         const result = await request(
           "/auth/" + (signup ? "signup" : "login"),
           {
@@ -619,19 +628,15 @@
           },
           false,
         );
-        // Save identity and initial queued upload before changing view. Never touch legacy Local keys.
-        ready = false; // Reload before applying a different identity to the current collection bridge.
+        ready = false;
+        await engine?.running;
+        clearTimeout(engine?.timer);
         session = result;
         localStorage.setItem(SESSION, JSON.stringify(result));
         setupEngine();
-        if (signup) engine.save(records(snapshot, prefs(true)));
+        await window.UFreeAccounts.restoreDevice(snapshot, bridge.writeDevice);
         await engine.check(true);
-        if (!engine.state.initialized && !signup) {
-          localStorage.setItem(VIEW, "local");
-          location.reload();
-          return;
-        }
-        localStorage.setItem(VIEW, "account");
+        await window.UFreeAccounts.restoreDevice(await bridge.localSnapshot(), bridge.writeDevice);
         location.reload();
       },
     );
@@ -651,42 +656,9 @@
       () => authForm(!signup),
     );
   }
-  async function switchView(next) {
-    if (next === mode) return;
-    if (bridge.isBusy())
-      throw Error("Finish the current import or export first.");
-    if (next === "account" && !engine.state.initialized) {
-      await engine.check(true);
-      if (!engine.state.initialized)
-        throw Error(engine.error || "Connect to download your account first.");
-    }
-    localStorage.setItem(VIEW, next);
-    location.reload();
-  }
-  async function copyLocal() {
-    const record = await bridge.localSnapshot();
-    const confirmed = await confirmDialog(
-      "Copy the Local collection into Account? Existing Account schedules with the same name will be kept as separate copies.",
-    );
-    if (!confirmed) return;
-    const values = copy(engine.state.records);
-    for (const [name, value] of Object.entries(record?.data?.people || {})) {
-      let label = "p:" + name,
-        n = 2;
-      while (
-        Object.hasOwn(values, label) &&
-        JSON.stringify(values[label]) !== JSON.stringify(value)
-      )
-        label = `p:${name} (${n++})`;
-      values[label] = value;
-    }
-    engine.save(values);
-    await sync(true);
-  }
   async function applySync() {
     if (!ready || !active() || !needsReload || bridge.isBusy()) return;
     needsReload = false;
-    hydrate();
     await bridge.reload();
   }
   async function sync(force) {
@@ -868,7 +840,7 @@
     element("h3", "Incoming schedules", main);
     element(
       "p",
-      active() ? "Import destination: Account" : "Import destination: Local",
+      active() ? "Signed in: syncing this device" : "Signed out: saved on this device",
       main,
     );
     for (const item of result.followRequests || []) {
@@ -893,7 +865,7 @@
         await sync(true);
         text(
           status,
-          "You now follow each other. Personal schedules will stay updated in Account view.",
+          "You now follow each other. Personal schedules will stay updated while signed in.",
         );
       });
       action("Decline", box, async () => {
@@ -1037,7 +1009,7 @@
     element("h3", "Following", main);
     element(
       "p",
-      "Live personal schedules appear in Account view. They refresh when UFree opens, returns online, or you refresh sync. Offline copies may differ until synced.",
+      "Live personal schedules appear while signed in. They refresh when UFree opens, returns online, or you refresh sync. Offline copies may differ until synced.",
       main,
     );
     const list = element("div", "", main, { class: "follow-results" });

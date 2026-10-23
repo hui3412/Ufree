@@ -129,7 +129,7 @@ const SYNC_URL = 'https://youfree.ca';
   }
 
   function backupStateToSharedCache() {
-    if (window.UFreeAccounts?.active()) { window.UFreeAccounts.preferences(); return; }
+    if (window.UFreeAccounts?.active()) window.UFreeAccounts.preferences();
     if (!cacheSyncReady) return;
     try {
       const storage = {};
@@ -150,7 +150,6 @@ const SYNC_URL = 'https://youfree.ca';
   }
 
   async function loadStateFromSharedCache() {
-    if (window.UFreeAccounts?.active()) return false;
     if (!("caches" in window)) return false;
     const written = [];
     try {
@@ -2945,9 +2944,18 @@ const SYNC_URL = 'https://youfree.ca';
   let scheduleStorageRevision = 0;
   const recordRevision = record => Number.isSafeInteger(record?.storageRevision) && record.storageRevision > 0 ? record.storageRevision : 0;
 
-  async function readLocalScheduleRecord() {
-    if (window.UFreeAccounts?.active()) { state.storageBackend = "account-local"; return window.UFreeAccounts.read(); }
-    return readLegacyLocalScheduleRecord();
+  let deviceOperations = Promise.resolve();
+  function onDevice(work) {
+    const task = deviceOperations.then(work);
+    deviceOperations = task.catch(() => {});
+    return task;
+  }
+  function readLocalScheduleRecord() {
+    return onDevice(async () => {
+      const record = await readLegacyLocalScheduleRecord();
+      if (record?.data) validateData(record.data);
+      return window.UFreeAccounts ? window.UFreeAccounts.restoreDevice(record, writeDeviceScheduleRecord) : record;
+    });
   }
 
   async function readLegacyLocalScheduleRecord() {
@@ -2975,8 +2983,14 @@ const SYNC_URL = 'https://youfree.ca';
     return null;
   }
 
-  async function saveLocalScheduleRecord(record) {
-    if (window.UFreeAccounts?.active()) return window.UFreeAccounts.save(record);
+  function saveLocalScheduleRecord(record) {
+    const snapshot = JSON.parse(JSON.stringify(record));
+    return onDevice(() => window.UFreeAccounts?.active()
+      ? window.UFreeAccounts.save(snapshot, writeDeviceScheduleRecord)
+      : writeDeviceScheduleRecord(snapshot));
+  }
+
+  async function writeDeviceScheduleRecord(record) {
     const saved = { ...record, storageRevision: Math.max(Date.now(), scheduleStorageRevision + 1) };
     scheduleStorageRevision = saved.storageRevision;
     try {
@@ -3002,7 +3016,7 @@ const SYNC_URL = 'https://youfree.ca';
   }
 
   async function deleteLocalScheduleRecord() {
-    if (window.UFreeAccounts?.active()) return window.UFreeAccounts.clear();
+    if (window.UFreeAccounts?.active()) return window.UFreeAccounts.clear(writeDeviceScheduleRecord);
     let primaryRemoved = !("indexedDB" in window), fallbackRemoved = false;
     if ("indexedDB" in window) {
       try { await idbDelete(LOCAL_SCHEDULE_KEY); primaryRemoved = true; }
@@ -3085,12 +3099,12 @@ const SYNC_URL = 'https://youfree.ca';
   async function persistCurrentDatabase(label = "Local schedule collection") {
     validateData(state.data);
     cleanGroupPreferences();
-    const meta = makeCollectionMeta(state.data, label);
+    const meta = { ...state.scheduleMeta, ...makeCollectionMeta(state.data, label) };
     const record = { data: state.data, meta };
     let storageWarning = null;
     try {
       const saved = await saveLocalScheduleRecord(record);
-      if (window.UFreeAccounts?.active()) state.data = saved.data;
+      if (window.UFreeAccounts?.active()) { state.data = saved.data; Object.assign(meta, saved.meta); }
       await requestPersistentStorage();
       if (Object.keys(peopleMap()).length) rememberScheduleHistory();
     } catch (error) {
@@ -4020,6 +4034,19 @@ const SYNC_URL = 'https://youfree.ca';
     state.storageReadError = false;
     try {
       let record = await readLocalScheduleRecord();
+      if (window.UFreeAccounts?.active()) {
+        const preferences = loadPeoplePreferences();
+        state.nicknames = { ...preferences.nicknames };
+        state.pinnedPeople = new Set(preferences.pinnedPeople);
+        Object.assign(state, loadGroupPreferences());
+        state.personOrders = {}; loadPersonOrders();
+        state.showEveryone = localStorage.getItem(VIEW_PREFERENCE_KEY) === "all";
+        state.theme = loadTheme(); applyTheme(state.theme);
+        state.accentTheme = loadAccentTheme(); applyAccentTheme(state.accentTheme, false);
+        const notifications = loadNotificationSettings();
+        state.notificationsEnabled = notifications.enabled && "Notification" in window && Notification.permission === "granted";
+        state.mutedPeople = new Set(notifications.mutedPeople);
+      }
       if (!record?.data) {
         state.hasData = false;
         state.data = { people: {} };
@@ -5468,7 +5495,8 @@ const SYNC_URL = 'https://youfree.ca';
       state.sharedLinkStartup = false;
       await openSharedLink();
       window.UFreeAccounts?.ready({
-        snapshot: () => ({ data: JSON.parse(JSON.stringify(state.data || { people: {} })) }),
+        snapshot: () => ({ data: JSON.parse(JSON.stringify(state.data || { people: {} })), meta: state.scheduleMeta }),
+        writeDevice: writeDeviceScheduleRecord,
         localSnapshot: readLegacyLocalScheduleRecord,
         prepareDialog: () => {
           const target = usesDrawerNavigation() ? mobileMenuButton : document.activeElement;
@@ -5480,10 +5508,8 @@ const SYNC_URL = 'https://youfree.ca';
         openImport: () => openQuickCodePanel("import"),
         reload: async () => {
           if (state.isParsing || state.pendingImage || state.codeMode) return;
-          const saved = loadPeoplePreferences();
-          state.nicknames = { ...saved.nicknames }; state.pinnedPeople = new Set(saved.pinnedPeople);
-          Object.assign(state, loadGroupPreferences()); loadPersonOrders();
           await loadSchedulesFromDevice();
+          refresh({ preserveScroll: true });
         },
         importPeople: async people => {
           if (!schedulesWritable() || state.isParsing || state.pendingImage) throw new Error("Finish the current import or export first.");
