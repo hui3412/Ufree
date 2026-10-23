@@ -1,6 +1,12 @@
 // Presentation catalogue. Never translate saved schedules or transport payloads.
 window.UFreeFrench = {
   "exact": {
+    "Search": "Rechercher",
+    "Choose your CEGEP": "Choisissez votre cégep",
+    "Search CEGEPs": "Rechercher un cégep",
+    "CEGEPs found": "cégeps trouvés",
+    "No matching CEGEPs. Try another search.": "Aucun cégep trouvé. Essayez une autre recherche.",
+    "Select a CEGEP from the list.": "Sélectionnez un cégep dans la liste.",
     "Import fixed Local copies. Edit your attached Online schedule in Profile.": "Importez des copies locales fixes. Modifiez votre horaire associé en ligne dans Profil.",
     "Picture recognition runs on your device. Only your attached personal schedule syncs online.": "La reconnaissance d’images s’exécute sur votre appareil. Seul votre horaire personnel associé est synchronisé en ligne.",
     "Local schedules stay in this browser without automatic sync. Online caches your attached schedule and mutual followers for offline viewing. Keep a code or JSON backup before clearing browser data. Imported Local copies do not receive future updates.": "Les horaires locaux restent dans ce navigateur sans synchronisation. En ligne conserve votre horaire associé et ceux de vos abonnements mutuels pour la consultation hors ligne. Gardez une sauvegarde par code ou JSON avant de nettoyer le navigateur. Les copies locales importées ne reçoivent pas de mises à jour.",

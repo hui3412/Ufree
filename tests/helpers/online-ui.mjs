@@ -92,6 +92,7 @@ export async function app({
     "schedule-groups.js",
     "schedule-share-code.js",
     "account-sync.js",
+    "schools.js",
     "accounts.js",
     "app.js",
   ])

@@ -466,6 +466,62 @@
     );
     renderStatus();
   }
+  function schoolChooser() {
+    const section = element("section", "", main, {class: "school-picker", "aria-labelledby": "schoolPickerLabel"});
+    element("p", "School", section, {id: "schoolPickerLabel", class: "school-picker-label"});
+    const selected = element("input", "", section, {type: "hidden", id: "selectedCegep"});
+    const details = element("details", "", section, {id: "schoolChooser"});
+    const summary = element("summary", "", details);
+    const placeholder = element("span", "Choose your CEGEP", summary);
+    const selection = element("span", "", summary, {"data-no-translate": ""});
+    const content = element("div", "", details, {class: "school-picker-content"});
+    element("label", "Search CEGEPs", content, {for: "cegepSearch"});
+    const row = element("div", "", content, {class: "school-search-row"});
+    const search = element("input", "", row, {type: "search", id: "cegepSearch", "aria-controls": "cegepResults", autocomplete: "off", maxlength: "200"});
+    const searchButton = action("Search", row, () => renderResults());
+    searchButton.setAttribute("aria-controls", "cegepResults");
+    const count = element("p", "", content, {role: "status", "aria-live": "polite", "aria-atomic": "true", class: "school-result-count"});
+    const number = element("span", "", count, {"data-no-translate": ""});
+    element("span", "CEGEPs found", count);
+    const results = element("ul", "", content, {id: "cegepResults", class: "school-results"});
+    const empty = element("p", "No matching CEGEPs. Try another search.", content);
+    function renderResults() {
+      const matches = window.UFreeSchools.search(search.value);
+      results.replaceChildren();
+      number.textContent = matches.length + " ";
+      empty.hidden = matches.length > 0;
+      for (const school of matches) {
+        const li = element("li", "", results);
+        const button = element("button", "", li, {type: "button", "data-school-id": school.id, "aria-pressed": String(selected.value === school.id)});
+        element("span", school.name, button, {"data-no-translate": ""});
+        element("small", school.region, button, {"data-no-translate": ""});
+        button.addEventListener("click", () => {
+          selected.value = school.id;
+          selection.textContent = school.name;
+          placeholder.hidden = true;
+          for (const option of results.querySelectorAll("button")) option.setAttribute("aria-pressed", String(option === button));
+          details.open = false;
+          summary.focus();
+        });
+      }
+    }
+    search.addEventListener("input", renderResults);
+    search.addEventListener("keydown", event => {
+      if (event.key === "Enter") {
+        event.preventDefault(); event.stopPropagation(); renderResults();
+      }
+    });
+    details.addEventListener("keydown", event => {
+      if (event.key === "Escape") {
+        event.preventDefault(); event.stopPropagation(); details.open = false; summary.focus();
+      }
+    });
+    renderResults();
+    return {get value() {return selected.value;}, requireSelection() {
+      if (window.UFreeSchools.find(selected.value)) return true;
+      details.open = true; search.focus(); return false;
+    }};
+  }
   function authForm(signup) {
     if (signup && session) {
       text(status, "Sign out before creating another account.");
@@ -509,8 +565,7 @@
         main,
       );
       nickname=field("Account nickname");nickname.required=false;nickname.maxLength=60;
-      school = field("School");
-      school.maxLength = 200;
+      school = schoolChooser();
       const label = element("label", "Your personal schedule", main);
       personal = element("select", "", label, { required: "" });
       for (const name of Object.keys(bridge.snapshot().data.people))
@@ -543,9 +598,11 @@
           password.reportValidity();
           return;
         }
+        if (signup && !school.requireSelection())
+          throw Error("Select a CEGEP from the list.");
         if (
           signup &&
-          (!school.checkValidity() || !personal.value || !consent.checked)
+          (!personal.value || !consent.checked)
         )
           throw Error(
             "School, personal schedule and upload consent are required.",

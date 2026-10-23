@@ -7,7 +7,7 @@ import {CloudStorage} from '../backend/cloud-storage.mjs';
 const person=(course='Calculus')=>({semester:'Fall 2026',source_file:'picture',classes:[{day:'Monday',start:'09:00',end:'10:00',course,course_code:'201',room:'A-1',instructor:'Full Teacher Name'}]});
 test('signup attaches exactly one complete personal schedule and a distinct nickname; username stays immutable',async()=>{
  const f=fixture();try{
- const body={username:'signup_test',password:'fictional-password-123',school:'School',personalSchedule:'Personal',people:{Personal:person()},nickname:'Tom',consent:true};
+ const body={username:'signup_test',password:'fictional-password-123',school:'collegeahuntsic',personalSchedule:'Personal',people:{Personal:person()},nickname:'Tom',consent:true};
  const response=await f.call(null,'/auth/signup',body);assert.equal(response.status,201);assert.equal(response.data.user.nickname,'Tom');assert.equal(response.data.user.modelVersion,2);
  const user={...response.data.user,token:response.data.token};
  const delta=await f.call(user,'/sync?since=0');assert.equal(delta.status,200);assert.deepEqual(delta.data.changes.find(x=>x.name==='p:Personal').value,person());assert.deepEqual(delta.data.changes.find(x=>x.name==='@profile').value,{nickname:'Tom'});

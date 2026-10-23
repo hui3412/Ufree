@@ -1,3 +1,4 @@
+import schoolCatalog from "../schools.js";
 import { measureDatabase, requestRoute } from "./request-metrics.mjs";
 import { CloudStorage } from "./cloud-storage.mjs";
 import { following, followRequests } from "./following.mjs";
@@ -8,7 +9,7 @@ const ORIGIN = "https://hui3412.github.io";
 const HOUR = 3600000,
   DAY = HOUR * 24;
 const encoder = new TextEncoder();
-const RELEASE = "attached-accounts-v2";
+const RELEASE = "cegep-selection-v1";
 const random = () => bytesToHex(crypto.getRandomValues(new Uint8Array(32)));
 const digest = async (value) =>
   bytesToHex(
@@ -285,18 +286,14 @@ export default {
       const input = request.method === "POST" ? await bodyJSON(request) : null;
       if (path === "/auth/signup" && input) {
         const username = credentials(input);
+        const school = schoolCatalog.find(input.school);
+        if (!school) fail("Select a CEGEP from the list.");
         await throttle(
           db,
           `signup:${request.headers.get("cf-connecting-ip") || "unknown"}`,
           5,
           HOUR,
         );
-        if (
-          typeof input.school !== "string" ||
-          !input.school.trim() ||
-          input.school.length > 200
-        )
-          fail("School is required.");
         validatePeople(input.people);
         if (!Object.hasOwn(input.people, input.personalSchedule))
           fail("Select your personal schedule.");
@@ -311,13 +308,13 @@ export default {
         await storage.stage([prepared,profileObject]);
         try {
           await db.batch([
-            statement(db,"INSERT INTO users(id,username,password_hash,school,personal_schedule,created_at,last_active,nickname,revision) VALUES(?,?,?,?,?,?,?,?,1)",id,username,hash,input.school.trim(),"Personal",now,now,nickname),
+            statement(db,"INSERT INTO users(id,username,password_hash,school,personal_schedule,created_at,last_active,nickname,revision) VALUES(?,?,?,?,?,?,?,?,1)",id,username,hash,school.name,"Personal",now,now,nickname),
             statement(db,"INSERT INTO records(user_id,name,payload,revision) VALUES(?,?,?,1)",id,"p:Personal",prepared.ref),
             statement(db,"INSERT INTO records(user_id,name,payload,revision) VALUES(?,?,?,1)",id,"@profile",profileObject.ref),
           ]);
         } catch(error) { if (/unique/i.test(error.message)) fail("That username is unavailable.",409); throw error; }
         const session = await newSession(db,id);
-        return respond({...session,user:{id,username,school:input.school.trim(),personalSchedule:"Personal",nickname,modelVersion:2}},201);
+        return respond({...session,user:{id,username,school:school.name,personalSchedule:"Personal",nickname,modelVersion:2}},201);
       }
       if (path === "/auth/login" && input) {
         if (

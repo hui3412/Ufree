@@ -3054,3 +3054,19 @@ html[lang="fr"] .nav-extra-label, html[lang="fr"] .nav-button-label { min-width:
 .profile-class {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.6rem;border:1px solid var(--border,#bbb);border-radius:.6rem;padding:.8rem}
 .profile-class label {min-width:0}.profile-class input,.profile-class select {width:100%;min-width:0;box-sizing:border-box}
 @media(max-width:480px){.profile-class{grid-template-columns:1fr}}
+
+.school-picker { margin: 16px 0; }
+.school-picker .school-picker-label { margin-bottom: 8px; }
+.school-picker details { border: 1px solid var(--border, #555); border-radius: 10px; }
+.school-picker summary { cursor: pointer; min-height: 44px; padding: 12px; overflow-wrap: anywhere; }
+.school-picker summary:focus-visible, .school-results button:focus-visible { outline: 2px solid var(--accent, #7daaff); outline-offset: 2px; }
+.school-picker-content { padding: 0 12px 12px; }
+.school-search-row { display: flex; gap: 8px; align-items: center; }
+.school-search-row input { flex: 1; min-width: 0; }
+.school-search-row button { flex: 0 0 auto; }
+.school-picker .school-result-count { font-size: .85rem; margin: 8px 0; }
+.school-results { list-style: none; margin: 0; padding: 0; max-height: min(18rem, 40dvh); overflow-y: auto; overscroll-behavior: contain; }
+.school-results li { margin: 0; padding: 0; }
+.school-results button { display: flex; flex-direction: column; gap: 4px; width: calc(100% - 10px); text-align: left; padding: 10px; color: inherit; background: var(--bg); border: 1px solid var(--border, #555); border-radius: 8px; overflow-wrap: anywhere; }
+.school-results button[aria-pressed=true] { border-color: var(--accent, #7daaff); box-shadow: inset 3px 0 var(--accent, #7daaff); }
+.school-results small { opacity: .75; }

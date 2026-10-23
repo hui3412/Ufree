@@ -1,0 +1,419 @@
+{
+  "verifiedOn": "2026-10-23",
+  "scope": "Public CEGEPs in the Québec government directory; Champlain and Lanaudière campuses are separate choices where their student portals differ. Private colleges are outside this CEGEP catalog.",
+  "directory": "https://www.quebec.ca/education/cegeps-colleges-prives/etudier/liste-colleges",
+  "schools": [
+    {
+      "id": "collegeahuntsic",
+      "name": "Collège Ahuntsic",
+      "region": "Montréal",
+      "aliases": [
+        "Cégep d’Ahuntsic"
+      ],
+      "source": "https://www.collegeahuntsic.qc.ca/",
+      "portal": "https://collegeahuntsic.omnivox.ca/"
+    },
+    {
+      "id": "cmaisonneuve",
+      "name": "Collège de Maisonneuve",
+      "region": "Montréal",
+      "aliases": [
+        "Cégep de Maisonneuve"
+      ],
+      "source": "https://www.cmaisonneuve.qc.ca/",
+      "portal": "https://cmaisonneuve.omnivox.ca/"
+    },
+    {
+      "id": "claurendeau",
+      "name": "Cégep André-Laurendeau",
+      "region": "Montréal",
+      "aliases": [],
+      "source": "https://claurendeau.omnivox.ca/",
+      "portal": "https://claurendeau.omnivox.ca/"
+    },
+    {
+      "id": "cegepba",
+      "name": "Cégep Beauce-Appalaches",
+      "region": "Chaudière-Appalaches",
+      "aliases": [],
+      "source": "https://cegepba.omnivox.ca/",
+      "portal": "https://cegepba.omnivox.ca/"
+    },
+    {
+      "id": "champlaincollege-st-lawrence",
+      "name": "Cégep Champlain – Campus Saint-Lawrence",
+      "region": "Capitale-Nationale",
+      "aliases": [],
+      "source": "https://slc.qc.ca/",
+      "portal": "https://champlaincollege-st-lawrence.omnivox.ca/"
+    },
+    {
+      "id": "champlaincollege-lennoxville",
+      "name": "Cégep Champlain – Lennoxville",
+      "region": "Estrie",
+      "aliases": [],
+      "source": "https://www.crc-lennox.qc.ca/",
+      "portal": "https://champlaincollege-lennoxville.omnivox.ca/"
+    },
+    {
+      "id": "champlaincollege-st-lambert",
+      "name": "Cégep Champlain – Saint-Lambert",
+      "region": "Montérégie",
+      "aliases": [],
+      "source": "https://champlainsaintlambert.ca/",
+      "portal": "https://champlaincollege-st-lambert.omnivox.ca/"
+    },
+    {
+      "id": "cegepgarneau",
+      "name": "Cégep Garneau",
+      "region": "Capitale-Nationale",
+      "aliases": [],
+      "source": "https://cegepgarneau.ca/",
+      "portal": "https://cegepgarneau.omnivox.ca/"
+    },
+    {
+      "id": "cgodin",
+      "name": "Cégep Gérald-Godin",
+      "region": "Montréal",
+      "aliases": [],
+      "source": "https://www.cgodin.qc.ca/",
+      "portal": "https://cgodin.omnivox.ca/"
+    },
+    {
+      "id": "cegep-heritage",
+      "name": "Cégep Heritage College",
+      "region": "Outaouais",
+      "aliases": [
+        "Collège Héritage"
+      ],
+      "source": "https://www.cegep-heritage.qc.ca/fr/etudiantes-actuelles/pour-commencer",
+      "portal": "https://cegep-heritage.omnivox.ca/"
+    },
+    {
+      "id": "climoilou",
+      "name": "Cégep Limoilou",
+      "region": "Capitale-Nationale",
+      "aliases": [],
+      "source": "https://www.cegeplimoilou.ca/connexion/",
+      "portal": "https://climoilou.omnivox.ca/"
+    },
+    {
+      "id": "collegemv",
+      "name": "Cégep Marie-Victorin",
+      "region": "Montréal",
+      "aliases": [],
+      "source": "https://cegepmv.ca/",
+      "portal": "https://collegemv.omnivox.ca/"
+    },
+    {
+      "id": "cstjean",
+      "name": "Cégep Saint-Jean-sur-Richelieu",
+      "region": "Montérégie",
+      "aliases": [],
+      "source": "https://www.cstjean.qc.ca/",
+      "portal": "https://cstjean.omnivox.ca/"
+    },
+    {
+      "id": "cegep-baie-comeau",
+      "name": "Cégep de Baie-Comeau",
+      "region": "Côte-Nord",
+      "aliases": [],
+      "source": "https://cegepbc.ca/",
+      "portal": "https://cegep-baie-comeau.omnivox.ca/"
+    },
+    {
+      "id": "bdeb",
+      "name": "Cégep de Bois-de-Boulogne",
+      "region": "Montréal",
+      "aliases": [],
+      "source": "https://www.bdeb.qc.ca/",
+      "portal": "https://bdeb.omnivox.ca/"
+    },
+    {
+      "id": "cchic",
+      "name": "Cégep de Chicoutimi",
+      "region": "Saguenay–Lac-Saint-Jean",
+      "aliases": [],
+      "source": "https://cchic.ca/",
+      "portal": "https://cchic.omnivox.ca/"
+    },
+    {
+      "id": "cegepdrummond",
+      "name": "Cégep de Drummondville",
+      "region": "Centre-du-Québec",
+      "aliases": [],
+      "source": "https://www.cegepdrummond.ca/",
+      "portal": "https://cegepdrummond.omnivox.ca/"
+    },
+    {
+      "id": "cegepgranby",
+      "name": "Cégep de Granby",
+      "region": "Estrie",
+      "aliases": [],
+      "source": "https://cegepgranby.ca/",
+      "portal": "https://cegepgranby.omnivox.ca/"
+    },
+    {
+      "id": "cegeplevis",
+      "name": "Cégep de Lévis",
+      "region": "Chaudière-Appalaches",
+      "aliases": [],
+      "source": "https://www.cegeplevis.ca/",
+      "portal": "https://cegeplevis.omnivox.ca/"
+    },
+    {
+      "id": "cegep-matane",
+      "name": "Cégep de Matane",
+      "region": "Bas-Saint-Laurent",
+      "aliases": [],
+      "source": "https://www.cegep-matane.qc.ca/",
+      "portal": "https://cegep-matane.omnivox.ca/"
+    },
+    {
+      "id": "cegep-rimouski",
+      "name": "Cégep de Rimouski",
+      "region": "Bas-Saint-Laurent",
+      "aliases": [],
+      "source": "https://www.cegep-rimouski.qc.ca/",
+      "portal": "https://cegep-rimouski.omnivox.ca/"
+    },
+    {
+      "id": "cegeprdl",
+      "name": "Cégep de Rivière-du-Loup",
+      "region": "Bas-Saint-Laurent",
+      "aliases": [],
+      "source": "https://www.cegeprdl.ca/",
+      "portal": "https://cegeprdl.omnivox.ca/"
+    },
+    {
+      "id": "crosemont",
+      "name": "Cégep de Rosemont",
+      "region": "Montréal",
+      "aliases": [],
+      "source": "https://crosemont.omnivox.ca/",
+      "portal": "https://crosemont.omnivox.ca/"
+    },
+    {
+      "id": "cegepsth",
+      "name": "Cégep de Saint-Hyacinthe",
+      "region": "Montérégie",
+      "aliases": [
+        "Cégep de St-Hyacinthe"
+      ],
+      "source": "https://www.cegepsth.qc.ca/",
+      "portal": "https://cegepsth.omnivox.ca/"
+    },
+    {
+      "id": "cstj",
+      "name": "Cégep de Saint-Jérôme",
+      "region": "Laurentides",
+      "aliases": [],
+      "source": "https://www.cstj.qc.ca/",
+      "portal": "https://cstj.omnivox.ca/"
+    },
+    {
+      "id": "cegep-st-laurent",
+      "name": "Cégep de Saint-Laurent",
+      "region": "Montréal",
+      "aliases": [],
+      "source": "https://www.cegepsl.qc.ca/",
+      "portal": "https://cegep-st-laurent.omnivox.ca/"
+    },
+    {
+      "id": "csfoy",
+      "name": "Cégep de Sainte-Foy",
+      "region": "Capitale-Nationale",
+      "aliases": [],
+      "source": "https://www.csfoy.ca/etudiants/employes",
+      "portal": "https://csfoy.omnivox.ca/"
+    },
+    {
+      "id": "cegep-sept-iles",
+      "name": "Cégep de Sept-Îles",
+      "region": "Côte-Nord",
+      "aliases": [],
+      "source": "https://cegepsi.ca/",
+      "portal": "https://cegep-sept-iles.omnivox.ca/"
+    },
+    {
+      "id": "cshawi",
+      "name": "Cégep de Shawinigan",
+      "region": "Mauricie",
+      "aliases": [],
+      "source": "https://www.cegepshawinigan.ca/",
+      "portal": "https://cshawi.omnivox.ca/"
+    },
+    {
+      "id": "cegepsherbrooke",
+      "name": "Cégep de Sherbrooke",
+      "region": "Estrie",
+      "aliases": [],
+      "source": "https://cegepsherbrooke.qc.ca/",
+      "portal": "https://cegepsherbrooke.omnivox.ca/"
+    },
+    {
+      "id": "cegepst",
+      "name": "Cégep de Sorel-Tracy",
+      "region": "Montérégie",
+      "aliases": [],
+      "source": "https://www.cegepst.qc.ca/",
+      "portal": "https://cegepst.omnivox.ca/"
+    },
+    {
+      "id": "cegepth",
+      "name": "Cégep de Thetford",
+      "region": "Chaudière-Appalaches",
+      "aliases": [],
+      "source": "https://www.cegepthetford.ca/admission/",
+      "portal": "https://cegepth.omnivox.ca/"
+    },
+    {
+      "id": "cegeptr",
+      "name": "Cégep de Trois-Rivières",
+      "region": "Mauricie",
+      "aliases": [],
+      "source": "https://www.cegeptr.qc.ca/",
+      "portal": "https://cegeptr.omnivox.ca/"
+    },
+    {
+      "id": "colval",
+      "name": "Cégep de Valleyfield",
+      "region": "Montérégie",
+      "aliases": [],
+      "source": "https://www.cegepvalleyfield.ca/",
+      "portal": "https://colval.omnivox.ca/"
+    },
+    {
+      "id": "cegepvicto",
+      "name": "Cégep de Victoriaville",
+      "region": "Centre-du-Québec",
+      "aliases": [],
+      "source": "https://www.cegepvicto.ca/eleves-actuels/guide-etudiant/",
+      "portal": "https://cegepvicto.omnivox.ca/"
+    },
+    {
+      "id": "cegepgim",
+      "name": "Cégep de la Gaspésie et des Îles",
+      "region": "Gaspésie–Îles-de-la-Madeleine",
+      "aliases": [],
+      "source": "https://cegepgim.ca/",
+      "portal": "https://cegepgim.omnivox.ca/"
+    },
+    {
+      "id": "cegepat",
+      "name": "Cégep de l’Abitibi-Témiscamingue",
+      "region": "Abitibi-Témiscamingue",
+      "aliases": [],
+      "source": "https://www.cegepat.qc.ca/",
+      "portal": "https://cegepat.omnivox.ca/"
+    },
+    {
+      "id": "cegepoutaouais",
+      "name": "Cégep de l’Outaouais",
+      "region": "Outaouais",
+      "aliases": [],
+      "source": "https://cegepoutaouais.qc.ca/",
+      "portal": "https://cegepoutaouais.omnivox.ca/"
+    },
+    {
+      "id": "cvm",
+      "name": "Cégep du Vieux Montréal",
+      "region": "Montréal",
+      "aliases": [
+        "Cégep du Vieux Montréal"
+      ],
+      "source": "https://www.cvm.qc.ca/",
+      "portal": "https://cvm.omnivox.ca/"
+    },
+    {
+      "id": "cegep-lanaudiere-joliette",
+      "name": "Cégep régional de Lanaudière à Joliette",
+      "region": "Lanaudière",
+      "aliases": [],
+      "source": "https://cegep-lanaudiere.qc.ca/joliette/",
+      "portal": "https://cegep-lanaudiere-joliette.omnivox.ca/"
+    },
+    {
+      "id": "cegep-lanaudiere-assomption",
+      "name": "Cégep régional de Lanaudière à L’Assomption",
+      "region": "Lanaudière",
+      "aliases": [],
+      "source": "https://cegep-lanaudiere.qc.ca/lassomption/",
+      "portal": "https://cegep-lanaudiere-assomption.omnivox.ca/"
+    },
+    {
+      "id": "cegep-lanaudiere-terrebonne",
+      "name": "Cégep régional de Lanaudière à Terrebonne",
+      "region": "Lanaudière",
+      "aliases": [],
+      "source": "https://cegep-lanaudiere.qc.ca/terrebonne/",
+      "portal": "https://cegep-lanaudiere-terrebonne.omnivox.ca/"
+    },
+    {
+      "id": "cegepmontpetit",
+      "name": "Cégep Édouard-Montpetit",
+      "region": "Montérégie",
+      "aliases": [
+        "Cégep Édouard Montpetit"
+      ],
+      "source": "https://www.cegepmontpetit.ca/",
+      "portal": "https://cegepmontpetit.omnivox.ca/"
+    },
+    {
+      "id": "dawsoncollege",
+      "name": "Dawson College",
+      "region": "Montréal",
+      "aliases": [
+        "Collège Dawson"
+      ],
+      "source": "https://www.dawsoncollege.qc.ca/",
+      "portal": "https://dawsoncollege.omnivox.ca/"
+    },
+    {
+      "id": "johnabbott",
+      "name": "John Abbott College",
+      "region": "Montréal",
+      "aliases": [
+        "Cégep John Abbott"
+      ],
+      "source": "https://johnabbott.qc.ca/",
+      "portal": "https://johnabbott.omnivox.ca/"
+    },
+    {
+      "id": "vaniercollege",
+      "name": "Vanier College",
+      "region": "Montréal",
+      "aliases": [
+        "Cégep Vanier"
+      ],
+      "source": "https://www.vaniercollege.qc.ca/",
+      "portal": "https://vaniercollege.omnivox.ca/"
+    }
+  ],
+  "excludedColnet": [
+    {
+      "name": "Cégep de La Pocatière",
+      "source": "https://www.cegeplapocatiere.qc.ca/acces-rapide/colnet-temis/"
+    },
+    {
+      "name": "Cégep Lionel Groulx",
+      "source": "https://clg.qc.ca/colnet/"
+    },
+    {
+      "name": "Cégep Montmorency",
+      "source": "https://www.cmontmorency.qc.ca/etudiants/carrefour-info/se-connecter/"
+    },
+    {
+      "name": "Cégep de Jonquière",
+      "source": "https://enligne.cegepjonquiere.ca/"
+    },
+    {
+      "name": "Cégep de St-Félicien",
+      "source": "https://cegepstfe.ca/acces-aux-etudiants/"
+    },
+    {
+      "name": "Collège d’Alma",
+      "source": "https://www.collegealma.ca/plateformes-etudiants/"
+    }
+  ]
+}

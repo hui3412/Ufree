@@ -81,7 +81,7 @@ const signup = (call, name) =>
   call("/auth/signup", {
     username: name,
     password: "fictional-secret-123",
-    school: "Fictional School",
+    school: "collegeahuntsic",
     personalSchedule: "Personal",
     people: { Personal: person },
     consent: true,
