@@ -495,7 +495,7 @@
     const controls = element("div", "", main, { class: "account-actions" });
     action("Refresh sync", controls, () => sync(true));
     action("Find accounts", controls, searchAccounts);
-    action("Following", controls, followingForm);
+    action("Friends", controls, followingForm);
     action("Your personal schedule", controls, personalForm);
     action("Cloud sharing", controls, sharing);
     action("Inbox", controls, () => inbox(true));
@@ -608,6 +608,7 @@
     password.autocomplete = signup ? "new-password" : "current-password";
     username.pattern = "[A-Za-z0-9_]{3,24}";
     username.maxLength = 24;
+    element("p", "Usernames are not case-sensitive: David and david are the same account.", main);
     if (!signup) element("p", "Signing in syncs this device’s schedules and preferences with your account. Conflicting schedule edits are kept as separate copies.", main);
     let school, personal, consent;
     if (signup) {
@@ -734,7 +735,7 @@
     clear();
     element("h3", "Delete account", main);
     element("p", "@" + session.user.username, main, { "data-no-translate": "" });
-    element("p", "This permanently deletes your account, cloud schedules, cloud links, deliveries and following connections. Schedules saved on this device and other people’s independent copies are kept.", main);
+    element("p", "This permanently deletes your account, cloud schedules, cloud links, deliveries and friendships. Schedules saved on this device and other people’s independent copies are kept.", main);
     const password = field("Current password", "password");
     password.autocomplete = "current-password";
     const confirmation = field("Confirm your username");
@@ -846,7 +847,7 @@
     });
     const recipient = field("Recipient username", "text", recipientUsername);
     recipient.addEventListener("input", () => {
-      verified = "";
+      if (verified.toLowerCase() !== recipient.value.toLowerCase()) verified = "";
     });
     action("Verify recipient", main, async () => {
       const result = await request("/users/lookup", {
@@ -857,7 +858,7 @@
       status.textContent = `${tr("Verified recipient")}: @${verified}`;
     });
     formButton("Send by username", async () => {
-      if (!verified || verified !== recipient.value.toLowerCase())
+      if (!verified || verified.toLowerCase() !== recipient.value.toLowerCase())
         throw Error("Verify the recipient first.");
       const people = selected();
       if (!Object.keys(people).length) throw Error("Select schedules.");
@@ -953,10 +954,10 @@
     );
     for (const item of result.followRequests || []) {
       const box = element("section", "", main, { class: "follow-result" });
-      element("h4", "Follow request", box);
+      element("h4", "Friend request", box);
       element("p", "@" + item.sender, box, { "data-no-translate": "" });
       element("p", followConsent, box);
-      action("Follow back and share", box, async () => {
+      action("Accept friend request", box, async () => {
         if (
           !(await confirmDialog(
             "@" + item.sender + "\n" + tr(followConsent) + "\n" + tr(warning),
@@ -973,7 +974,7 @@
         await sync(true);
         text(
           status,
-          "You now follow each other. Personal schedules will stay updated while signed in.",
+          "You are now friends. Personal schedules will stay updated while signed in.",
         );
       });
       action("Decline", box, async () => {
@@ -1028,9 +1029,9 @@
     await followingForm();
   }
   const followConsent =
-    "Following back adds both selected personal schedules to the main list as @username. Courses, rooms and teachers are shared; other schedules and school information stay private. Either person can stop following.";
+    "Accepting a friend request adds both selected personal schedules to the main list as @username. Courses, rooms and teachers are shared; other schedules and school information stay private. Either person can remove the friend.";
   const requestConsent =
-    "If this person follows back, your selected Account personal schedule, including courses, rooms and teachers, will be shared with them and kept updated. You will only see their personal schedule after they agree. Other schedules and school information stay private.";
+    "If this person accepts your friend request, your selected Account personal schedule, including courses, rooms and teachers, will be shared with them and kept updated. You will only see their personal schedule after they agree. Other schedules and school information stay private.";
   async function ensureSynced() {
     await sync(true);
     if (engine.error || engine.pending())
@@ -1068,20 +1069,20 @@
         const row = element("section", "", results, { class: "follow-result" });
         element("p", "@" + match.username, row, { "data-no-translate": "" });
         if (match.connection?.status === "accepted") {
-          element("p", "Following each other", row);
+          element("p", "Friends", row);
           element("p", "Their schedule is available in the main list.", row);
         } else if (match.connection?.status === "pending") {
           element(
             "p",
             match.connection.direction === "incoming"
-              ? "This person wants to follow you."
-              : "Follow request pending.",
+              ? "This person wants to add you as a friend."
+              : "Friend request pending.",
             row,
           );
           if (match.connection.direction === "incoming")
-            action("Follow back", row, () => followBack(match.username));
+            action("Accept friend request", row, () => followBack(match.username));
         } else {
-          const follow = action("Follow", row, async () => {
+          const follow = action("Add friend", row, async () => {
             if (
               !(await confirmDialog(
                 "@" +
@@ -1099,8 +1100,8 @@
               sharePersonal: true,
             });
             follow.disabled = true;
-            text(follow, "Follow request pending.");
-            text(status, "Follow request sent.");
+            text(follow, "Friend request pending.");
+            text(status, "Friend request sent.");
           });
         }
       }
@@ -1121,10 +1122,10 @@
   }
   async function followingForm() {
     clear();
-    element("h3", "Following", main);
+    element("h3", "Friends", main);
     element(
       "p",
-      "Mutual follows appear as @username in the main list. Their schedules refresh each time you sign in or open UFree. Offline copies remain available until the next sync.",
+      "Friends appear as @username in the main list. Their schedules refresh each time you sign in or open UFree. Offline copies remain available until the next sync.",
       main,
     );
     const list = element("div", "", main, { class: "follow-results" });
@@ -1132,17 +1133,17 @@
     const result = await request("/connections");
     if (!list.isConnected) return;
     if (!result.connections.length)
-      element("p", "You are not following anyone yet.", list);
+      element("p", "You are not friends with anyone yet.", list);
     for (const connection of result.connections) {
       const row = element("section", "", list, { class: "follow-result" });
       element("p", "@" + connection.username, row, { "data-no-translate": "" });
       element(
         "p",
         connection.status === "accepted"
-          ? "Following each other"
+          ? "Friends"
           : connection.direction === "incoming"
-            ? "This person wants to follow you."
-            : "Follow request pending.",
+            ? "This person wants to add you as a friend."
+            : "Friend request pending.",
         row,
       );
       if (connection.status === "accepted")
@@ -1151,11 +1152,11 @@
         connection.direction === "incoming" &&
         connection.status === "pending"
       )
-        action("Follow back", row, () => followBack(connection.username));
+        action("Accept friend request", row, () => followBack(connection.username));
       else
         action(
           connection.status === "accepted"
-            ? "Stop following"
+            ? "Remove friend"
             : "Cancel request",
           row,
           async () => {
@@ -1201,7 +1202,7 @@
     element("h3", "Your personal schedule", main);
     element(
       "p",
-      "Choose a schedule from your Account collection. Changes to this selection are automatically shared only with people you mutually follow.",
+      "Choose a schedule from your Account collection. Changes to this selection are automatically shared only with people you are friends with.",
       main,
     );
     const label = element("label", "Your personal schedule", main),

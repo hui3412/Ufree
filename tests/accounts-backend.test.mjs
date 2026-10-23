@@ -96,9 +96,11 @@ test("accounts, access controls, revision conflicts, passwords, immutable snapsh
     (await call("/health", undefined, null, "https://youfree.ca")).status,
     403,
   );
-  const a = (await signup(call, "fictional_a")).data,
+  const a = (await signup(call, "Fictional_A")).data,
     b = (await signup(call, "fictional_b")).data;
   assert.equal((await signup(call, "FICTIONAL_A")).status, 409);
+  assert.equal(a.user.username, "fictional_a");
+  assert.throws(() => sql.prepare("UPDATE users SET username=? WHERE id=?").run("FICTIONAL_A", b.user.id), /UNIQUE/);
   assert.equal(
     (
       await call(
@@ -160,7 +162,7 @@ test("accounts, access controls, revision conflicts, passwords, immutable snapsh
   );
   const other = (
     await call("/auth/login", {
-      username: "fictional_a",
+      username: "FiCtIoNaL_A",
       password: "fictional-secret-123",
     })
   ).data;
@@ -187,7 +189,7 @@ test("accounts, access controls, revision conflicts, passwords, immutable snapsh
     (
       await call(
         "/deliveries",
-        { username: "fictional_b", people: { Alex: person }, confirmed: true },
+        { username: "FiCtIoNaL_B", people: { Alex: person }, confirmed: true },
         a.token,
       )
     ).status,

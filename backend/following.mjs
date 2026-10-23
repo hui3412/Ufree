@@ -48,8 +48,8 @@ export async function following(
       db,
       `SELECT u.username,c.id AS connectionId,c.status,c.requester_id FROM users u
       LEFT JOIN connections c ON (c.requester_id=? AND c.recipient_id=u.id) OR (c.recipient_id=? AND c.requester_id=u.id)
-      WHERE u.id<>? AND instr(u.username,?)>0 AND NOT EXISTS(SELECT 1 FROM blocks b WHERE (b.user_id=? AND b.blocked_id=u.id) OR (b.user_id=u.id AND b.blocked_id=?))
-      ORDER BY CASE WHEN u.username=? THEN 0 WHEN instr(u.username,?)=1 THEN 1 ELSE 2 END,u.username COLLATE NOCASE LIMIT 10`,
+      WHERE u.id<>? AND instr(lower(u.username),?)>0 AND NOT EXISTS(SELECT 1 FROM blocks b WHERE (b.user_id=? AND b.blocked_id=u.id) OR (b.user_id=u.id AND b.blocked_id=?))
+      ORDER BY CASE WHEN u.username=? COLLATE NOCASE THEN 0 WHEN instr(lower(u.username),?)=1 THEN 1 ELSE 2 END,u.username COLLATE NOCASE LIMIT 10`,
       user.id,
       user.id,
       user.id,
@@ -108,7 +108,7 @@ export async function following(
     if (!target || target.id === user.id || (await unavailable(target.id)))
       fail("Recipient unavailable.");
     if (!(await hasPersonal(user.id)))
-      fail("Select and sync your personal schedule before following someone.");
+      fail("Select and sync your personal schedule before adding a friend.");
     const pair = [user.id, target.id].sort().join(":");
     const existing = await one(
       db,
@@ -120,14 +120,14 @@ export async function following(
       const accepted = await one(db,
         "UPDATE connections SET status='accepted' WHERE id=? AND recipient_id=? AND status='pending' RETURNING id",
         existing.id,user.id);
-      if (!accepted) fail("This follow request is no longer pending.",409);
+      if (!accepted) fail("This friend request is no longer pending.",409);
       return {ok:true,id:existing.id,status:"accepted"};
     }
     if (existing?.status === "accepted" || existing?.status === "pending")
-      fail("A follow request or connection already exists.", 409);
+      fail("A friend request or connection already exists.", 409);
     if (existing && Date.now() - existing.created_at < 86400000)
       fail(
-        "Wait 24 hours before sending another follow request to this person.",
+        "Wait 24 hours before sending another friend request to this person.",
         429,
       );
     if ((await count(user.id)) >= 100 || (await count(target.id)) >= 100)
@@ -144,7 +144,7 @@ export async function following(
         Date.now(),
         id,
       );
-      if (!result) fail("A follow request or connection already exists.", 409);
+      if (!result) fail("A friend request or connection already exists.", 409);
     } else
       await run(
         db,
@@ -166,7 +166,7 @@ export async function following(
       input.id,
       user.id,
     );
-    if (!connection) fail("This follow request is no longer pending.", 409);
+    if (!connection) fail("This friend request is no longer pending.", 409);
     if (input.decision === "accepted") {
       if (input.sharePersonal !== true)
         fail("Confirm ongoing sharing of your personal schedule.");
@@ -185,7 +185,7 @@ export async function following(
       input.id,
       user.id,
     );
-    if (!result) fail("This follow request is no longer pending.", 409);
+    if (!result) fail("This friend request is no longer pending.", 409);
     return { ok: true };
   }
   if (path === "/connections/remove" && input) {

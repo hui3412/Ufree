@@ -199,7 +199,30 @@ const buttonWith = (w, label) =>
   [...w.document.querySelectorAll("button")].find(
     (b) => b.textContent === label,
   );
-test("account search caps results and sends no follow request before explicit consent", async () => {
+test("sharing verifies mixed-case recipients, retains case-only edits and invalidates different accounts", async () => {
+  const a = await app({ account: true, handler: path => path === "/users/lookup" ? {username:"David"} : path === "/deliveries" ? {ok:true} : undefined });
+  try {
+    a.el("mobileMenuButton").click(); a.el("accountMenuButton").click();
+    assert.ok(buttonWith(a.w,"Friends"));
+    buttonWith(a.w,"Cloud sharing").click();
+    const recipient = a.w.document.querySelector('.account-dialog input[type="text"]');
+    recipient.value = "david";
+    buttonWith(a.w,"Verify recipient").click();
+    await settle(() => a.w.document.querySelector('.account-dialog').textContent.includes('Verified recipient: @David'));
+    a.w.document.querySelector('.account-dialog input[type="checkbox"]').checked = true;
+    recipient.value = "DAVID"; recipient.dispatchEvent(new a.w.Event("input"));
+    buttonWith(a.w,"Send by username").click();
+    await settle(() => buttonWith(a.w,"Confirm")); buttonWith(a.w,"Confirm").click();
+    await settle(() => a.calls.some(c=>c.url.endsWith('/deliveries')));
+    await settle(() => !buttonWith(a.w,"Send by username").disabled);
+    const sent = a.calls.filter(c=>c.url.endsWith('/deliveries')).length;
+    recipient.value = "someone_else"; recipient.dispatchEvent(new a.w.Event("input"));
+    buttonWith(a.w,"Send by username").click();
+    await settle(() => a.w.document.querySelector('.account-dialog').textContent.includes('Verify the recipient first.'));
+    assert.equal(a.calls.filter(c=>c.url.endsWith('/deliveries')).length,sent);
+  } finally { await a.close(); }
+});
+test("account search caps results and sends no friend request before explicit consent", async () => {
   const a = await app({
     account: true,
     handler: (path) =>
@@ -224,7 +247,7 @@ test("account search caps results and sends no follow request before explicit co
     await settle(
       () => a.w.document.querySelectorAll(".follow-result").length === 10,
     );
-    buttonWith(a.w, "Follow").click();
+    buttonWith(a.w, "Add friend").click();
     assert.equal(
       a.calls.filter((c) => c.url.endsWith("/connections/request")).length,
       0,
@@ -296,8 +319,8 @@ test("follow inbox acceptance requires a second consent confirmation and preserv
     a.el("mobileMenuButton").click();
     a.el("accountMenuButton").click();
     buttonWith(a.w, "Inbox").click();
-    await settle(() => buttonWith(a.w, "Follow back and share"));
-    buttonWith(a.w, "Follow back and share").click();
+    await settle(() => buttonWith(a.w, "Accept friend request"));
+    buttonWith(a.w, "Accept friend request").click();
     assert.equal(
       a.calls.filter((c) => c.url.endsWith("/connections/respond")).length,
       0,
@@ -572,7 +595,7 @@ test('signup sends the selected college ID after switching languages without los
  }finally{await a.close();}
 });
 
-test('following back automatically puts @username in the main list without a separate sharing action',async()=>{
+test('accepting a friend request automatically puts @username in the main list without a separate sharing action',async()=>{
  let revision=1,mutual=false;
  const cloud={'p:Account person':{semester:'Fall 2026',classes:[]}};
  const friend={semester:'Fall 2026',classes:[{day:'Monday',start:'09:00',end:'10:00',course:'Friend current course'}]};
@@ -588,7 +611,7 @@ test('following back automatically puts @username in the main list without a sep
  }});
  try{
  a.el('mobileMenuButton').click();a.el('accountMenuButton').click();buttonWith(a.w,'Find accounts').click();a.w.document.querySelector('.account-dialog input').value='test2';buttonWith(a.w,'Search accounts').click();
- await settle(()=>buttonWith(a.w,'Follow back'));buttonWith(a.w,'Follow back').click();buttonWith(a.w,'Confirm').click();
+ await settle(()=>buttonWith(a.w,'Accept friend request'));buttonWith(a.w,'Accept friend request').click();buttonWith(a.w,'Confirm').click();
  await settle(()=>a.el('peopleList').textContent.includes('@test2'));
  assert.deepEqual(JSON.parse(JSON.stringify(a.w.UFreeAccounts.read().data.people['@test2'])),friend);
  assert.equal(buttonWith(a.w,'Share schedules'),undefined);

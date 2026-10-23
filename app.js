@@ -2597,7 +2597,7 @@ const SYNC_URL = 'https://youfree.ca';
   }
 
   function openManualSchedule(name = "", person = { source_file: "manual", classes: [] }) {
-    if (window.UFreeAccounts?.isLive(name)) { showToast("Live personal schedules are read-only. Manage following in Account."); return; }
+    if (window.UFreeAccounts?.isLive(name)) { showToast("Live personal schedules are read-only. Manage friends in Account."); return; }
     if (!schedulesWritable() || state.isParsing || state.pendingImage) return;
     state.pendingImage = { name, person, editingName: name || null };
     els.imageReviewName.value = name;
@@ -4099,7 +4099,7 @@ const SYNC_URL = 'https://youfree.ca';
   }
 
   async function removePerson(name) {
-    if (window.UFreeAccounts?.isLive(name)) { showToast("Live personal schedules are read-only. Manage following in Account."); return; }
+    if (window.UFreeAccounts?.isLive(name)) { showToast("Live personal schedules are read-only. Manage friends in Account."); return; }
     if (!schedulesWritable() || state.isParsing || state.pendingImage || state.codeMode) return;
     if (!state.hasData || !Object.prototype.hasOwnProperty.call(state.data.people || {}, name)) return;
     const confirmed = window.confirm(translateUi(`Remove ${displayName(name)} from this device?`));
@@ -4192,7 +4192,7 @@ const SYNC_URL = 'https://youfree.ca';
       removeButton.className = "mini-danger-button";
       setUiText(removeButton, "Remove");
       removeButton.disabled = Boolean(window.UFreeAccounts?.isLive(name)) || state.isParsing || Boolean(state.pendingImage) || Boolean(state.codeMode);
-      if (window.UFreeAccounts?.isLive(name)) setUiAttribute(removeButton,"title","Manage following in Account.");
+      if (window.UFreeAccounts?.isLive(name)) setUiAttribute(removeButton,"title","Manage friends in Account.");
       setUiAttribute(removeButton, "aria-label", `Remove ${displayName(name)}`);
       removeButton.addEventListener("click", () => removePerson(name));
 
@@ -4364,7 +4364,7 @@ const SYNC_URL = 'https://youfree.ca';
     if (state.hasData) refresh(); else renderDataSetup();
     updateScheduleModal();
     updateSettingsModal();
-    showToast(window.UFreeAccounts?.active() && state.hasData ? "Your own schedules were removed. Live schedules remain until you stop following." : "All local schedules removed");
+    showToast(window.UFreeAccounts?.active() && state.hasData ? "Your own schedules were removed. Live schedules remain until you remove the friend." : "All local schedules removed");
   }
 
   function iconAction(label, path, extraClass = "") {

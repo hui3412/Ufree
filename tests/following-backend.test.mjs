@@ -123,6 +123,22 @@ async function fixture() {
     });
   return { sql, db, seed, call, revision, update, delta, follow };
 }
+test("mixed-case legacy usernames resolve identically for search, lookup and friend requests", async () => {
+  const f = await fixture();
+  try {
+    const me = await f.seed("Owner"), peer = await f.seed("David");
+    for (const query of ["david", "DAVID", "aVi"]) {
+      const result = await f.call(me, "/users/search", { query });
+      assert.equal(result.status, 200);
+      assert.equal(result.data.users[0].username, "David");
+    }
+    assert.equal((await f.call(me, "/users/lookup", { username: "dAvId" })).data.username, "David");
+    assert.equal((await f.call(me, "/connections/request", { username: "DAVID", sharePersonal: true })).status, 200);
+    assert.equal((await f.call(me, "/connections/request", { username: "david", sharePersonal: true })).status, 409);
+    assert.equal((await f.call(peer, "/connections/request", { username: "oWnEr", sharePersonal: true })).status, 200);
+    assert.equal((await f.call(me, "/connections")).data.connections.length, 1);
+  } finally { f.sql.close(); }
+});
 test("authenticated substring search is case-insensitive, literal, capped at ten and never exposes private profiles", async () => {
   const f = await fixture();
   try {
