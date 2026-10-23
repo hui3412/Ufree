@@ -1215,6 +1215,7 @@ const SYNC_URL = 'https://youfree.ca';
   }
 
   function displayName(name) {
+    if (window.UFreeAccounts?.isLive(name)) return name;
     const nickname = String(state.nicknames[name] || "").trim();
     return nickname || name;
   }

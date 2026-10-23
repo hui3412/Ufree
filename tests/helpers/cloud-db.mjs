@@ -16,6 +16,8 @@ export function fixture({ through = null } = {}) {
     );
     sql.prepare("INSERT INTO d1_migrations(name) VALUES(?)").run(name);
   }
+  if (through && through < "0010_sliding_sessions.sql")
+    sql.exec(fs.readFileSync(new URL("../../backend/migrations/0010_sliding_sessions.sql", import.meta.url), "utf8"));
   const db = {
     queries: 0,
     prepare(query) {
@@ -77,9 +79,9 @@ export function fixture({ through = null } = {}) {
       );
     sql
       .prepare(
-        "INSERT INTO sessions(token_hash,user_id,expires_at) VALUES(?,?,?)",
+        "INSERT INTO sessions(token_hash,user_id,expires_at,created_at,last_refreshed_at) VALUES(?,?,?,?,?)",
       )
-      .run(hash, id, Date.now() + 86400000);
+      .run(hash, id, Date.now() + 86400000, Date.now(), Date.now());
     return { id, token, username };
   }
   async function call(user, path, data) {

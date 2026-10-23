@@ -115,6 +115,14 @@ export async function following(
       "SELECT * FROM connections WHERE pair_key=?",
       pair,
     );
+    if (existing?.status === "pending" && existing.requester_id === target.id && existing.recipient_id === user.id) {
+      if (!(await hasPersonal(target.id))) fail("Both people need a synced personal schedule before sharing.");
+      const accepted = await one(db,
+        "UPDATE connections SET status='accepted' WHERE id=? AND recipient_id=? AND status='pending' RETURNING id",
+        existing.id,user.id);
+      if (!accepted) fail("This follow request is no longer pending.",409);
+      return {ok:true,id:existing.id,status:"accepted"};
+    }
     if (existing?.status === "accepted" || existing?.status === "pending")
       fail("A follow request or connection already exists.", 409);
     if (existing && Date.now() - existing.created_at < 86400000)

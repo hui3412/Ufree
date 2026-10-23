@@ -10,7 +10,7 @@ const ORIGIN = "https://hui3412.github.io";
 const HOUR = 3600000,
   DAY = HOUR * 24;
 const encoder = new TextEncoder();
-const RELEASE = "account-deletion-free-crypto-v2";
+const RELEASE = "mutual-follow-sliding-sessions-v1";
 const random = () => bytesToHex(crypto.getRandomValues(new Uint8Array(32)));
 const digest = async (value) =>
   bytesToHex(
@@ -169,13 +169,15 @@ async function failedLogin(db, keys) {
 }
 async function newSession(db, id) {
   const token = random();
-  const expiresAt = Date.now() + 30 * DAY;
+  const now = Date.now(), expiresAt = now + 3 * DAY;
   await run(
     db,
-    "INSERT INTO sessions(token_hash,user_id,expires_at) VALUES(?,?,?)",
+    "INSERT INTO sessions(token_hash,user_id,expires_at,created_at,last_refreshed_at) VALUES(?,?,?,?,?)",
     await digest(token),
     id,
     expiresAt,
+    now,
+    now,
   );
   return { token, expiresAt };
 }
@@ -187,15 +189,24 @@ async function authenticate(request, db) {
   const hash = await digest(token);
   const user = await one(
     db,
-    "SELECT u.*,s.token_hash FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND s.expires_at>?",
+    "SELECT u.*,s.token_hash,s.expires_at AS session_expires_at,s.created_at AS session_created_at,s.last_refreshed_at AS session_refreshed_at FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND s.expires_at>? AND s.created_at>?",
     hash,
     Date.now(),
+    Date.now() - 30 * DAY,
   );
   if (!user)
     fail(
       "Your session expired. Sign in again; pending local changes are retained.",
       401,
     );
+  const now = Date.now();
+  const renewedExpiry = Math.min(now + 3 * DAY, user.session_created_at + 30 * DAY);
+  if (user.session_refreshed_at <= now - HOUR && renewedExpiry > user.session_expires_at) {
+    await run(db,
+      "UPDATE sessions SET expires_at=MIN(?,created_at+?),last_refreshed_at=? WHERE token_hash=? AND expires_at>? AND last_refreshed_at<=?",
+      renewedExpiry,30*DAY,now,user.token_hash,now,now-HOUR);
+    user.session_expires_at = renewedExpiry;
+  }
   if (user.last_active < Date.now() - HOUR)
     await run(
       db,

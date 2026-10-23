@@ -262,7 +262,7 @@
       mount();
       if (session) {
         engine
-          .check()
+          .check(true)
           .then(() => inbox())
           .catch(showError);
       }
@@ -1020,8 +1020,15 @@
       });
     }
   }
+  async function followBack(username) {
+    if (!(await confirmDialog("@" + username + "\n" + tr(followConsent)))) return;
+    await ensureSynced();
+    await request("/connections/request", {username,sharePersonal:true});
+    await sync(true);
+    await followingForm();
+  }
   const followConsent =
-    "Following back shares both selected Account personal schedules, including courses, rooms and teachers, and keeps future changes updated in both directions. Other schedules and school information stay private. Either person can stop following.";
+    "Following back adds both selected personal schedules to the main list as @username. Courses, rooms and teachers are shared; other schedules and school information stay private. Either person can stop following.";
   const requestConsent =
     "If this person follows back, your selected Account personal schedule, including courses, rooms and teachers, will be shared with them and kept updated. You will only see their personal schedule after they agree. Other schedules and school information stay private.";
   async function ensureSynced() {
@@ -1062,7 +1069,7 @@
         element("p", "@" + match.username, row, { "data-no-translate": "" });
         if (match.connection?.status === "accepted") {
           element("p", "Following each other", row);
-          action("Share schedules", row, () => sharing(match.username));
+          element("p", "Their schedule is available in the main list.", row);
         } else if (match.connection?.status === "pending") {
           element(
             "p",
@@ -1072,7 +1079,7 @@
             row,
           );
           if (match.connection.direction === "incoming")
-            action("Open inbox", row, () => inbox(true));
+            action("Follow back", row, () => followBack(match.username));
         } else {
           const follow = action("Follow", row, async () => {
             if (
@@ -1117,7 +1124,7 @@
     element("h3", "Following", main);
     element(
       "p",
-      "Live personal schedules appear while signed in. They refresh when UFree opens, returns online, or you refresh sync. Offline copies may differ until synced.",
+      "Mutual follows appear as @username in the main list. Their schedules refresh each time you sign in or open UFree. Offline copies remain available until the next sync.",
       main,
     );
     const list = element("div", "", main, { class: "follow-results" });
@@ -1139,12 +1146,12 @@
         row,
       );
       if (connection.status === "accepted")
-        action("Share schedules", row, () => sharing(connection.username));
+        element("p", "Their schedule is available in the main list.", row);
       if (
         connection.direction === "incoming" &&
         connection.status === "pending"
       )
-        action("Open inbox", row, () => inbox(true));
+        action("Follow back", row, () => followBack(connection.username));
       else
         action(
           connection.status === "accepted"

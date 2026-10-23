@@ -86,8 +86,8 @@ async function fixture() {
         Date.now(),
       );
     sql
-      .prepare("INSERT INTO sessions VALUES(?,?,?)")
-      .run(hash, id, Date.now() + 10000000);
+      .prepare("INSERT INTO sessions(token_hash,user_id,expires_at,created_at,last_refreshed_at) VALUES(?,?,?,?,?)")
+      .run(hash, id, Date.now() + 10000000, Date.now(), Date.now());
     sql
       .prepare("INSERT INTO records VALUES(?,?,?,1)")
       .run(id, "p:Personal", JSON.stringify(person()));
@@ -171,7 +171,7 @@ test("follow requests notify only the recipient and both personal schedules rema
     );
     const request = await f.follow(a, b);
     assert.equal(request.status, 200);
-    assert.equal((await f.follow(b, a)).status, 409);
+    assert.equal((await f.follow(a, b)).status, 409);
     assert.equal(
       (await f.call(b, "/deliveries")).data.followRequests[0].sender,
       a.username,
@@ -421,4 +421,19 @@ test("declining and cancelling requests grant no schedule access; stop-following
   } finally {
     f.sql.close();
   }
+});
+
+test('following each other directly grants both current personal schedules and login sync sees later edits',async()=>{
+ const f=await fixture();try{
+ const a=await f.seed('mutual_test'),b=await f.seed('mutual_test2');
+ assert.equal((await f.follow(a,b)).status,200);
+ assert.equal((await f.delta(b)).changes.some(r=>r.name==='f:'+a.id),false);
+ const mutual=await f.follow(b,a);assert.equal(mutual.status,200);assert.equal(mutual.data.status,'accepted');
+ assert.deepEqual((await f.delta(a)).changes.find(r=>r.name==='f:'+b.id).value.person,person());
+ assert.deepEqual((await f.delta(b)).changes.find(r=>r.name==='f:'+a.id).value.person,person());
+ const since=await f.revision(b);const edited=person('Updated for next login');assert.equal((await f.update(a,'Personal',edited)).status,200);
+ assert.deepEqual((await f.delta(b,since)).changes.find(r=>r.name==='f:'+a.id).value.person,edited);
+ assert.equal((await f.call(a,'/connections/remove',{id:mutual.data.id})).status,200);
+ assert.equal((await f.delta(b)).changes.find(r=>r.name==='f:'+a.id).value,null);
+ }finally{f.sql.close();}
 });

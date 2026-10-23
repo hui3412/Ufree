@@ -571,3 +571,40 @@ test('signup sends the selected college ID after switching languages without los
  await settle(()=>a.calls.some(c=>new URL(c.url).pathname==='/sync'&&c.options?.body));
  }finally{await a.close();}
 });
+
+test('following back automatically puts @username in the main list without a separate sharing action',async()=>{
+ let revision=1,mutual=false;
+ const cloud={'p:Account person':{semester:'Fall 2026',classes:[]}};
+ const friend={semester:'Fall 2026',classes:[{day:'Monday',start:'09:00',end:'10:00',course:'Friend current course'}]};
+ const a=await app({account:true,handler:(path,options)=>{
+  if(path==='/revision')return {revision};
+  if(path==='/sync'){
+   if(options?.body){for(const r of JSON.parse(options.body).changes){if(r.value===null)delete cloud[r.name];else cloud[r.name]=r.value;}return {revision:++revision};}
+   return {revision,changes:Object.entries(cloud).map(([name,value])=>({name,value}))};
+  }
+  if(path==='/users/search')return {users:[{username:'test2',connection:{id:'pair',status:'pending',direction:'incoming'}}]};
+  if(path==='/connections/request'){mutual=true;cloud['f:peer']={username:'test2',person:friend};revision++;return {ok:true,id:'pair',status:'accepted'};}
+  if(path==='/connections')return {connections:mutual?[{id:'pair',username:'test2',status:'accepted',direction:'incoming'}]:[]};
+ }});
+ try{
+ a.el('mobileMenuButton').click();a.el('accountMenuButton').click();buttonWith(a.w,'Find accounts').click();a.w.document.querySelector('.account-dialog input').value='test2';buttonWith(a.w,'Search accounts').click();
+ await settle(()=>buttonWith(a.w,'Follow back'));buttonWith(a.w,'Follow back').click();buttonWith(a.w,'Confirm').click();
+ await settle(()=>a.el('peopleList').textContent.includes('@test2'));
+ assert.deepEqual(JSON.parse(JSON.stringify(a.w.UFreeAccounts.read().data.people['@test2'])),friend);
+ assert.equal(buttonWith(a.w,'Share schedules'),undefined);
+ assert.ok(JSON.parse(a.w.localStorage.getItem('whos-free-local-schedules')).data.people['@test2']);
+ }finally{await a.close();}
+});
+test('reopening a signed-in account checks fresh cloud revisions even with a recently checked cache',async()=>{
+ let a=await app({account:true,extraRecords:{'f:peer':{username:'test2',person:{semester:'Fall 2026',classes:[],note:'Old'}}}});let saved;
+ try{
+ saved=snapshotStorage(a.w);const key='ufree-test-account-v1:test-user',state=JSON.parse(saved[key]);state.checkedAt=Date.now();saved[key]=JSON.stringify(state);
+ }finally{await a.close();}
+ const latest={semester:'Fall 2026',classes:[],note:'Updated before login'};
+ a=await app({savedStorage:saved,handler:(path,options)=>{
+ if(path==='/revision')return {revision:99};
+ if(path==='/sync'&&!options?.body)return {revision:99,changes:[{name:'f:peer',value:{username:'test2',person:latest}}]};
+ }});
+ try{await settle(()=>a.w.UFreeAccounts.read().data.people['@test2']?.note===latest.note);assert.match(a.el('peopleList').textContent,/@test2/);}
+ finally{await a.close();}
+});

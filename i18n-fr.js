@@ -781,7 +781,11 @@ window.UFreeFrench = {
     "Search CEGEPs and colleges": "Rechercher un cégep ou un collège",
     "Colleges found": "établissements trouvés",
     "No matching colleges. Try another search.": "Aucun établissement trouvé. Essayez une autre recherche.",
-    "Select a CEGEP or college from the list.": "Sélectionnez un cégep ou un collège dans la liste."
+    "Select a CEGEP or college from the list.": "Sélectionnez un cégep ou un collège dans la liste.",
+    "Follow back": "Suivre en retour",
+    "Their schedule is available in the main list.": "Son horaire est accessible dans la liste principale.",
+    "Following back adds both selected personal schedules to the main list as @username. Courses, rooms and teachers are shared; other schedules and school information stay private. Either person can stop following.": "Le suivi réciproque ajoute les deux horaires personnels sélectionnés à la liste principale sous @nom_utilisateur. Les cours, salles et enseignants sont partagés; les autres horaires et l’établissement restent privés. Chaque personne peut arrêter le suivi.",
+    "Mutual follows appear as @username in the main list. Their schedules refresh each time you sign in or open UFree. Offline copies remain available until the next sync.": "Les suivis réciproques apparaissent sous @nom_utilisateur dans la liste principale. Leurs horaires sont actualisés à chaque connexion ou ouverture d’UFree. Les copies hors ligne restent accessibles jusqu’à la prochaine synchronisation."
   },
   "templates": [
     {
