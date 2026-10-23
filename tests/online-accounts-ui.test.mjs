@@ -52,3 +52,18 @@ test('offline profile changes remain queued and a followed row can never be uplo
  const cached=JSON.parse(a.w.localStorage.getItem('ufree-test-account-v1:test-user'));assert.equal(cached.records['@profile'].nickname,'Offline nick');assert.notDeepEqual(cached.records,cached.base);assert.equal(a.w.localStorage.getItem('whos-free-local-schedules'),a.original);
  }finally{await a.close();}
 });
+test('a concurrent personal edit shows its preserved draft and allows review instead of reporting a completed upload',async()=>{
+ let revision=1,conflict=false;
+ const remote={...person,classes:[{...person.classes[0],course:'Remote course'}]};
+ const a=await app({account:true,extraRecords:{'p:Personal':person},handler:(path,options)=>{
+  if(path==='/revision')return {revision,inboxRevision:0};
+  if(path==='/sync' && options?.method==='GET')return {revision,changes:[{name:'p:Personal',value:remote}],personalSchedule:'Personal'};
+  if(path==='/sync' && options?.method==='POST'){if(!conflict){conflict=true;revision=2;return new Response(JSON.stringify({error:'Cloud changed. Reconcile and retry.'}),{status:409});}return {revision:++revision};}
+ }});
+ try{
+ await pause();open(a);button(a.w,'Edit profile').click();a.w.document.querySelector('[data-profile-field="course"]').value='Local course';button(a.w,'Save profile').click();await pause();
+ assert.match(a.w.document.querySelector('.account-dialog').textContent,/Conflicting edits were preserved as local drafts/);
+ const cached=JSON.parse(a.w.localStorage.getItem('ufree-test-account-v1:test-user'));assert.equal(cached.records['p:Personal'].classes[0].course,'Remote course');assert.equal(cached.records['draft:Personal (sync conflict 1)'].classes[0].course,'Local course');
+ button(a.w,'Review saved conflict draft').click();assert.equal(a.w.document.querySelector('[data-profile-field="course"]').value,'Local course');
+ }finally{await a.close();}
+});

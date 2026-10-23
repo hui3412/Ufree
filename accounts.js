@@ -1000,8 +1000,14 @@
       validateAttached(person);
       if (nickname.value.trim().length>60)throw Error("Nickname must be 60 characters or fewer.");
       const values={...engine.state.records,"p:Personal":person,"@profile":{nickname:nickname.value.trim()}};
+      const conflictsBefore=engine.state.conflicts.length;
       engine.save(values);session.user.nickname=nickname.value.trim();localStorage.setItem(SESSION,JSON.stringify(session));needsReload=true;
-      await sync(true);text(status,engine.error || "Profile saved. Pending edits stay on this device until synced.");
+      await sync(true);
+      if (engine.state.conflicts.length>conflictsBefore) {
+        text(status,"Conflicting edits were preserved as local drafts. Review them in Profile.");
+        const draftName=engine.state.conflicts.at(-1),draft=engine.state.records[draftName];
+        if (draft?.classes) action("Review saved conflict draft",main,()=>load(draft));
+      } else text(status,engine.error || "Profile saved. Pending edits stay on this device until synced.");
     });
     action("Followers",main,followingForm);
     backToAccount();
