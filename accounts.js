@@ -43,6 +43,23 @@
   const active = () => !!session?.user?.id;
   const prefix = () => "";
   const key = () => PREFIX + session.user.id;
+  function withoutLiveSchedules(record) {
+    if (!record) return record;
+    const clean = copy(record);
+    for (const name of Object.keys(clean.meta?.liveSchedules || {})) delete clean.data?.people?.[name];
+    if (clean.meta) {
+      delete clean.meta.liveSchedules;
+      delete clean.meta.liveAccount;
+      if (clean.data?.people) clean.meta.peopleCount = Object.keys(clean.data.people).length;
+    }
+    return clean;
+  }
+  function discardLiveCache() {
+    if (!engine) return;
+    const strip = values => Object.fromEntries(Object.entries(values).filter(([name]) => !name.startsWith("f:")));
+    // Request a full delta on the next login so unchanged friend schedules return too.
+    engine.persist({...engine.state, revision: 0, base: strip(engine.state.base), records: strip(engine.state.records)});
+  }
   const noteKey = (username) => "friend-note:" + username.toLowerCase();
   function friendNote(username) {
     const value = active() && engine?.state.records["@preferences"]?.[noteKey(username)];
@@ -232,9 +249,9 @@
     read: () => accountRecord(),
     async restoreDevice(record, write) {
       liveNames.clear();
-      for (const [name, value] of Object.entries(record?.meta?.liveSchedules || {}))
-        if (!active() || record.meta.liveAccount === session.user.id) liveNames.set(name, value);
-      if (!active()) return record;
+      const hadLive = !!record?.meta?.liveSchedules;
+      record = withoutLiveSchedules(record);
+      if (!active()) return hadLive ? write(record) : record;
       let baseline;
       try { baseline = JSON.parse(localStorage.getItem(key() + ":device-base-v1") || "null"); } catch {}
       const account = copy(engine.state.records);
@@ -537,6 +554,8 @@
       clearTimeout(engine.timer);
       await window.UFreeAccounts.restoreDevice(await bridge.localSnapshot(), bridge.writeDevice);
       clearTimeout(engine.timer);
+      await bridge.writeDevice(withoutLiveSchedules(await bridge.localSnapshot()));
+      discardLiveCache();
       try {
         await request("/auth/logout", {});
       } catch {}
@@ -722,6 +741,7 @@
         ready = false;
         await engine?.running;
         clearTimeout(engine?.timer);
+        if (session?.user?.id !== result.user.id) discardLiveCache();
         session = result;
         localStorage.setItem(SESSION, JSON.stringify(result));
         setupEngine();

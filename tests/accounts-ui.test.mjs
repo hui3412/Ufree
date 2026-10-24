@@ -427,6 +427,36 @@ test('cloud-sharing controls send all saved details without a filtering checkbox
 });
 
 const snapshotStorage = w => Object.fromEntries(Array.from({length:w.localStorage.length}, (_,i) => {const key=w.localStorage.key(i);return [key,w.localStorage.getItem(key)];}));
+test("live schedules leave the shared device on logout and never import into another account", async () => {
+  const linked = {username:"friend",person:{semester:"Fall 2026",classes:[]}};
+  let a = await app({account:true,extraRecords:{"f:peer":linked}}), saved;
+  try {
+    await settle(()=>a.el("peopleList").textContent.includes("@friend"));
+    saved = snapshotStorage(a.w);
+    a.el("mobileMenuButton").click(); a.el("accountMenuButton").click(); buttonWith(a.w,"Sign out").click();
+    await settle(()=>!a.w.localStorage.getItem("ufree-test-session-v1"));
+    const phone = JSON.parse(a.w.localStorage.getItem("whos-free-local-schedules"));
+    assert.equal(phone.data.people["@friend"],undefined);
+    assert.ok(phone.data.people.Original);
+    const cache = JSON.parse(a.w.localStorage.getItem("ufree-test-account-v1:test-user"));
+    assert.equal(cache.records["f:peer"],undefined);
+    assert.equal(cache.base["f:peer"],undefined);
+    assert.equal(cache.revision,0);
+  } finally { await a.close(); }
+  const guest = {...saved}; delete guest["ufree-test-session-v1"];
+  a = await app({savedStorage:guest});
+  try { assert.equal(a.el("peopleList").textContent.includes("@friend"),false); } finally { await a.close(); }
+  const other = {...saved,"ufree-test-session-v1":JSON.stringify({user:{...user,id:"other-account",username:"other"},token:"c".repeat(64)})};
+  a = await app({savedStorage:other,handler:()=>{throw Error("Offline");}});
+  try {
+    assert.equal(a.el("peopleList").textContent.includes("@friend"),false);
+    const state = JSON.parse(a.w.localStorage.getItem("ufree-test-account-v1:other-account"));
+    assert.equal(state.records["p:@friend"],undefined);
+    assert.equal(state.records["f:peer"],undefined);
+  } finally { await a.close(); }
+  a = await app({savedStorage:saved,handler:()=>{throw Error("Offline");}});
+  try { assert.ok(a.el("peopleList").textContent.includes("@friend")); } finally { await a.close(); }
+});
 test("Friends opens directly from the drawer; private notes persist, sync and never change shared schedules", async () => {
   const peer = {username:"David",person:{semester:"Fall 2026",classes:[]}};
   const connections = [{id:"pair",username:"David",status:"accepted",direction:"outgoing"}];
