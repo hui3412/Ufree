@@ -5507,6 +5507,7 @@ const SYNC_URL = 'https://youfree.ca';
       window.UFreeAccounts?.ready({
         snapshot: () => ({ data: JSON.parse(JSON.stringify(state.data || { people: {} })), meta: state.scheduleMeta }),
         refresh: () => refresh({preserveScroll: true}),
+        toast: showToast,
         writeDevice: writeDeviceScheduleRecord,
         localSnapshot: readLegacyLocalScheduleRecord,
         prepareDialog: () => {

@@ -966,7 +966,7 @@
       } catch {}
     }
     if (!result.deliveries.length && !(result.followRequests || []).length) {
-      if (force) text(status, "No pending deliveries.");
+      if (force) bridge.toast("Inbox is empty.");
       return;
     }
     if (!panel.open) {
