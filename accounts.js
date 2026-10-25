@@ -630,7 +630,7 @@
       details.open = true; search.focus(); return false;
     }};
   }
-  function authForm(signup) {
+  function authForm(signup, credentials = {}) {
     if (signup && session) {
       text(status, "Sign out before creating another account.");
       return;
@@ -651,6 +651,8 @@
     });
     const username = field("Username"),
       password = field("Password", "password");
+    username.value = credentials.username || "";
+    password.value = credentials.password || "";
     username.autocomplete = "username";
     password.autocomplete = signup ? "new-password" : "current-password";
     username.pattern = "[A-Za-z0-9_]{3,24}";
@@ -764,7 +766,7 @@
     action(
       signup ? "Already have an account? Sign in" : "Create account",
       main,
-      () => authForm(!signup),
+      () => authForm(!signup, {username: username.value, password: password.value}),
     );
   }
   async function applySync() {

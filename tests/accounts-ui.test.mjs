@@ -661,6 +661,22 @@ test('failed account deletion keeps identity and phone data, clears the password
 });
 
 const signupField=(w,label)=>[...w.document.querySelectorAll('.account-dialog label')].find(n=>w.UFreeI18n.sourceText(n.firstChild)===label)?.querySelector('input,select');
+test('switching between sign-in and signup preserves entered credentials without persisting them',async()=>{
+ const a=await app();try{
+ a.el('mobileMenuButton').click();a.el('accountMenuButton').click();
+ signupField(a.w,'Username').value='David';signupField(a.w,'Password').value='Private-test-password';
+ buttonWith(a.w,'Create account').click();
+ assert.equal(signupField(a.w,'Username').value,'David');assert.equal(signupField(a.w,'Password').value,'Private-test-password');
+ assert.equal(signupField(a.w,'Password').autocomplete,'new-password');
+ buttonWith(a.w,'Already have an account? Sign in').click();
+ assert.equal(signupField(a.w,'Username').value,'David');assert.equal(signupField(a.w,'Password').value,'Private-test-password');
+ assert.equal(signupField(a.w,'Password').autocomplete,'current-password');
+ assert.equal(a.calls.length,0);
+ assert.equal(JSON.stringify(snapshotStorage(a.w)).includes('Private-test-password'),false);
+ buttonWith(a.w,'Close').click();a.el('mobileMenuButton').click();a.el('accountMenuButton').click();
+ assert.equal(signupField(a.w,'Password').value,'');
+ }finally{await a.close();}
+});
 async function signupPicker(){const a=await app();a.el('mobileMenuButton').click();a.el('accountMenuButton').click();buttonWith(a.w,'Create account').click();return a;}
 test('expandable college chooser filters accents, selects Marianopolis and preserves signup fields in both languages',async()=>{
  const a=await signupPicker();try{
