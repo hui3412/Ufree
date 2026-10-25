@@ -3055,6 +3055,9 @@ html[lang="fr"] .nav-extra-label, html[lang="fr"] .nav-button-label { min-width:
 .friend-identity p { font-size: .8rem; color: var(--muted); margin: 3px 0 0; }
 .friend-menu { position: relative; flex: 0 0 auto; }
 .cloud-sharing-heading { display: flex; align-items: center; justify-content: flex-end; gap: 12px; }
+.account-dialog .modal-header { gap: 8px; }
+.account-dialog .modal-header h2 { flex: 1; min-width: 0; }
+.cloud-sharing-heading { flex: 0 0 auto; }
 .cloud-sharing-heading .friend-menu-actions { max-height: 55dvh; overflow-y: auto; }
 .cloud-sharing-heading .friend-menu-actions p { margin: 10px; font-size: .8rem; }
 .account-dialog [hidden] { display: none !important; }

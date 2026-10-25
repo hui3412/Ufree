@@ -436,9 +436,11 @@ test('structured and edge HTML daily quota errors pause cloud requests across re
  }
 });
 test('cloud-sharing controls send all saved details without a filtering checkbox in English and French',async()=>{
+ let copied;
  const full={semester:'Fall 2026',source_file:'original-photo.jpg',savedNote:'Exact',classes:[{day:'Monday',start:'09:00',end:'10:00',course:'Math',course_code:'201',section:'01',room:'A-1',instructor:'Full Teacher Name',custom:'Keep'}]};
  const a=await app({account:true,extraRecords:{'p:Complete':full},handler:(path)=>path==='/shares'?{code:'UFC1:'+'c'.repeat(64),expiresAt:Date.now()+86400000}:undefined});
  try{
+ Object.defineProperty(a.w.navigator,'clipboard',{value:{writeText:async value=>{copied=value;}},configurable:true});
  a.el('mobileMenuButton').click();a.el('homeExportButton').click();
  assert.doesNotMatch(a.w.document.querySelector('.account-dialog').textContent,/Include course names, rooms and teachers/);
  const all=a.el('cloud-selectAllSchedules');all.checked=false;all.dispatchEvent(new a.w.Event('change'));
@@ -448,6 +450,11 @@ test('cloud-sharing controls send all saved details without a filtering checkbox
  const label=[...a.w.document.querySelectorAll('.account-dialog label')].find(label=>label.textContent==='Complete');label.querySelector('input').checked=true;label.querySelector('input').dispatchEvent(new a.w.Event('change'));
  buttonWith(a.w,'Create 48-hour link / code').click();await new Promise(r=>setTimeout(r,30));
  const request=a.calls.find(call=>new URL(call.url).pathname==='/shares');assert.ok(request);assert.deepEqual(JSON.parse(request.options.body).people,{Complete:full});
+ await settle(()=>copied==='UFC1:'+'c'.repeat(64));
+ assert.equal(a.el('toast').textContent,'Code copied.');
+ const output=a.w.document.querySelector('textarea[aria-label="Cloud link and code"]');
+ assert.equal(output.parentElement.previousElementSibling.textContent,'Create 48-hour link / code');
+ assert.equal(a.w.document.querySelector('.cloud-sharing-heading').nextElementSibling.textContent,'Close');
  a.w.UFreeI18n.setLanguage('fr');assert.match(a.w.document.querySelector('.account-dialog').textContent,/Comprend l’horaire complet/);
  a.el('cloud-exportGroupButton').click();assert.equal(a.el('cloud-exportGroupPicker').hidden,false);
  a.el('cloud-exportGroupPicker').querySelector('button').click();assert.equal(a.el('cloud-selectAllSchedules').checked,true);

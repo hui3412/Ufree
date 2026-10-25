@@ -363,6 +363,7 @@
     panel.showModal();
   }
   function clear() {
+    panel.querySelector(".cloud-sharing-heading")?.remove();
     main.onkeydown = null;
     main.replaceChildren();
     verified = "";
@@ -870,7 +871,8 @@
   function sharing(recipientUsername = "") {
     clear();
     text(document.getElementById("accountDialogTitle"), "Cloud sharing");
-    const heading = element("div", "", main, {class: "cloud-sharing-heading"});
+    const heading = element("div", "", null, {class: "cloud-sharing-heading"});
+    panel.querySelector(".modal-header").lastElementChild.before(heading);
     const menu = element("details", "", heading, {class: "friend-menu"});
     const toggle = element("summary", "", menu, {"aria-label": "Sharing options", title: "Sharing options"});
     element("span", "⋮", toggle, {"aria-hidden": "true", "data-no-translate": ""});
@@ -888,18 +890,26 @@
       selection().map(name => [name,copy(values[name])]),
     );
     formButton("Create 48-hour link / code", async () => {
-      const result = await request("/shares", { people: selected() });
-      const output = element("textarea", "", main, {
-        readonly: "",
-        "aria-label": "Cloud link and code",
-      });
+      const generated = request("/shares", { people: selected() });
+      let copying;
+      try {
+        // Start clipboard access during the tap, before the network response,
+        // so Safari can retain user activation for the promised code.
+        copying = typeof ClipboardItem !== "undefined" && navigator.clipboard?.write
+          ? navigator.clipboard.write([new ClipboardItem({"text/plain": generated.then(result => new Blob([result.code], {type: "text/plain"}))})])
+          : generated.then(result => navigator.clipboard.writeText(result.code));
+      } catch { copying = Promise.resolve(false); }
+      const copied = Promise.resolve(copying).then(value => value !== false, () => false);
+      const result = await generated;
       output.value = `${location.origin}${location.pathname}#cloud=${result.code.slice(5)}\n${result.code}`;
-      element(
-        "p",
-        `${tr("Expires")}: ${new Date(result.expiresAt).toLocaleString()}`,
-        main,
-      );
+      expiry.textContent = `${tr("Expires")}: ${new Date(result.expiresAt).toLocaleString()}`;
+      generatedBox.hidden = false;
+      output.scrollIntoView?.({block: "nearest"});
+      bridge.toast(await copied ? "Code copied." : "Code created. Copy it from the box.");
     });
+    const generatedBox = element("div", "", main, {hidden: ""});
+    const output = element("textarea", "", generatedBox, {readonly: "", "aria-label": "Cloud link and code", rows: "4"});
+    const expiry = element("p", "", generatedBox);
     const recipient = field("Recipient username", "text", recipientUsername);
     recipient.addEventListener("input", () => {
       if (verified.toLowerCase() !== recipient.value.toLowerCase()) verified = "";
