@@ -869,25 +869,21 @@
     "Recipients can save, screenshot, or reshare their copy. Deleting your account does not delete their copy. Get permission before sharing someone else's schedule.";
   function sharing(recipientUsername = "") {
     clear();
+    text(document.getElementById("accountDialogTitle"), "Cloud sharing");
     const heading = element("div", "", main, {class: "cloud-sharing-heading"});
-    element("h3", "Cloud sharing", heading);
     const menu = element("details", "", heading, {class: "friend-menu"});
     const toggle = element("summary", "", menu, {"aria-label": "Sharing options", title: "Sharing options"});
     element("span", "⋮", toggle, {"aria-hidden": "true", "data-no-translate": ""});
     const options = element("div", "", menu, {class: "friend-menu-actions"});
     action("Offline Sharing", options, () => { menu.open = false; close(); bridge.openExport(); });
+    element("p", warning, options);
+    element("p", "Select schedules to share. Shared copies are fixed snapshots and will not receive future edits.", options);
+    element("p", "Includes the complete schedule and all saved details.", options);
     menu.addEventListener("keydown", event => {
       if (event.key === "Escape" && menu.open) { event.preventDefault(); event.stopPropagation(); menu.open = false; toggle.focus(); }
     });
-    element("p", warning, main);
-    element(
-      "p",
-      "Select schedules to share. Shared copies are fixed snapshots and will not receive future edits.",
-      main,
-    );
     const values = bridge.snapshot().data.people;
     const selection = bridge.exportPicker(main);
-    element("p", "Includes the complete schedule and all saved details.", main);
     const selected = () => Object.fromEntries(
       selection().map(name => [name,copy(values[name])]),
     );
