@@ -707,6 +707,8 @@ window.UFreeFrench = {
     "The selected schedules exceed the 2 MB test limit.": "Les horaires sélectionnés dépassent la limite de test de 2 Mo.",
     "Find accounts": "Trouver des comptes",
     "Friends": "Amis",
+    "Sharing options": "Options de partage",
+    "Offline Sharing": "Partage hors ligne",
     "Inbox is empty.": "La boîte de réception est vide.",
     "Friend options": "Options de cet ami",
     "Add a note": "Ajouter une note",

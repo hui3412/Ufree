@@ -3054,6 +3054,7 @@ html[lang="fr"] .nav-extra-label, html[lang="fr"] .nav-button-label { min-width:
 .person-name .friend-note { margin-left: .4em; }
 .friend-identity p { font-size: .8rem; color: var(--muted); margin: 3px 0 0; }
 .friend-menu { position: relative; flex: 0 0 auto; }
+.cloud-sharing-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .friend-menu summary { display: flex; align-items: center; justify-content: center; list-style: none; cursor: pointer; min-width: 44px; min-height: 44px; border-radius: 8px; font-size: 1.7rem; }
 .friend-menu summary::-webkit-details-marker { display: none; }
 .friend-menu summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

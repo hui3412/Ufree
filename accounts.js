@@ -227,6 +227,12 @@
   window.UFreeAccounts = {
     active,
     prefix,
+    openSharing: () => {
+      if (!active()) return;
+      focusBefore = bridge.prepareDialog();
+      sharing();
+      panel.showModal();
+    },
     isLive: (name) => liveNames.has(name),
     friendNote: (name) => friendNote(liveNames.get(name)?.username || ""),
     renamed: (from, to) => {
@@ -864,7 +870,16 @@
     "Recipients can save, screenshot, or reshare their copy. Deleting your account does not delete their copy. Get permission before sharing someone else's schedule.";
   function sharing(recipientUsername = "") {
     clear();
-    element("h3", "Cloud sharing", main);
+    const heading = element("div", "", main, {class: "cloud-sharing-heading"});
+    element("h3", "Cloud sharing", heading);
+    const menu = element("details", "", heading, {class: "friend-menu"});
+    const toggle = element("summary", "", menu, {"aria-label": "Sharing options", title: "Sharing options"});
+    element("span", "⋮", toggle, {"aria-hidden": "true", "data-no-translate": ""});
+    const options = element("div", "", menu, {class: "friend-menu-actions"});
+    action("Offline Sharing", options, () => { menu.open = false; close(); bridge.openExport(); });
+    menu.addEventListener("keydown", event => {
+      if (event.key === "Escape" && menu.open) { event.preventDefault(); event.stopPropagation(); menu.open = false; toggle.focus(); }
+    });
     element("p", warning, main);
     element(
       "p",

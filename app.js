@@ -5198,7 +5198,10 @@ const SYNC_URL = 'https://youfree.ca';
       applyAccentTheme(button.dataset.colorTheme, true);
     });
     els.scheduleDataButton.addEventListener("click", openScheduleModal);
-    els.homeExportButton.addEventListener("click", event => openQuickCodePanel("export", event));
+    els.homeExportButton.addEventListener("click", event => {
+      if (window.UFreeAccounts?.active()) window.UFreeAccounts.openSharing();
+      else openQuickCodePanel("export", event);
+    });
     els.homeImportButton?.addEventListener("click", event => openQuickCodePanel("import", event));
     els.bottomImportButton?.addEventListener("click", event => openQuickCodePanel("import", event));
     els.helpButton.addEventListener("click", openHelp);
@@ -5527,6 +5530,7 @@ const SYNC_URL = 'https://youfree.ca';
         isBusy: () => state.isParsing || Boolean(state.pendingImage) || Boolean(state.codeMode),
         canNotify: () => ![...document.querySelectorAll(".modal-backdrop")].some(modal=>!modal.hidden),
         openImport: () => openQuickCodePanel("import"),
+        openExport: () => openQuickCodePanel("export"),
         reload: async () => {
           if (state.isParsing || state.pendingImage || state.codeMode) return;
           await loadSchedulesFromDevice();

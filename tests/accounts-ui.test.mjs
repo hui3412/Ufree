@@ -223,6 +223,24 @@ test("sharing verifies mixed-case recipients, retains case-only edits and invali
     assert.equal(a.calls.filter(c=>c.url.endsWith('/deliveries')).length,sent);
   } finally { await a.close(); }
 });
+test("signed-in Export opens cloud sharing with Offline Sharing in its options", async () => {
+ const a=await app({account:true});try{
+ a.el('mobileMenuButton').click();a.el('homeExportButton').click();
+ assert.equal(a.el('mobileMenuButton').getAttribute('aria-expanded'),'false');
+ assert.equal(a.w.document.querySelector('.account-dialog').open,true);
+ assert.ok(a.w.document.querySelector('.cloud-sharing-heading'));
+ const menu=a.w.document.querySelector('.cloud-sharing-heading details');
+ assert.equal(menu.open,false);menu.querySelector('summary').click();
+ a.w.UFreeI18n.setLanguage('fr');buttonWith(a.w,'Partage hors ligne').click();
+ assert.equal(a.w.document.querySelector('.account-dialog').open,false);
+ assert.equal(a.el('scheduleModal').hidden,false);
+ }finally{await a.close();}
+ const guest=await app();try{
+ guest.el('mobileMenuButton').click();guest.el('homeExportButton').click();
+ assert.equal(guest.w.document.querySelector('.account-dialog').open,false);
+ assert.equal(guest.el('scheduleModal').hidden,false);
+ }finally{await guest.close();}
+});
 test("account search caps results and sends no friend request before explicit consent", async () => {
   const a = await app({
     account: true,
