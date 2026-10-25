@@ -690,6 +690,9 @@ input[type="time"]:disabled {
 }
 
 .toast {
+  inset: auto;
+  margin: 0;
+  border: 0;
   position: fixed;
   left: 50%;
   bottom: max(22px, env(safe-area-inset-bottom));

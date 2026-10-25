@@ -2244,7 +2244,14 @@ const SYNC_URL = 'https://youfree.ca';
       return;
     }
     setUiText(els.toast, message);
+    // Native modal dialogs sit above every z-index. Promote notifications to
+    // the top layer too; keep the live region inside the active dialog.
+    const dialogs = [...document.querySelectorAll("dialog[open]")];
+    const parent = dialogs.at(-1) || document.body;
+    els.toast.hidePopover?.();
+    parent.append(els.toast);
     els.toast.hidden = false;
+    els.toast.showPopover?.();
     if (canAnimate()) {
       window.gsap.killTweensOf(els.toast);
       window.gsap.fromTo(
@@ -2263,11 +2270,13 @@ const SYNC_URL = 'https://youfree.ca';
           ease: "power1.in",
           onComplete: () => {
             els.toast.hidden = true;
+            els.toast.hidePopover?.();
             window.gsap.set(els.toast, { clearProps: "opacity,transform" });
           },
         });
       } else {
         els.toast.hidden = true;
+        els.toast.hidePopover?.();
       }
     }, 2600);
   }

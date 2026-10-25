@@ -358,6 +358,10 @@ test("an empty unchanged inbox does not need its own automatic request; manual I
     a.el("accountMenuButton").click();
     buttonWith(a.w, "Inbox").click();
     await settle(() => a.calls.some((c) => c.url.endsWith("/deliveries")));
+    await settle(() => !a.el("toast").hidden);
+    assert.equal(a.el("toast").textContent,"Inbox is empty.");
+    assert.equal(a.el("toast").getAttribute("popover"),"manual");
+    assert.equal(a.el("toast").parentElement.matches("dialog[open]"),true);
     assert.equal(
       a.calls.filter((c) => c.url.endsWith("/deliveries")).length,
       1,

@@ -1,4 +1,4 @@
-const CACHE_NAME = "whos-free-main-shell-v157";
+const CACHE_NAME = "whos-free-main-shell-v158";
 const OCR_CACHE_NAME = "whos-free-ocr-v1";
 const APP_SHELL = [
   "./",
@@ -12,8 +12,8 @@ const APP_SHELL = [
   "./i18n.js?v=127",
   "./assets/flag-fr.svg",
   "./assets/flag-uk.svg",
-  "./styles.css?v=156",
-  "./app.js?v=156",
+  "./styles.css?v=158",
+  "./app.js?v=158",
   "./account-sync.js?v=149",
   "./schools.js?v=1",
   "./accounts.js?v=157",
