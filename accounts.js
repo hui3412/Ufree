@@ -548,7 +548,6 @@
     action("Refresh sync", controls, () => sync(true));
     action("Find accounts", controls, searchAccounts);
     action("Your personal schedule", controls, personalForm);
-    action("Cloud sharing", controls, sharing);
     action("Inbox", controls, () => inbox(true));
     action("Change password", controls, passwordForm);
     action("Sign in again", controls, () => authForm(false));
@@ -886,16 +885,11 @@
       "Select schedules to share. Shared copies are fixed snapshots and will not receive future edits.",
       main,
     );
-    const values = bridge.snapshot().data.people,
-      choices = [];
-    for (const name of Object.keys(values)) {
-      const label = element("label", name, main, { "data-no-translate": "" }),
-        input = element("input", "", label, { type: "checkbox" });
-      choices.push([name, input]);
-    }
+    const values = bridge.snapshot().data.people;
+    const selection = bridge.exportPicker(main);
     element("p", "Includes the complete schedule and all saved details.", main);
     const selected = () => Object.fromEntries(
-      choices.filter(([,input]) => input.checked).map(([name]) => [name,copy(values[name])]),
+      selection().map(name => [name,copy(values[name])]),
     );
     formButton("Create 48-hour link / code", async () => {
       const result = await request("/shares", { people: selected() });

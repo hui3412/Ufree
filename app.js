@@ -3279,6 +3279,64 @@ const SYNC_URL = 'https://youfree.ca';
     if (element === els.importCodeStatus) updateImportProgress(message);
   }
 
+  function cloudExportPicker(parent) {
+    const root = els.exportSelectionControls.cloneNode(true);
+    const get = id => root.querySelector('[id="' + id + '"]');
+    const search = get("exportPeopleSearch"), list = get("exportPeopleList"), details = get("exportSelection"),
+      summary = get("exportSelectionSummary"), toggle = get("exportSelectionToggleLabel"),
+      all = get("selectAllSchedules"), empty = get("exportPeopleEmpty"), groups = get("exportGroupPicker"), groupButton = get("exportGroupButton");
+    for (const node of [root, ...root.querySelectorAll("[id]")]) if (node.id) node.id = "cloud-" + node.id;
+    for (const node of root.querySelectorAll("[aria-controls]")) node.setAttribute("aria-controls", "cloud-" + node.getAttribute("aria-controls"));
+    root.hidden = false; details.hidden = false; details.open = false; groups.hidden = true; search.value = "";
+    groupButton.classList.remove("has-group"); groupButton.setAttribute("aria-expanded", "false");
+    setUiAttribute(groupButton,"aria-label","Choose a group to share");setUiAttribute(groups,"aria-label","Choose a group to share");
+    setUiText(groupButton.querySelector("span"), "Group");
+    setUiText(root.querySelector(".export-person-search span"), "Search people to share");
+    setUiAttribute(search,"placeholder","Search people");
+    setUiText(all.nextElementSibling,"Everyone"); setUiText(empty,"No matching people.");
+    list.replaceChildren();
+    const inputs = [];
+    const selected = () => inputs.filter(input => input.checked).map(input => input.dataset.person);
+    const update = () => {
+      const terms = searchText(search.value.trim()).split(/\s+/).filter(Boolean);
+      let visible = 0;
+      for (const input of inputs) {
+        const name = input.dataset.person;
+        const matches = terms.every(term => searchText(`${name} ${displayName(name)}`).includes(term));
+        input.closest("label").hidden = !matches; if (matches) visible++;
+      }
+      const count = selected().length;
+      all.checked = count > 0 && count === inputs.length; all.indeterminate = count > 0 && count < inputs.length;
+      empty.hidden = visible > 0;
+      setUiText(summary, terms.length ? `${visible} matching · ${count} selected` : count === inputs.length && count > 0 ? `Everyone · ${count}` : `${count} of ${inputs.length} selected`);
+      setUiText(toggle,details.open ? "Hide people" : "Show people");
+    };
+    for (const name of Object.keys(peopleMap()).sort(comparePeopleNames)) {
+      const label = document.createElement("label"); label.className = "share-selection";
+      const input = document.createElement("input"); input.type = "checkbox"; input.checked = true; input.dataset.person = name;
+      const caption = document.createElement("span"); setUiText(caption,displayName(name) === name ? name : `${displayName(name)} (${name})`,false);
+      label.append(input,caption); list.append(label); inputs.push(input); input.addEventListener("change",update);
+    }
+    search.addEventListener("input",()=>{details.open = true; update();});
+    groups.addEventListener("keydown",event=>{if(event.key==="Escape"){event.preventDefault();event.stopPropagation();groups.hidden=true;groupButton.setAttribute("aria-expanded","false");groupButton.focus();}});
+    details.addEventListener("toggle",update);
+    all.addEventListener("change",()=>{for(const input of inputs) input.checked = all.checked; update();});
+    groupButton.addEventListener("click",()=>{
+      groups.hidden = !groups.hidden; groupButton.setAttribute("aria-expanded",String(!groups.hidden));
+      if(groups.hidden)return;
+      details.open = false; groups.replaceChildren();
+      for(const group of [null,...state.groups]){
+        const members = group ? groupMembers(group) : Object.keys(peopleMap());
+        const button = document.createElement("button"); button.type="button";button.className="export-group-choice";button.disabled=!members.length;
+        const name=document.createElement("span"), count=document.createElement("span");
+        setUiText(name,group?.name || "Everyone individually",!group);setUiText(count,`${members.length} ${members.length===1?"person":"people"}`);button.append(name,count);
+        button.addEventListener("click",()=>{const names=new Set(members);for(const input of inputs)input.checked=names.has(input.dataset.person);search.value="";groups.hidden=true;groupButton.setAttribute("aria-expanded","false");update();groupButton.focus();});groups.append(button);
+      }
+      if(!state.groups.length){const message=document.createElement("p");setUiText(message,"No saved groups. Create one using the group controls on the main page.");groups.append(message);}
+    });
+    parent.append(root); update(); return selected;
+  }
+
   function filterExportPeople() {
     const terms = searchText(els.exportPeopleSearch.value.trim()).split(/\s+/).filter(Boolean);
     const inputs = [...els.exportPeopleList.querySelectorAll("input")];
@@ -5531,6 +5589,7 @@ const SYNC_URL = 'https://youfree.ca';
         canNotify: () => ![...document.querySelectorAll(".modal-backdrop")].some(modal=>!modal.hidden),
         openImport: () => openQuickCodePanel("import"),
         openExport: () => openQuickCodePanel("export"),
+        exportPicker: cloudExportPicker,
         reload: async () => {
           if (state.isParsing || state.pendingImage || state.codeMode) return;
           await loadSchedulesFromDevice();
