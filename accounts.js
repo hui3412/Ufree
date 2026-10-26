@@ -32,7 +32,6 @@
     ready = false,
     busy = false,
     deletingAccount = false,
-    verified = "",
     lastInbox = 0,
     inboxTask = null,
     needsReload = false,
@@ -366,7 +365,6 @@
     panel.querySelector(".cloud-sharing-heading")?.remove();
     main.onkeydown = null;
     main.replaceChildren();
-    verified = "";
     text(status, "");
   }
   function field(label, type = "text", value = "") {
@@ -911,35 +909,17 @@
     const output = element("textarea", "", generatedBox, {readonly: "", "aria-label": "Cloud link and code", rows: "4"});
     const expiry = element("p", "", generatedBox);
     const recipient = field("Recipient username", "text", recipientUsername);
-    recipient.addEventListener("input", () => {
-      if (verified.toLowerCase() !== recipient.value.toLowerCase()) verified = "";
-    });
-    action("Verify recipient", main, async () => {
-      const result = await request("/users/lookup", {
-        username: recipient.value,
-      });
-      if (!result.username) throw Error("Recipient unavailable.");
-      verified = result.username;
-      status.textContent = `${tr("Verified recipient")}: @${verified}`;
-    });
     formButton("Send by username", async () => {
-      if (!verified || verified.toLowerCase() !== recipient.value.toLowerCase())
-        throw Error("Verify the recipient first.");
-      const people = selected();
-      if (!Object.keys(people).length) throw Error("Select schedules.");
-      const snapshot = JSON.stringify(people);
-      if (
-        !(await confirmDialog(
-          `${tr("Verified recipient")}: @${verified}\n${Object.keys(people).join(", ")}\n${tr("Includes the complete schedule and all saved details.")}\n${tr(warning)}`,
-        ))
-      )
-        return;
-      await request("/deliveries", {
-        username: verified,
-        people: JSON.parse(snapshot),
-        confirmed: true,
-      });
-      text(status, "Schedules sent.");
+      try {
+        const username = recipient.value.trim();
+        if (!/^[A-Za-z0-9_]{3,24}$/.test(username)) throw Error("Enter a username.");
+        const people = selected();
+        if (!Object.keys(people).length) throw Error("Select schedules.");
+        const result = await request("/users/lookup", {username});
+        if (!result.username) throw Error("Recipient unavailable.");
+        await request("/deliveries", {username: result.username, people, confirmed: true});
+        bridge.toast("Schedules sent.");
+      } catch (error) { bridge.toast(error.message || "Cloud request failed."); }
     });
   }
   async function confirmDialog(message) {

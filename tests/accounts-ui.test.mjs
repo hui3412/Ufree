@@ -200,27 +200,28 @@ const buttonWith = (w, label) =>
   [...w.document.querySelectorAll("button")].find(
     (b) => b.textContent === label,
   );
-test("sharing verifies mixed-case recipients, retains case-only edits and invalidates different accounts", async () => {
-  const a = await app({ account: true, handler: path => path === "/users/lookup" ? {username:"David"} : path === "/deliveries" ? {ok:true} : undefined });
+test("one send click verifies the recipient, prevents duplicate taps and reports unavailable accounts", async () => {
+  const a = await app({ account: true, handler: (path,options) => path === "/users/lookup" ? {username:JSON.parse(options.body).username.toLowerCase()==="david"?"David":null} : path === "/deliveries" ? {ok:true} : undefined });
   try {
     a.el("mobileMenuButton").click(); a.el("accountMenuButton").click();
     assert.ok(buttonWith(a.w,"Friends"));
     a.w.UFreeAccounts.openSharing();
     const recipient = a.w.document.querySelector('.account-dialog input[type="text"]');
     recipient.value = "david";
-    buttonWith(a.w,"Verify recipient").click();
-    await settle(() => a.w.document.querySelector('.account-dialog').textContent.includes('Verified recipient: @David'));
+    assert.equal(buttonWith(a.w,"Verify recipient"),undefined);
     a.w.document.querySelector('.account-dialog input[type="checkbox"]').checked = true;
     recipient.value = "DAVID"; recipient.dispatchEvent(new a.w.Event("input"));
     buttonWith(a.w,"Send by username").click();
-    await settle(() => buttonWith(a.w,"Confirm")); buttonWith(a.w,"Confirm").click();
+    buttonWith(a.w,"Send by username").click();
     await settle(() => a.calls.some(c=>c.url.endsWith('/deliveries')));
     await settle(() => !buttonWith(a.w,"Send by username").disabled);
-    const sent = a.calls.filter(c=>c.url.endsWith('/deliveries')).length;
+    const sent = a.calls.filter(c=>c.url.endsWith('/deliveries') && c.options.body).length;
+    assert.equal(sent,1);
+    assert.equal(a.el('toast').textContent,'Schedules sent.');
     recipient.value = "someone_else"; recipient.dispatchEvent(new a.w.Event("input"));
     buttonWith(a.w,"Send by username").click();
-    await settle(() => a.w.document.querySelector('.account-dialog').textContent.includes('Verify the recipient first.'));
-    assert.equal(a.calls.filter(c=>c.url.endsWith('/deliveries')).length,sent);
+    await settle(() => a.el('toast').textContent==='Recipient unavailable.');
+    assert.equal(a.calls.filter(c=>c.url.endsWith('/deliveries') && c.options.body).length,sent);
   } finally { await a.close(); }
 });
 test("signed-in Export opens cloud sharing with Offline Sharing in its options", async () => {
