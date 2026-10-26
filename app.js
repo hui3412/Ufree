@@ -2152,6 +2152,14 @@ const SYNC_URL = 'https://youfree.ca';
     return window.WhosFreeAvailability.isFree(classesForDay(name, day), minute);
   }
 
+  function freeStatusLabel(name, day, minute) {
+    const classes = classesForDay(name, day).filter(c => toMinutes(c.end) > toMinutes(c.start));
+    if (!classes.length) return "FREE";
+    if (minute < Math.min(...classes.map(c => toMinutes(c.start)))) return "Free before school";
+    if (minute >= Math.max(...classes.map(c => toMinutes(c.end)))) return "Free after school";
+    return "FREE";
+  }
+
   function previousClasses(name, day, minute) {
     if (!ALL_DAYS.includes(day)) return [];
     return classesForDay(name, day).filter(c => toMinutes(c.end) <= minute);
@@ -4710,8 +4718,9 @@ const SYNC_URL = 'https://youfree.ca';
 
     const badge = document.createElement("span");
     badge.className = `status-badge ${busy ? "busy" : "free"}`;
-    setUiText(badge, busyClass ? "IN CLASS" : busy ? "Class Soon" : "FREE");
-    badge.style.whiteSpace = "pre-line";
+    setUiText(badge, busyClass ? "IN CLASS" : busy ? "Class Soon" : freeStatusLabel(name, day, minute));
+    badge.style.whiteSpace = "normal";
+    badge.style.maxWidth = "13ch";
 
     button.append(dot, copy, badge);
     attachPersonReorder(button, name, scope);
@@ -4953,7 +4962,7 @@ const SYNC_URL = 'https://youfree.ca';
 
     const badge = document.createElement("span");
     badge.className = `status-badge ${busy ? "busy" : "free"}`;
-    setUiText(badge, current ? "IN CLASS" : busy ? "Class Soon" : "FREE");
+    setUiText(badge, current ? "IN CLASS" : busy ? "Class Soon" : freeStatusLabel(name, day, minute));
     statusRow.append(badge);
 
     if (current) {

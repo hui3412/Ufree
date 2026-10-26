@@ -1,6 +1,8 @@
 // Presentation catalogue. Never translate saved schedules or transport payloads.
 window.UFreeFrench = {
   "exact": {
+    "Free before school": "Libre avant les cours",
+    "Free after school": "Libre après les cours",
     "or": "ou",
     "Maximum limit of schedules reached.": "Nombre maximal d’horaires atteint.",
     "Create an account to get unlimited slots.": "Créez un compte pour afficher un nombre illimité d’horaires.",
