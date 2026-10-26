@@ -3107,3 +3107,24 @@ html[lang="fr"] .nav-extra-label, html[lang="fr"] .nav-button-label { min-width:
 .school-results button { display: flex; flex-direction: column; gap: 4px; width: calc(100% - 10px); text-align: left; padding: 10px; color: inherit; background: var(--bg); border: 1px solid var(--border, #555); border-radius: 8px; overflow-wrap: anywhere; }
 .school-results button[aria-pressed=true] { border-color: var(--accent, #7daaff); box-shadow: inset 3px 0 var(--accent, #7daaff); }
 .school-results small { opacity: .75; }
+
+/* Separate the two independent cloud-sharing methods without competing with actions. */
+.account-dialog .cloud-sharing-alternative {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  margin: 22px 0;
+  color: var(--muted);
+  font-size: .8rem;
+  font-weight: 500;
+  line-height: 1.2;
+  text-align: center;
+}
+.account-dialog .cloud-sharing-alternative::before,
+.account-dialog .cloud-sharing-alternative::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
