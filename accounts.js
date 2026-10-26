@@ -595,7 +595,7 @@
     );
     element(
       "p",
-      "Accounts are intended to expire after 12 months without authenticated use. Automatic deletion is disabled in this test until the warning method and grace period are decided.",
+      "Accounts are intended to expire after four months without authenticated use.",
       main,
     );
     renderStatus();
