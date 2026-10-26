@@ -2155,8 +2155,8 @@ const SYNC_URL = 'https://youfree.ca';
   function freeStatusLabel(name, day, minute) {
     const classes = classesForDay(name, day).filter(c => toMinutes(c.end) > toMinutes(c.start));
     if (!classes.length) return "FREE";
-    if (minute < Math.min(...classes.map(c => toMinutes(c.start)))) return "Free before school";
-    if (minute >= Math.max(...classes.map(c => toMinutes(c.end)))) return "Free after school";
+    if (minute < Math.min(...classes.map(c => toMinutes(c.start)))) return "Before School";
+    if (minute >= Math.max(...classes.map(c => toMinutes(c.end)))) return "After School";
     return "FREE";
   }
 

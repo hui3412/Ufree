@@ -1,8 +1,8 @@
 // Presentation catalogue. Never translate saved schedules or transport payloads.
 window.UFreeFrench = {
   "exact": {
-    "Free before school": "Libre avant les cours",
-    "Free after school": "Libre après les cours",
+    "Before School": "Avant les cours",
+    "After School": "Après les cours",
     "or": "ou",
     "Maximum limit of schedules reached.": "Nombre maximal d’horaires atteint.",
     "Create an account to get unlimited slots.": "Créez un compte pour afficher un nombre illimité d’horaires.",
@@ -433,13 +433,13 @@ window.UFreeFrench = {
     "This person already belongs to every group.": "Cette personne appartient déjà à tous les groupes.",
     "Create a group in Manage groups first.": "Créez d’abord un groupe dans Gérer les groupes.",
     "No more classes today": "Plus de cours aujourd’hui",
-    "Free after classes at": "Libre après les cours à",
+    "Free after classes at": "Après les cours à",
     "Next break starts at": "Prochaine pause à",
     "IN CLASS": "EN COURS",
     "FREE": "LIBRE",
     "No classes this day.": "Aucun cours ce jour-là.",
     "Current class": "Cours actuel",
-    "Free after classes": "Libre après les cours",
+    "Free after classes": "Après les cours",
     "Next break": "Prochaine pause",
     "No more classes today after this time.": "Aucun autre cours aujourd’hui après cette heure.",
     "Earlier today": "Plus tôt aujourd’hui",
@@ -2214,7 +2214,7 @@ window.UFreeFrench = {
     },
     {
       "en": "Free after classes at {0}",
-      "fr": "Libre après les cours à {0}",
+      "fr": "Après les cours à {0}",
       "translateSlots": []
     },
     {

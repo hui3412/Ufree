@@ -15,12 +15,12 @@ test('school labels follow daily boundaries, breaks, overlaps and language',asyn
  const el=id=>w.document.getElementById(id);
  const badge=()=>el('peopleList').querySelector('[data-person="Student"] .status-badge');
  const at=(day,time)=>{el('daySelect').value=day;el('daySelect').dispatchEvent(new w.Event('change'));el('timeInput').value=time;el('timeInput').dispatchEvent(new w.Event('input'));return badge().textContent;};
- for(const [day,time,label] of [['Monday','00:00','Free before school'],['Monday','08:59','Free before school'],['Monday','09:00','IN CLASS'],['Monday','10:30','IN CLASS'],['Monday','11:00','FREE'],['Monday','13:00','Class Soon'],['Monday','14:00','Free after school'],['Monday','23:59','Free after school'],['Tuesday','00:00','Free before school'],['Sunday','00:00','FREE']])assert.equal(at(day,time),label);
+ for(const [day,time,label] of [['Monday','00:00','Before School'],['Monday','08:59','Before School'],['Monday','09:00','IN CLASS'],['Monday','10:30','IN CLASS'],['Monday','11:00','FREE'],['Monday','13:00','Class Soon'],['Monday','14:00','After School'],['Monday','23:59','After School'],['Tuesday','00:00','Before School'],['Sunday','00:00','FREE']])assert.equal(at(day,time),label);
  assert.equal(el('peopleList').querySelector('[data-person="Empty"] .status-badge').textContent,'FREE');
  at('Monday','08:00');el('peopleList').querySelector('[data-person="Student"] .person-select-button').click();
- assert.equal(el('detailPanel').querySelector('.status-badge').textContent,'Free before school');
- w.UFreeI18n.setLanguage('fr');assert.equal(badge().textContent,'Libre avant les cours');
- assert.equal(el('detailPanel').querySelector('.status-badge').textContent,'Libre avant les cours');
- assert.equal(at('Monday','14:00'),'Libre après les cours');
+ assert.equal(el('detailPanel').querySelector('.status-badge').textContent,'Before School');
+ w.UFreeI18n.setLanguage('fr');assert.equal(badge().textContent,'Avant les cours');
+ assert.equal(el('detailPanel').querySelector('.status-badge').textContent,'Avant les cours');
+ assert.equal(at('Monday','14:00'),'Après les cours');
  }finally{await w.happyDOM.abort();}
 });
