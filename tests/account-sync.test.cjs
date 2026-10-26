@@ -9,6 +9,24 @@ const make = () => {
   };
 };
 const person = (n) => ({ classes: [], semester: "Fall 2026", note: n });
+test("cloud slots preserve device overflow across restart and promote it when a slot is freed",async()=>{
+ const storage=make();
+ const records=Object.fromEntries(Array.from({length:102},(_,i)=>['p:Person'+i,person(i)]));
+ storage.setItem('limited',JSON.stringify({revision:1,base:Object.fromEntries(Object.entries(records).slice(0,100)),records,initialized:true,conflicts:[]}));
+ let revision=1;
+ const request=async(path,data)=>path==='/revision'?{revision}:(data?{revision:++revision}:{revision,changes:[]});
+ let sync=new Sync({storage,key:'limited',scheduleLimit:100,request});
+ assert.equal(sync.pending(),0);
+ assert.equal(Object.keys(sync.cloudRecords()).length,100);
+ assert.ok(sync.state.records['p:Person101']);
+ const changed={...sync.state.records};delete changed['p:Person0'];sync.save(changed);
+ assert.ok(sync.cloudRecords()['p:Person100']);
+ await sync.check(true);clearTimeout(sync.timer);
+ assert.equal(Object.keys(sync.state.base).length,100);
+ assert.equal(sync.state.base['p:Person0'],undefined);
+ sync=new Sync({storage,key:'limited',scheduleLimit:100,request});
+ assert.ok(sync.state.records['p:Person101']);assert.equal(sync.pending(),0);
+});
 test("concurrent edits preserve both versions and deletions preserve edited conflicts separately", () => {
   const b = { Alex: person("old") };
   let r = reconcile(b, { Alex: person("local") }, { Alex: person("remote") });

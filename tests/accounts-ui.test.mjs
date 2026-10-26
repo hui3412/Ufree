@@ -253,6 +253,28 @@ test("block controls show the blocked list and refresh it after blocking or unbl
  a.w.UFreeI18n.setLanguage('fr');assert.equal(a.w.document.querySelector('.blocked-accounts').textContent,'@David');
  }finally{await a.close();}
 });
+test("overflow remains on the device and cannot use cloud sharing, while offline export remains available",async()=>{
+ const extras=Object.fromEntries(Array.from({length:99},(_,i)=>['p:Saved'+i,{semester:'Fall 2026',classes:[]}]));
+ let a=await app({account:true,extraRecords:extras});try{
+ await settle(()=>a.calls.some(c=>new URL(c.url).pathname==='/revision'));
+ const record=a.w.UFreeAccounts.read();record.data.people.Overflow={semester:'Fall 2026',classes:[]};
+ const saved=await a.w.UFreeAccounts.save(record);
+ assert.equal(saved.cloudLimitReached,true);
+ assert.ok(saved.data.people.Overflow);assert.ok(saved.data.people.Original);
+ a.el('accountReloadButton').click();
+ await settle(()=>!a.el('accountReloadButton').disabled);
+ const cache=JSON.parse(a.w.localStorage.getItem('ufree-test-account-v1:test-user'));
+ assert.equal(Object.keys(cache.base).filter(n=>n.startsWith('p:')).length,100);
+ assert.ok(cache.records['p:Overflow']);assert.equal(cache.base['p:Overflow'],undefined);
+ const stored=snapshotStorage(a.w);await a.close();a=await app({account:true,extraRecords:extras,savedStorage:stored});
+ a.el('mobileMenuButton').click();a.el('homeExportButton').click();buttonWith(a.w,'Create 48-hour link / code').click();
+ await settle(()=>a.el('toast').textContent.includes('device-only schedule'));
+ assert.equal(a.calls.filter(c=>new URL(c.url).pathname==='/shares').length,0);
+ a.w.document.querySelector('.cloud-sharing-heading summary').click();buttonWith(a.w,'Offline Sharing').click();
+ assert.equal(a.el('scheduleModal').hidden,false);
+ assert.ok(a.el('exportPeopleList').textContent.includes('Overflow'));
+ }finally{await a.close();}
+});
 test("signed-in Export opens cloud sharing with Offline Sharing in its options", async () => {
  const a=await app({account:true});try{
  a.el('mobileMenuButton').click();a.el('homeExportButton').click();

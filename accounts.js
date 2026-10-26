@@ -14,6 +14,13 @@
   const SESSION = "ufree-test-session-v1",
     PREFIX = "ufree-test-account-v1:";
   const liveNames = new Map();
+  const LIMIT_NOTICE = "Cloud limit reached: extra schedules are saved on this device only, not in your account's cloud storage.";
+  const LOCAL_SHARE_NOTICE = "You selected a device-only schedule because the 100-schedule cloud limit was reached. Use Offline Sharing for codes, QR codes or links.";
+  const localOnlyNames = () => {
+    if (!engine) return [];
+    const cloud = engine.cloudRecords();
+    return Object.keys(engine.state.records).filter(name => name.startsWith("p:") && !Object.hasOwn(cloud, name));
+  };
   let personalChangeTask = null;
   const PREFS = [
     "whos-free-people-preferences-v1",
@@ -220,6 +227,8 @@
           flushPersonalChange().then(applySync).catch(showError),
         );
       },
+      scheduleLimit: 100,
+      preferredSchedule: () => pendingPersonal()?.to ?? engine?.state.personalSchedule ?? session.user.personalSchedule,
     });
   }
   setupEngine();
@@ -234,6 +243,7 @@
       document.activeElement?.blur();
     },
     isLive: (name) => liveNames.has(name),
+    localOnly: (name) => active() && Object.hasOwn(engine.state.records,"p:"+name) && !Object.hasOwn(engine.cloudRecords(),"p:"+name),
     friendNote: (name) => friendNote(liveNames.get(name)?.username || ""),
     renamed: (from, to) => {
       if (!active()) return;
@@ -273,10 +283,12 @@
       return saved;
     },
     async save(record, write = bridge.writeDevice) {
+      const previous = new Set(localOnlyNames());
       try { engine.save(records(record)); }
       catch (error) { await write(record); throw error; }
       const saved = await write(accountRecord());
       await markDevice(saved);
+      saved.cloudLimitReached = localOnlyNames().some(name => !previous.has(name));
       return saved;
     },
     async clear(write = bridge.writeDevice) {
@@ -296,7 +308,7 @@
       if (session) {
         engine
           .check(true)
-          .then(() => inbox())
+          .then(() => { if (localOnlyNames().length) bridge.toast(LIMIT_NOTICE); return inbox(); })
           .catch(showError);
       }
       cloudHash();
@@ -764,7 +776,8 @@
               ? {
                   school: school.value,
                   personalSchedule: personal.value,
-                  people: peopleFromRecords(records(snapshot)),
+                  people: Object.fromEntries(Object.entries(peopleFromRecords(records(snapshot)))
+                    .sort(([a],[b])=>Number(b===personal.value)-Number(a===personal.value)).slice(0,100)),
                   consent: true,
                 }
               : {}),
@@ -923,11 +936,17 @@
     });
     const values = bridge.snapshot().data.people;
     const selection = bridge.exportPicker(main);
-    const selected = () => Object.fromEntries(
-      selection().map(name => [name,copy(values[name])]),
-    );
+    const selected = (names = selection()) => {
+      const localOnly = new Set(localOnlyNames());
+      if (names.some(name => localOnly.has("p:" + name))) {
+        bridge.toast(LOCAL_SHARE_NOTICE);
+        throw Error(LOCAL_SHARE_NOTICE);
+      }
+      return Object.fromEntries(names.map(name => [name,copy(values[name])]));
+    };
     formButton("Create 48-hour link / code", async () => {
-      const generated = request("/shares", { people: selected() });
+      const people = selected();
+      const generated = ensureSynced().then(() => request("/shares", {people: selected(Object.keys(people))}));
       let copying;
       try {
         // Start clipboard access during the tap, before the network response,
@@ -954,6 +973,8 @@
         if (!/^[A-Za-z0-9_]{3,24}$/.test(username)) throw Error("Enter a username.");
         const people = selected();
         if (!Object.keys(people).length) throw Error("Select schedules.");
+        await ensureSynced();
+        selected(Object.keys(people));
         const result = await request("/users/lookup", {username});
         if (!result.username) throw Error("Recipient unavailable.");
         await request("/deliveries", {username: result.username, people, confirmed: true});

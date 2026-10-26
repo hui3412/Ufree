@@ -3114,6 +3114,7 @@ const SYNC_URL = 'https://youfree.ca';
     let storageWarning = null;
     try {
       const saved = await saveLocalScheduleRecord(record);
+      if (saved.cloudLimitReached) storageWarning = "Cloud limit reached: extra schedules are saved on this device only, not in your account's cloud storage.";
       if (window.UFreeAccounts?.active()) { state.data = saved.data; Object.assign(meta, saved.meta); }
       await requestPersistentStorage();
       if (Object.keys(peopleMap()).length) rememberScheduleHistory();
@@ -3315,7 +3316,9 @@ const SYNC_URL = 'https://youfree.ca';
       const label = document.createElement("label"); label.className = "share-selection";
       const input = document.createElement("input"); input.type = "checkbox"; input.checked = true; input.dataset.person = name;
       const caption = document.createElement("span"); setUiText(caption,displayName(name) === name ? name : `${displayName(name)} (${name})`,false);
-      label.append(input,caption); list.append(label); inputs.push(input); input.addEventListener("change",update);
+      label.append(input,caption);
+      if (window.UFreeAccounts?.localOnly(name)) { const badge=document.createElement("small");setUiText(badge,"Device only");label.append(badge); }
+      list.append(label); inputs.push(input); input.addEventListener("change",update);
     }
     search.addEventListener("input",()=>{details.open = true; update();});
     groups.addEventListener("keydown",event=>{if(event.key==="Escape"){event.preventDefault();event.stopPropagation();groups.hidden=true;groupButton.setAttribute("aria-expanded","false");groupButton.focus();}});
@@ -4650,6 +4653,7 @@ const SYNC_URL = 'https://youfree.ca';
 
     copy.append(personName, detail);
     if (window.UFreeAccounts?.isLive(name)) { const live = document.createElement("span"); live.className = "live-personal-label"; setUiText(live,"Live personal schedule"); copy.append(live); }
+    if (window.UFreeAccounts?.localOnly(name)) { const local = document.createElement("span"); local.className = "live-personal-label"; setUiText(local,"Device only"); copy.append(local); }
     if (semesterIsOlder(peopleMap()[name].semester)) {
       const label = document.createElement("span");
       label.className = `schedule-semester${semesterIsOlder(peopleMap()[name].semester) ? " semester-older" : ""}`;
@@ -5602,9 +5606,9 @@ const SYNC_URL = 'https://youfree.ca';
           const merged = await window.WhosFreeShareCode.merge(state.hasData ? state.data : null, incoming, () => "both");
           const before = captureScheduleChange(); state.data = merged.data;
           const warning = await persistCurrentDatabase("Imported cloud snapshot");
-          if (warning) throw new Error(warning);
+          if (warning && warning !== "Cloud limit reached: extra schedules are saved on this device only, not in your account's cloud storage.") throw new Error(warning);
           rememberScheduleChange(before, "Imported cloud snapshot");
-          showToast("Imported cloud snapshot");
+          showToast(warning || "Imported cloud snapshot");
         },
       });
       maybeShowSingleScheduleReminder();

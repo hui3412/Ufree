@@ -89,12 +89,16 @@
       request,
       onChange = () => {},
       onSynced = () => {},
+      scheduleLimit = Infinity,
+      preferredSchedule = () => null,
     }) {
       this.storage = storage;
       this.key = key;
       this.request = request;
       this.onChange = onChange;
       this.onSynced = onSynced;
+      this.scheduleLimit = scheduleLimit;
+      this.preferredSchedule = preferredSchedule;
       this.running = null;
       this.lastCheck = 0;
       this.timer = null;
@@ -131,7 +135,18 @@
       this.onChange(this);
     }
     pending() {
-      return differences(this.state.base, this.state.records).length;
+      return differences(this.state.base, this.cloudRecords()).length;
+    }
+    cloudRecords() {
+      const values = this.state.records;
+      const personal = "p:" + (this.preferredSchedule() ?? this.state.personalSchedule);
+      if (this.cloudProjection?.state === this.state && this.cloudProjection.personal === personal) return this.cloudProjection.values;
+      const names = [...new Set([personal, ...Object.keys(this.state.base), ...Object.keys(values)])]
+        .filter(name => name.startsWith("p:") && Object.hasOwn(values, name));
+      const allowed = new Set(names.slice(0, this.scheduleLimit));
+      const projected = Object.fromEntries(Object.entries(values).filter(([name]) => !name.startsWith("p:") || allowed.has(name)));
+      this.cloudProjection = {state:this.state,personal,values:projected};
+      return projected;
     }
     save(records) {
       const before = copy(this.state.records);
@@ -265,8 +280,8 @@
           this.reload();
           const changes = differences(
             this.state.base,
-            this.state.records,
-          ).slice(0, 50);
+            this.cloudRecords(),
+          ).sort((a,b) => Number(b.value === null) - Number(a.value === null)).slice(0, 50);
           if (!changes.length) break;
           const sentBase = this.state.revision;
           const result = await this.request("/sync", {

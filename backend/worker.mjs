@@ -11,6 +11,19 @@ const HOUR = 3600000,
   DAY = HOUR * 24;
 const encoder = new TextEncoder();
 const RELEASE = "mutual-follow-sliding-sessions-v1";
+const LOCAL_ONLY_SHARE = "You selected a device-only schedule because the 100-schedule cloud limit was reached. Use Offline Sharing for codes, QR codes or links.";
+async function checkCloudSharing(db,userId,people) {
+  const records = await rows(db,"SELECT name,CASE WHEN name GLOB 'f:*' THEN json_extract(payload,'$.username') ELSE NULL END AS username FROM records WHERE user_id=? AND payload IS NOT NULL",userId);
+  const names = new Set(records.filter(row=>row.name.startsWith("p:")).map(row=>row.name.slice(2)));
+  const uploadedCount = names.size;
+  for (const row of records.filter(row=>row.name.startsWith("f:")).sort((a,b)=>a.name.localeCompare(b.name))) {
+    let label="@"+row.username,index=2;
+    while(names.has(label))label=`@${row.username} (${index++})`;
+    names.add(label);
+  }
+  const extra = Object.keys(people).filter(name=>!names.has(name)).length;
+  if(extra && uploadedCount + extra > 100)fail(LOCAL_ONLY_SHARE,413);
+}
 const random = () => bytesToHex(crypto.getRandomValues(new Uint8Array(32)));
 const digest = async (value) =>
   bytesToHex(
@@ -565,6 +578,12 @@ export default {
           user.id,
           ...input.changes.map((change) => change.name),
         );
+        const currentSchedules = await rows(db,"SELECT name FROM records WHERE user_id=? AND name GLOB 'p:*' AND payload IS NOT NULL",user.id);
+        const scheduleNames = new Set(currentSchedules.map(row=>row.name));
+        for (const change of input.changes) if (change.name.startsWith("p:")) {
+          if (change.value === null) scheduleNames.delete(change.name); else scheduleNames.add(change.name);
+        }
+        if (scheduleNames.size > 100 && scheduleNames.size > currentSchedules.length) fail("Cloud schedule limit reached.",413);
         const sizes = new Map(existing.map((row) => [row.name, row.size || 0]));
         const increase = input.changes.reduce(
           (total, change) =>
@@ -616,6 +635,7 @@ export default {
       }
       if (path === "/shares" && input) {
         validatePeople(input.people);
+        await checkCloudSharing(db,user.id,input.people);
         if (!Object.keys(input.people).length) fail("Select schedules.");
         await throttle(db, `shares:${user.id}`, 30, DAY);
         const id = random(),
@@ -668,6 +688,7 @@ export default {
       }
       if (path === "/deliveries" && input) {
         validatePeople(input.people);
+        await checkCloudSharing(db,user.id,input.people);
         if (!Object.keys(input.people).length) fail("Select schedules.");
         if (typeof input.username !== "string" || input.confirmed !== true)
           fail("Verify and confirm the recipient.");
@@ -756,6 +777,7 @@ export default {
       }
       fail("Not found.", 404);
     } catch (error) {
+      if ((error.message || "").includes("Cloud schedule limit reached.")) return respond({error:"Cloud schedule limit reached."},413);
       // Daily quota failures must not become a rapid generic-503 retry loop.
       if (/free tier daily row (read|write) limit|\b7500\b/i.test(error.message || "")) {
         const now = new Date(), retryAt = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1);
