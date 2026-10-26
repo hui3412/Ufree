@@ -3128,3 +3128,9 @@ html[lang="fr"] .nav-extra-label, html[lang="fr"] .nav-button-label { min-width:
   height: 1px;
   background: var(--border);
 }
+
+/* Keep every home-card status flush with the same right edge, including wrapped labels. */
+.person-card .status-badge {
+  justify-self: end;
+  text-align: right;
+}
