@@ -527,7 +527,7 @@ test("Friends opens directly from the drawer; private notes persist, sync and ne
     assert.equal(a.el("peopleList").querySelector(".friend-note").textContent,"Biology <class>");
     buttonWith(a.w,"Back to account").click();
     assert.equal(a.w.document.querySelector(".account-actions").textContent.includes("Friends"),false);
-    buttonWith(a.w,"Refresh sync").click();
+    a.el("accountReloadButton").click();
     await settle(() => a.calls.some(c=>new URL(c.url).pathname==="/sync" && JSON.parse(c.options?.body||"null")?.changes.some(r=>r.name==="@preferences" && r.value["friend-note:david"]==="Biology <class>")));
     const value = JSON.parse(a.w.localStorage.getItem("ufree-test-account-v1:test-user")).records;
     assert.equal(value["@preferences"]["friend-note:david"],"Biology <class>");
@@ -628,7 +628,7 @@ test("signed-in offline changes persist on the phone and upload on reconnection"
     await a.w.UFreeAccounts.save({data:{people:{Offline:{semester:'Fall 2026',classes:[],note:'Saved without network'}}}});
     assert.equal(JSON.parse(a.w.localStorage.getItem('whos-free-local-schedules')).data.people.Offline.note,'Saved without network');
     offline=false;
-    a.el('mobileMenuButton').click();a.el('accountMenuButton').click();buttonWith(a.w,'Refresh sync').click();
+    a.el('mobileMenuButton').click();a.el('accountMenuButton').click();a.el('accountReloadButton').click();
     await settle(()=>a.calls.some(c=>new URL(c.url).pathname==='/sync'&&c.options?.body&&JSON.parse(c.options.body).changes.some(row=>row.name==='p:Offline')));
     const state=JSON.parse(a.w.localStorage.getItem('ufree-test-account-v1:test-user'));
     assert.equal(state.records['p:Offline'].note,'Saved without network');

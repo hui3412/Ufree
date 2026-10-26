@@ -3040,6 +3040,12 @@ html[lang="fr"] .nav-extra-label, html[lang="fr"] .nav-button-label { min-width:
 .account-dialog button { margin: 5px; min-height: 44px; }
 .account-dialog p { white-space: pre-line; overflow-wrap: anywhere; }
 .account-actions { display: flex; flex-wrap: wrap; }
+.settings-reload-button { display: inline-flex; align-items: center; gap: 8px; margin-top: 16px; min-height: 44px; }
+.settings-reload-button[hidden] { display: none; }
+.settings-reload-button svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; }
+.settings-reload-button.is-loading svg { animation: settings-reload-spin 1s linear infinite; }
+@keyframes settings-reload-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .settings-reload-button.is-loading svg { animation: none; } }
 .account-collection-label { margin: 0 0 12px; color: var(--muted); }
 
 .follow-results { display: grid; gap: 12px; margin-top: 16px; }

@@ -421,6 +421,24 @@
     status.textContent = parts.join(" · ");
   }
   function mount() {
+    const reload = document.getElementById("accountReloadButton");
+    reload.hidden = !active();
+    reload.addEventListener("click", async () => {
+      if (!active() || reload.disabled) return;
+      reload.disabled = true;
+      reload.setAttribute("aria-busy", "true");
+      reload.classList.add("is-loading");
+      try {
+        await sync(true);
+        if (engine.error) throw Error(engine.error);
+        bridge.toast("Reloaded.");
+      } catch (error) { bridge.toast(error.message || "Cloud request failed."); }
+      finally {
+        reload.disabled = false;
+        reload.removeAttribute("aria-busy");
+        reload.classList.remove("is-loading");
+      }
+    });
     const nav = document.getElementById("homeNavigation"),
       language = document.getElementById("languageToggleButton");
     const footer = element("div", "", null, { class: "account-nav-footer" });
@@ -544,7 +562,6 @@
       main,
     );
     const controls = element("div", "", main, { class: "account-actions" });
-    action("Refresh sync", controls, () => sync(true));
     action("Your personal schedule", controls, personalForm);
     action("Inbox", controls, () => inbox(true));
     action("Change password", controls, passwordForm);
