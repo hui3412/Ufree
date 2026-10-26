@@ -28,6 +28,45 @@ const SYNC_URL = 'https://youfree.ca';
   const WORK_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
   const ALL_DAYS = [...WORK_DAYS, "Saturday", "Sunday"];
 
+  // Main-page display limit while signed out. Change this number to 5, 15, etc.
+  // The complete collection remains stored and accessible in Schedules.
+  const GUEST_HOME_SCHEDULE_LIMIT = 10;
+
+  function guestHomeLimited() {
+    // Do not restrict deployments where account creation is unavailable.
+    return Boolean(window.UFreeAccounts && !window.UFreeAccounts.active());
+  }
+
+  function homePeople() {
+    const names = orderScopeMembers("main");
+    return guestHomeLimited() ? names.slice(0, GUEST_HOME_SCHEDULE_LIMIT) : names;
+  }
+
+  function appendGuestHomeNotice() {
+    if (!guestHomeLimited() || Object.keys(peopleMap()).length < GUEST_HOME_SCHEDULE_LIMIT) return;
+    const card = document.createElement("div");
+    card.className = "guest-home-limit-card";
+    card.setAttribute("role", "listitem");
+    const title = document.createElement("h3");
+    setUiText(title, "Maximum limit of schedules reached.");
+    const message = document.createElement("p");
+    setUiText(message, "Create an account to get unlimited slots.");
+    const note = document.createElement("p");
+    setUiText(note, "All your schedules are still saved on this device. View or delete them in Schedules.");
+    const actions = document.createElement("div");
+    actions.className = "account-actions";
+    for (const [label, signup] of [["Create an account", true], ["Sign in", false]]) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "secondary-button";
+      setUiText(button, label);
+      button.addEventListener("click", () => window.UFreeAccounts.openAuth(signup));
+      actions.append(button);
+    }
+    card.append(title, message, note, actions);
+    els.peopleList.append(card);
+  }
+
   const state = {
     data: { people: {} },
     hasData: false,
@@ -2224,7 +2263,7 @@ const SYNC_URL = 'https://youfree.ca';
 
   function visiblePeople(day, minute) {
     const terms = searchText(state.peopleSearchQuery.trim()).split(/\s+/).filter(Boolean);
-    const people = Object.keys(peopleMap()).filter(name => terms.every(term => searchText(`${name} ${displayName(name)}`).includes(term))).sort(comparePeopleNames);
+    const people = homePeople().filter(name => terms.every(term => searchText(`${name} ${displayName(name)}`).includes(term))).sort(comparePeopleNames);
     const free = people.filter(name => isFree(name, day, minute)).sort(comparePeopleNames);
     const freeSet = new Set(free);
     const busy = people.filter(name => !freeSet.has(name)).sort(comparePeopleNames);
@@ -5035,6 +5074,7 @@ const SYNC_URL = 'https://youfree.ca';
 
     if (visible.length === 0 && !state.showGroups) {
       els.peopleList.append(createEmptyList(state.peopleSearchQuery.trim() ? "No matching people" : "Nobody is free", state.peopleSearchQuery.trim() ? "Try another name, clear the search, or choose All." : "Try another time or choose Show everyone."));
+      appendGuestHomeNotice();
       state.selectedPerson = null;
       renderEmptyDetail();
       return;
@@ -5046,6 +5086,7 @@ const SYNC_URL = 'https://youfree.ca';
       displayed = grouped.visible;
       updatePeopleSearchStatus(displayed);
     } else visible.forEach(name => els.peopleList.append(renderPersonCard(name, day, minute)));
+    appendGuestHomeNotice();
     for (const section of els.peopleList.querySelectorAll(".people-group")) {
       if (openMenus.includes(section.dataset.groupId)) section.querySelector(".group-options").open = true;
     }

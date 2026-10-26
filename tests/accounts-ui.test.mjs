@@ -21,6 +21,8 @@ async function app({
   extraRecords = {},
   handler,
   savedStorage,
+  localPeople,
+  guestLimit,
 } = {}) {
   const w = new Window({
     url:
@@ -41,7 +43,7 @@ async function app({
     CompressionStream,
     DecompressionStream,
   });
-  const original = JSON.stringify(record);
+  const original = JSON.stringify(localPeople ? { ...record, data: { people: localPeople } } : record);
   w.localStorage.setItem("whos-free-local-schedules", original);
   if (session || account)
     w.localStorage.setItem(
@@ -111,7 +113,9 @@ async function app({
     "accounts.js",
     "app.js",
   ])
-    w.eval(read(f));
+    w.eval(f === "app.js" && guestLimit !== undefined
+      ? read(f).replace("const GUEST_HOME_SCHEDULE_LIMIT = 10;", `const GUEST_HOME_SCHEDULE_LIMIT = ${guestLimit};`)
+      : read(f));
   for (
     let i = 0;
     i < 100 && !w.document.getElementById("accountMenuButton");
@@ -854,4 +858,96 @@ test('reopening a signed-in account checks fresh cloud revisions even with a rec
  }});
  try{await settle(()=>a.w.UFreeAccounts.read().data.people['@test2']?.note===latest.note);assert.match(a.el('peopleList').textContent,/@test2/);}
  finally{await a.close();}
+});
+
+
+const guestPeople = (count) => Object.fromEntries(Array.from({length: count}, (_, i) =>
+  [`Guest ${String(i + 1).padStart(2, "0")}`, {semester: "Fall 2026", classes: []}]));
+const homeNames = a => [...a.el("peopleList").querySelectorAll(".person-card")].map(card => card.dataset.person);
+const guestNotice = a => a.el("peopleList").querySelector(".guest-home-limit-card");
+
+test("guest home shows ten of twenty without changing storage and keeps full Schedules access", async () => {
+  const people = guestPeople(20), a = await app({localPeople: people});
+  try {
+    assert.deepEqual(homeNames(a), Object.keys(people).slice(0, 10));
+    assert.equal(a.el("peopleList").lastElementChild, guestNotice(a));
+    assert.match(guestNotice(a).textContent, /Maximum limit of schedules reached/);
+    assert.equal(a.w.localStorage.getItem("whos-free-local-schedules"), a.original);
+    assert.equal(a.el("peopleManagerList").querySelectorAll(".people-manager-row").length, 20);
+    const row = [...a.el("peopleManagerList").children].find(row => row.textContent.includes("Guest 20"));
+    row.querySelector('[aria-label="Edit Guest 20"]').click();
+    assert.equal(a.el("imageReview").hidden, false);
+    assert.equal(a.w.localStorage.getItem("whos-free-local-schedules"), a.original);
+    assert.equal(a.calls.length, 0);
+  } finally { await a.close(); }
+});
+
+test("guest home signup and login buttons open the corresponding existing forms in either language", async () => {
+  const a = await app({localPeople: guestPeople(20)});
+  try {
+    guestNotice(a).querySelector("button").click();
+    assert.equal(a.w.document.querySelector(".account-dialog").open, true);
+    assert.equal(a.w.document.querySelector(".account-dialog h3").textContent, "Create account");
+    assert.ok(a.w.document.querySelector('.account-dialog input[autocomplete="new-password"]'));
+    a.w.document.querySelector(".account-dialog").close();
+    a.w.UFreeI18n.setLanguage("fr");
+    assert.match(guestNotice(a).textContent, /Nombre maximal d’horaires atteint/);
+    assert.equal(guestNotice(a).querySelector("button").textContent, "Créer un compte");
+    guestNotice(a).querySelectorAll("button")[1].click();
+    assert.equal(a.w.document.querySelector(".account-dialog h3").textContent, "Se connecter");
+    assert.ok(a.w.document.querySelector('.account-dialog input[autocomplete="current-password"]'));
+    assert.equal(a.calls.length, 0);
+  } finally { await a.close(); }
+});
+
+test("guest home hides excess schedules through search and groups and deletion fills the vacated slot", async () => {
+  const a = await app({localPeople: guestPeople(20)});
+  try {
+    a.el("peopleSearchButton").click();
+    a.el("peopleSearchInput").value = "Guest 20";
+    a.el("peopleSearchInput").dispatchEvent(new a.w.Event("input"));
+    assert.deepEqual(homeNames(a), []);
+    assert.ok(guestNotice(a));
+    a.el("peopleSearchInput").value = "";
+    a.el("peopleSearchInput").dispatchEvent(new a.w.Event("input"));
+    a.el("showGroupsToggle").click();
+    assert.equal(homeNames(a).length, 10);
+    assert.ok(!homeNames(a).includes("Guest 20"));
+    assert.ok(guestNotice(a));
+    a.w.confirm = () => true;
+    a.el("peopleManagerList").querySelector('[aria-label="Remove Guest 01"]').click();
+    await settle(() => !a.el("peopleManagerList").querySelector('[aria-label="Remove Guest 01"]'));
+    assert.equal(homeNames(a).length, 10);
+    assert.ok(homeNames(a).includes("Guest 11"));
+    const saved = JSON.parse(a.w.localStorage.getItem("whos-free-local-schedules")).data.people;
+    assert.equal(Object.keys(saved).length, 19);
+    assert.deepEqual(saved["Guest 20"], guestPeople(20)["Guest 20"]);
+  } finally { await a.close(); }
+});
+
+test("guest home limit is controlled by one number and the prompt starts at that limit", async () => {
+  for (const [count, limit, expected, notice] of [[9,10,9,false],[10,10,10,true],[20,5,5,true],[20,15,15,true]]) {
+    const a = await app({localPeople: guestPeople(count), guestLimit: limit});
+    try {
+      assert.equal(homeNames(a).length, expected);
+      assert.equal(Boolean(guestNotice(a)), notice);
+      assert.equal(a.el("peopleManagerList").children.length, count);
+    } finally { await a.close(); }
+  }
+});
+
+test("guest home restriction is removed after sign-in and returns on signed-out reload with all data retained", async () => {
+  const a = await app({localPeople: guestPeople(20), session: true});
+  let b;
+  try {
+    assert.equal(homeNames(a).length, 20);
+    assert.equal(guestNotice(a), null);
+    const savedStorage = Object.fromEntries(Object.keys(a.w.localStorage).filter(key => key !== "ufree-test-session-v1").map(key => [key, a.w.localStorage.getItem(key)]));
+    b = await app({savedStorage});
+    assert.equal(homeNames(b).length, 10);
+    assert.ok(guestNotice(b));
+    assert.equal(b.el("peopleManagerList").children.length, 20);
+    guestNotice(b).querySelectorAll("button")[1].click();
+    assert.equal(b.w.document.querySelector(".account-dialog h3").textContent, "Sign in");
+  } finally { await a.close(); await b?.close(); }
 });

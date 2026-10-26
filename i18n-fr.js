@@ -1,6 +1,10 @@
 // Presentation catalogue. Never translate saved schedules or transport payloads.
 window.UFreeFrench = {
   "exact": {
+    "Maximum limit of schedules reached.": "Nombre maximal d’horaires atteint.",
+    "Create an account to get unlimited slots.": "Créez un compte pour afficher un nombre illimité d’horaires.",
+    "All your schedules are still saved on this device. View or delete them in Schedules.": "Tous vos horaires restent enregistrés sur cet appareil. Consultez-les ou supprimez-les dans Horaires.",
+    "Create an account": "Créer un compte",
     "Open main menu": "Ouvrir le menu principal",
     "Find who's free now, or check any time during the week. Optimized for the Omnivox system.": "Voyez qui est libre maintenant ou choisissez un moment de la semaine. Optimisé pour le système Omnivox.",
     "Main menu": "Menu principal",

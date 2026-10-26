@@ -1,3 +1,18 @@
+### Guest main-page schedule limit
+
+`GUEST_HOME_SCHEDULE_LIMIT` near the top of `app.js` controls how many schedules
+appear on the home page while signed out. Its default is **10**; change that one
+number to 5, 15, 20, etc. and bump the app/service-worker cache references when
+shipping. The limit applies only where Accounts is enabled. Signed-in accounts
+show their full device collection, including device-only schedules beyond the
+separate cloud-storage limit.
+
+The first schedules use the main list's saved ordering and pinned/free/busy
+ordering before search and the Free filter. Groups use the same eligible people.
+The account prompt appears at the limit, with Create an account opening signup
+and Sign in opening login. All schedules remain stored, exportable and accessible
+for viewing, editing and removal in Schedules. No data is truncated or deleted.
+
 # Account test work
 
 The test account, sync and cloud-sharing implementation is documented in [backend/README.md](backend/README.md). Existing Local schedules retain their original storage keys. Account features run only on the hui3412 GitHub Pages test site. Remote database migration, Cloudflare CPU/runtime verification, real iOS tests and the inactivity-warning decision are required before launch.

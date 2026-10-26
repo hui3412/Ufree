@@ -235,6 +235,13 @@
   window.UFreeAccounts = {
     active,
     prefix,
+    openAuth: (signup = false) => {
+      if (!ready) return;
+      focusBefore = bridge.prepareDialog();
+      authForm(signup);
+      panel.showModal();
+      document.activeElement?.blur();
+    },
     openSharing: () => {
       if (!active()) return;
       focusBefore = bridge.prepareDialog();

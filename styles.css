@@ -3040,6 +3040,11 @@ html[lang="fr"] .nav-extra-label, html[lang="fr"] .nav-button-label { min-width:
 .account-dialog button { margin: 5px; min-height: 44px; }
 .account-dialog p { white-space: pre-line; overflow-wrap: anywhere; }
 .account-actions { display: flex; flex-wrap: wrap; }
+.guest-home-limit-card { background: var(--card); border-radius: 8px; padding: 16px; margin: 9px 0; }
+.guest-home-limit-card h3 { margin: 0 0 8px; font-size: 1rem; }
+.guest-home-limit-card p { margin: 0 0 12px; }
+.guest-home-limit-card p + p { color: var(--muted); font-size: .875rem; }
+.guest-home-limit-card .account-actions { gap: 8px; }
 .account-settings-shortcuts { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
 .account-settings-shortcuts:has(button:not([hidden])) { margin-bottom: 8px; }
 .account-settings-shortcuts:not(:has(button:not([hidden]))) { display: none; }
