@@ -423,6 +423,9 @@
   function mount() {
     const reload = document.getElementById("accountReloadButton");
     reload.hidden = !active();
+    const accountSettings = document.getElementById("accountSettingsButton");
+    accountSettings.hidden = !active();
+    accountSettings.addEventListener("click", () => { bridge.closeSettings(); open(); });
     reload.addEventListener("click", async () => {
       if (!active() || reload.disabled) return;
       reload.disabled = true;
@@ -867,18 +870,30 @@
       text(status, "Password changed.");
     });
   }
-  function blockForm() {
+  async function blockForm() {
     clear();
     const name = field("Username");
     action("Block", main, async () => {
       await request("/blocks", { username: name.value, blocked: true });
       await sync(true);
       text(status, "User blocked.");
+      await refreshBlocked();
     });
     action("Unblock", main, async () => {
       await request("/blocks", { username: name.value, blocked: false });
       text(status, "User unblocked.");
+      await refreshBlocked();
     });
+    element("h4", "Blocked accounts", main);
+    const list = element("ul", "", main, {class: "blocked-accounts"});
+    async function refreshBlocked() {
+      const result = await request("/blocks");
+      if (!list.isConnected) return;
+      list.replaceChildren();
+      for (const user of result.users) element("li", "@" + user.username, list, {"data-no-translate": ""});
+      if (!result.users.length) element("li", "No blocked accounts.", list);
+    }
+    await refreshBlocked();
   }
   const warning =
     "Recipients can save, screenshot, or reshare their copy. Deleting your account does not delete their copy. Get permission before sharing someone else's schedule.";

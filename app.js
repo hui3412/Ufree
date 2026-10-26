@@ -5589,6 +5589,7 @@ const SYNC_URL = 'https://youfree.ca';
         canNotify: () => ![...document.querySelectorAll(".modal-backdrop")].some(modal=>!modal.hidden),
         openImport: () => openQuickCodePanel("import"),
         openExport: () => openQuickCodePanel("export"),
+        closeSettings: closeSettingsModal,
         exportPicker: cloudExportPicker,
         reload: async () => {
           if (state.isParsing || state.pendingImage || state.codeMode) return;

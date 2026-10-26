@@ -224,6 +224,35 @@ test("one send click verifies the recipient, prevents duplicate taps and reports
     assert.equal(a.calls.filter(c=>c.url.endsWith('/deliveries') && c.options.body).length,sent);
   } finally { await a.close(); }
 });
+test("Account Settings shortcut closes Settings and opens the existing Account menu",async()=>{
+ const a=await app({account:true});try{
+ a.el('mobileMenuButton').click();a.el('settingsButton').click();
+ assert.equal(a.el('settingsModal').hidden,false);
+ assert.equal(a.el('accountSettingsButton').hidden,false);
+ assert.equal(a.el('accountSettingsButton').previousElementSibling.id,'accountReloadButton');
+ a.el('accountSettingsButton').click();
+ assert.equal(a.el('settingsModal').hidden,true);
+ assert.equal(a.w.document.querySelector('.account-dialog').open,true);
+ assert.ok(a.el('accountMenuButton'));
+ }finally{await a.close();}
+});
+test("block controls show the blocked list and refresh it after blocking or unblocking",async()=>{
+ let blocked=[{username:"David"}];
+ const a=await app({account:true,handler:(path,options)=>{
+  if(path!=="/blocks")return;
+  if(options.body){const data=JSON.parse(options.body);blocked=data.blocked?[{username:data.username}]:[];return {ok:true};}
+  return {users:blocked};
+ }});
+ try{
+ a.el('mobileMenuButton').click();a.el('accountMenuButton').click();buttonWith(a.w,'Block or unblock a username').click();
+ await settle(()=>a.w.document.querySelector('.blocked-accounts')?.textContent.includes('@David'));
+ a.w.document.querySelector('.account-dialog input').value='David';buttonWith(a.w,'Unblock').click();
+ await settle(()=>a.w.document.querySelector('.blocked-accounts').textContent==='No blocked accounts.');
+ buttonWith(a.w,'Block').click();
+ await settle(()=>a.w.document.querySelector('.blocked-accounts').textContent==='@David');
+ a.w.UFreeI18n.setLanguage('fr');assert.equal(a.w.document.querySelector('.blocked-accounts').textContent,'@David');
+ }finally{await a.close();}
+});
 test("signed-in Export opens cloud sharing with Offline Sharing in its options", async () => {
  const a=await app({account:true});try{
  a.el('mobileMenuButton').click();a.el('homeExportButton').click();

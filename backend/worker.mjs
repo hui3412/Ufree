@@ -719,6 +719,11 @@ export default {
         );
         return respond({ ok: true });
       }
+      if (path === "/blocks" && request.method === "GET") {
+        return respond({ users: await rows(db,
+          "SELECT u.username FROM blocks b JOIN users u ON u.id=b.blocked_id WHERE b.user_id=? ORDER BY u.username COLLATE NOCASE",
+          user.id) });
+      }
       if (path === "/blocks" && input) {
         const target = await one(
           db,
