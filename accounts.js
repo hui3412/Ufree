@@ -231,7 +231,7 @@
       focusBefore = bridge.prepareDialog();
       sharing();
       panel.showModal();
-      focusAccountHeading();
+      document.activeElement?.blur();
     },
     isLive: (name) => liveNames.has(name),
     friendNote: (name) => friendNote(liveNames.get(name)?.username || ""),
@@ -361,13 +361,7 @@
     focusBefore = bridge.prepareDialog();
     render();
     panel.showModal();
-    if (active()) focusAccountHeading();
-    else main.querySelector('input[autocomplete="username"]')?.focus({preventScroll: true});
-  }
-  function focusAccountHeading() {
-    const heading = document.getElementById("accountDialogTitle");
-    heading.tabIndex = -1;
-    heading.focus({preventScroll: true});
+    document.activeElement?.blur();
   }
   function clear() {
     panel.querySelector(".cloud-sharing-heading")?.remove();
@@ -466,7 +460,7 @@
         if (!active()) return;
         focusBefore = bridge.prepareDialog();
         panel.showModal();
-        focusAccountHeading();
+        document.activeElement?.blur();
         return followingForm();
       });
       friends.id = "friendsMenuButton";

@@ -930,9 +930,7 @@ const SYNC_URL = 'https://youfree.ca';
     requestAnimationFrame(() => {
       animateModalOpen(els.settingsModal, els.settingsModal.querySelector(".settings-modal"));
       animateSettingsContent();
-      const title = document.getElementById("settingsModalTitle");
-      title.tabIndex = -1;
-      title.focus({preventScroll: true});
+      document.activeElement?.blur();
     });
   }
 
@@ -3479,9 +3477,7 @@ const SYNC_URL = 'https://youfree.ca';
     els.helpModal.hidden = false;
     document.body.style.overflow = "hidden";
     els.helpModal.querySelector(".help-modal").scrollTop = 0;
-    const title = document.getElementById("helpTitle");
-    title.tabIndex = -1;
-    title.focus({preventScroll: true});
+    document.activeElement?.blur();
   }
 
   function closeHelp() {

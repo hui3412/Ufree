@@ -259,7 +259,7 @@ test("signed-in Export opens cloud sharing with Offline Sharing in its options",
  assert.equal(a.el('mobileMenuButton').getAttribute('aria-expanded'),'false');
  assert.equal(a.w.document.querySelector('.account-dialog').open,true);
  assert.ok(a.w.document.querySelector('.cloud-sharing-heading'));
- assert.equal(a.w.document.activeElement.id,'accountDialogTitle');
+ assert.equal(a.w.document.activeElement,a.w.document.body);
  const menu=a.w.document.querySelector('.cloud-sharing-heading details');
  assert.equal(menu.open,false);menu.querySelector('summary').click();
  a.w.UFreeI18n.setLanguage('fr');buttonWith(a.w,'Partage hors ligne').click();
