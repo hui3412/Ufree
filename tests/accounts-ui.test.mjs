@@ -260,7 +260,7 @@ test("account search caps results and sends no friend request before explicit co
   });
   try {
     a.el("mobileMenuButton").click();
-    a.el("accountMenuButton").click();
+    a.el("friendsMenuButton").click();
     buttonWith(a.w, "Find accounts").click();
     a.w.document.querySelector(".account-dialog input").value = "fictional";
     buttonWith(a.w, "Search accounts").click();
@@ -771,7 +771,7 @@ test('accepting a friend request automatically puts @username in the main list w
   if(path==='/connections')return {connections:mutual?[{id:'pair',username:'test2',status:'accepted',direction:'incoming'}]:[]};
  }});
  try{
- a.el('mobileMenuButton').click();a.el('accountMenuButton').click();buttonWith(a.w,'Find accounts').click();a.w.document.querySelector('.account-dialog input').value='test2';buttonWith(a.w,'Search accounts').click();
+ a.el('mobileMenuButton').click();a.el('friendsMenuButton').click();buttonWith(a.w,'Find accounts').click();a.w.document.querySelector('.account-dialog input').value='test2';buttonWith(a.w,'Search accounts').click();
  await settle(()=>buttonWith(a.w,'Accept friend request'));buttonWith(a.w,'Accept friend request').click();buttonWith(a.w,'Confirm').click();
  await settle(()=>a.el('peopleList').textContent.includes('@test2'));
  assert.deepEqual(JSON.parse(JSON.stringify(a.w.UFreeAccounts.read().data.people['@test2'])),friend);

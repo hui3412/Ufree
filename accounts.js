@@ -545,7 +545,6 @@
     );
     const controls = element("div", "", main, { class: "account-actions" });
     action("Refresh sync", controls, () => sync(true));
-    action("Find accounts", controls, searchAccounts);
     action("Your personal schedule", controls, personalForm);
     action("Inbox", controls, () => inbox(true));
     action("Change password", controls, passwordForm);
