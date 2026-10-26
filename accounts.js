@@ -588,7 +588,6 @@
     action("Your personal schedule", controls, personalForm);
     action("Inbox", controls, () => inbox(true));
     action("Change password", controls, passwordForm);
-    action("Sign in again", controls, () => authForm(false));
     action("Block or unblock a username", controls, blockForm);
     action("Delete account", controls, deleteAccountForm).className = "danger-button";
     action("Sign out", controls, async () => {
