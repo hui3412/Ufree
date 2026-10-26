@@ -259,6 +259,7 @@ test("signed-in Export opens cloud sharing with Offline Sharing in its options",
  assert.equal(a.el('mobileMenuButton').getAttribute('aria-expanded'),'false');
  assert.equal(a.w.document.querySelector('.account-dialog').open,true);
  assert.ok(a.w.document.querySelector('.cloud-sharing-heading'));
+ assert.equal(a.w.document.activeElement.id,'accountDialogTitle');
  const menu=a.w.document.querySelector('.cloud-sharing-heading details');
  assert.equal(menu.open,false);menu.querySelector('summary').click();
  a.w.UFreeI18n.setLanguage('fr');buttonWith(a.w,'Partage hors ligne').click();
@@ -673,7 +674,7 @@ test("sign-in form merges the phone schedules before uploading and retains downl
  try {
   a.el('mobileMenuButton').click();a.el('accountMenuButton').click();
   const fields=a.w.document.querySelectorAll('.account-dialog input');fields[0].value='fictional_user';fields[1].value='a long test password';
-  buttonWith(a.w,'Sign in').click();
+  fields[1].dispatchEvent(new a.w.KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true}));
   await settle(()=>JSON.parse(a.w.localStorage.getItem('whos-free-local-schedules')).data.people.Remote);
   const phone=JSON.parse(a.w.localStorage.getItem('whos-free-local-schedules')).data.people;
   assert.ok(phone.Original);assert.ok(phone.Remote);
