@@ -377,8 +377,6 @@
       required: "",
       ...(type === "password"
         ? {
-            minlength: "12",
-            maxlength: "128",
             autocomplete: "current-password",
           }
         : {}),
@@ -681,6 +679,11 @@
     password.value = credentials.password || "";
     username.autocomplete = "username";
     password.autocomplete = signup ? "new-password" : "current-password";
+    const confirmation = signup ? field("Confirm password", "password") : null;
+    if (confirmation) {
+      confirmation.autocomplete = "new-password";
+      element("p", "A longer, unique password is recommended.", main);
+    }
     username.pattern = "[A-Za-z0-9_]{3,24}";
     username.maxLength = 24;
     element("p", "Usernames are not case-sensitive: David and david are the same account.", main);
@@ -737,6 +740,8 @@
           password.reportValidity();
           return;
         }
+        if (signup && (!confirmation.reportValidity() || confirmation.value !== password.value))
+          throw Error("Passwords do not match.");
         if (signup && !school.requireSelection())
           throw Error("Select a CEGEP or college from the list.");
         if (

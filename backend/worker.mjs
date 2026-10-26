@@ -55,10 +55,9 @@ function credentials(body) {
     fail("Use 3–24 letters, numbers or underscores for the username.");
   if (
     typeof body.password !== "string" ||
-    body.password.length < 12 ||
-    body.password.length > 128
+    !body.password.length
   )
-    fail("Use a password with 12–128 characters.");
+    fail("Enter a password.");
   return body.username.toLowerCase();
 }
 export function validatePeople(people) {
@@ -343,7 +342,7 @@ export default {
           typeof input.username !== "string" ||
           !/^[A-Za-z0-9_]{3,24}$/.test(input.username) ||
           typeof input.password !== "string" ||
-          input.password.length > 128
+          !input.password.length
         )
           fail("Incorrect username or password.", 401);
         const username = input.username.toLowerCase();
@@ -423,7 +422,7 @@ export default {
         return respond({ ok: true });
       }
       if (path === "/auth/delete" && input) {
-        if (typeof input.currentPassword !== "string" || !input.currentPassword.length || input.currentPassword.length > 128)
+        if (typeof input.currentPassword !== "string" || !input.currentPassword.length)
           fail("Current password required.");
         if (typeof input.confirmUsername !== "string" || input.confirmUsername.trim().toLowerCase() !== user.username.toLowerCase())
           fail("Type your username to confirm account deletion.");
@@ -447,7 +446,7 @@ export default {
       if (path === "/auth/password" && input) {
         if (
           typeof input.currentPassword !== "string" ||
-          input.currentPassword.length > 128
+          !input.currentPassword.length
         )
           fail("Current password required.");
         await loginGate(db, [`password:${user.id}`]);

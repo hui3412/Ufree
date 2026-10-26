@@ -728,6 +728,17 @@ test('failed account deletion keeps identity and phone data, clears the password
 });
 
 const signupField=(w,label)=>[...w.document.querySelectorAll('.account-dialog label')].find(n=>w.UFreeI18n.sourceText(n.firstChild)===label)?.querySelector('input,select');
+test('signup requires matching confirmation but accepts one-character passwords',async()=>{
+ const a=await app();try{
+ a.el('mobileMenuButton').click();a.el('accountMenuButton').click();buttonWith(a.w,'Create account').click();
+ signupField(a.w,'Username').value='short_user';signupField(a.w,'Password').value='1';signupField(a.w,'Confirm password').value='2';
+ buttonWith(a.w,'Create account').click();await settle(()=>a.w.document.querySelector('.account-dialog').textContent.includes('Passwords do not match.'));
+ assert.equal(a.calls.length,0);
+ signupField(a.w,'Confirm password').value='1';
+ assert.equal(signupField(a.w,'Password').checkValidity(),true);
+ assert.equal(signupField(a.w,'Confirm password').checkValidity(),true);
+ }finally{await a.close();}
+});
 test('switching between sign-in and signup preserves entered credentials without persisting them',async()=>{
  const a=await app();try{
  a.el('mobileMenuButton').click();a.el('accountMenuButton').click();
@@ -762,7 +773,7 @@ test('expandable college chooser filters accents, selects Marianopolis and prese
 });
 test('typing or forging a college cannot submit signup and an empty search shows helpful feedback',async()=>{
  const a=await signupPicker();try{
- signupField(a.w,'Username').value='new_owner';signupField(a.w,'Password').value='fictional-password-123';a.w.document.querySelector('.account-dialog input[type="checkbox"]').checked=true;
+ signupField(a.w,'Username').value='new_owner';signupField(a.w,'Password').value='fictional-password-123';signupField(a.w,'Confirm password').value='fictional-password-123';a.w.document.querySelector('.account-dialog input[type="checkbox"]').checked=true;
  a.el('cegepSearch').value='Ahuntsic';buttonWith(a.w,'Create account').click();await new Promise(r=>setTimeout(r,10));assert.equal(a.calls.length,0);assert.equal(a.el('schoolChooser').open,true);
  a.el('selectedCegep').value='forged-school';buttonWith(a.w,'Create account').click();await new Promise(r=>setTimeout(r,10));assert.equal(a.calls.length,0);
  a.el('cegepSearch').value='no such college 9876';buttonWith(a.w,'Search').click();assert.equal(a.el('cegepResults').children.length,0);
@@ -773,7 +784,7 @@ test('signup sends the selected college ID after switching languages without los
  const a=await app({handler:path=>path==='/auth/signup'?{user:{...user,school:'Marianopolis College',personalSchedule:'Original'},token:'b'.repeat(64)}:undefined});
  try{
  a.el('mobileMenuButton').click();a.el('accountMenuButton').click();buttonWith(a.w,'Create account').click();
- signupField(a.w,'Username').value='new_owner';signupField(a.w,'Password').value='fictional-password-123';
+ signupField(a.w,'Username').value='new_owner';signupField(a.w,'Password').value='fictional-password-123';signupField(a.w,'Confirm password').value='fictional-password-123';
  const personal=signupField(a.w,'Your personal schedule');personal.value='Original';
  const consent=a.w.document.querySelector('.account-dialog input[type="checkbox"]');consent.checked=true;
  a.w.document.querySelector('[data-school-id="marianopolis"]').click();a.w.UFreeI18n.setLanguage('fr');

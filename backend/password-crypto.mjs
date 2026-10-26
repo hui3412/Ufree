@@ -9,7 +9,7 @@ export class PasswordCrypto extends DurableObject {
     this.pending = Promise.resolve();
   }
   async derive(password, salt) {
-    if (typeof password !== 'string' || password.length > 128 ||
+    if (typeof password !== 'string' || !password.length ||
         typeof salt !== 'string' || !/^[a-f0-9]{64}$/.test(salt))
       throw Error('Invalid password derivation input.');
     const task = this.pending.then(() => passwordHash(password, salt));
