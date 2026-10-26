@@ -973,6 +973,7 @@
     const generatedBox = element("div", "", main, {hidden: ""});
     const output = element("textarea", "", generatedBox, {readonly: "", "aria-label": "Cloud link and code", rows: "4"});
     const expiry = element("p", "", generatedBox);
+    element("p", "or", main, { class: "cloud-sharing-alternative" });
     const recipient = field("Recipient username", "text", recipientUsername);
     formButton("Send by username", async () => {
       try {

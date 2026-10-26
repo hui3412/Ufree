@@ -1,6 +1,7 @@
 // Presentation catalogue. Never translate saved schedules or transport payloads.
 window.UFreeFrench = {
   "exact": {
+    "or": "ou",
     "Maximum limit of schedules reached.": "Nombre maximal d’horaires atteint.",
     "Create an account to get unlimited slots.": "Créez un compte pour afficher un nombre illimité d’horaires.",
     "All your schedules are still saved on this device. View or delete them in Schedules.": "Tous vos horaires restent enregistrés sur cet appareil. Consultez-les ou supprimez-les dans Horaires.",
