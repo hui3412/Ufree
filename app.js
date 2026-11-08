@@ -34,7 +34,7 @@ const SYNC_URL = 'https://youfree.ca';
 
   function guestHomeLimited() {
     // Do not restrict deployments where account creation is unavailable.
-    return Boolean(window.UFreeAccounts?.uiEnabled !== false && window.UFreeAccounts && !window.UFreeAccounts.active());
+    return Boolean(window.UFreeAccounts && !window.UFreeAccounts.active());
   }
 
   function homePeople() {
@@ -5311,7 +5311,7 @@ const SYNC_URL = 'https://youfree.ca';
     });
     els.scheduleDataButton.addEventListener("click", openScheduleModal);
     els.homeExportButton.addEventListener("click", event => {
-      if (window.UFreeAccounts?.uiEnabled !== false && window.UFreeAccounts?.active()) window.UFreeAccounts.openSharing();
+      if (window.UFreeAccounts?.active()) window.UFreeAccounts.openSharing();
       else openQuickCodePanel("export", event);
     });
     els.homeImportButton?.addEventListener("click", event => openQuickCodePanel("import", event));

@@ -1,7 +1,5 @@
 (() => {
   "use strict";
-  // Re-enable account controls by changing this flag to true.
-  const ACCOUNT_UI_ENABLED = false;
   const API = "https://youfreetest.huien3412.workers.dev";
   // Deliberately disabled outside the test GitHub Pages project and local development.
   if (
@@ -236,10 +234,8 @@
   setupEngine();
   window.UFreeAccounts = {
     active,
-    uiEnabled: ACCOUNT_UI_ENABLED,
     prefix,
     openAuth: (signup = false) => {
-      if (!ACCOUNT_UI_ENABLED) return;
       if (!ready) return;
       focusBefore = bridge.prepareDialog();
       authForm(signup);
@@ -247,7 +243,6 @@
       document.activeElement?.blur();
     },
     openSharing: () => {
-      if (!ACCOUNT_UI_ENABLED) return;
       if (!active()) return;
       focusBefore = bridge.prepareDialog();
       sharing();
@@ -382,7 +377,6 @@
     focusBefore?.focus?.();
   }
   function open() {
-    if (!ACCOUNT_UI_ENABLED) return;
     focusBefore = bridge.prepareDialog();
     render();
     panel.showModal();
@@ -447,9 +441,9 @@
   }
   function mount() {
     const reload = document.getElementById("accountReloadButton");
-    reload.hidden = !ACCOUNT_UI_ENABLED || !active();
+    reload.hidden = !active();
     const accountSettings = document.getElementById("accountSettingsButton");
-    accountSettings.hidden = !ACCOUNT_UI_ENABLED || !active();
+    accountSettings.hidden = !active();
     accountSettings.addEventListener("click", () => { bridge.closeSettings(); open(); });
     reload.addEventListener("click", async () => {
       if (!active() || reload.disabled) return;
@@ -478,17 +472,15 @@
       open,
     );
     button.id = "accountMenuButton";
-    button.hidden = !ACCOUNT_UI_ENABLED;
     if (active()) {
       const friends = action("", nav.querySelector(".header-actions"), () => {
-        if (!ACCOUNT_UI_ENABLED || !active()) return;
+        if (!active()) return;
         focusBefore = bridge.prepareDialog();
         panel.showModal();
         document.activeElement?.blur();
         return followingForm();
       });
       friends.id = "friendsMenuButton";
-      friends.hidden = !ACCOUNT_UI_ENABLED;
       friends.classList.add("header-data-button");
       friends.setAttribute("aria-haspopup", "dialog");
       const icon = document.getElementById("viewToggleButton")?.querySelector("svg");
@@ -1408,7 +1400,6 @@
   }
 
   async function cloudHash() {
-    if (!ACCOUNT_UI_ENABLED) return;
     if (!ready || !location.hash.startsWith("#cloud=")) return;
     try {
       await window.UFreeAccounts.receive(location.href);
